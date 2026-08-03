@@ -1,5 +1,5 @@
 # ============================================================
-# Publish the app to GitHub Pages at https://app.aibhlinn.ai
+# Publish the app to GitHub Pages at https://pietimers.aibhlinn.ai
 #
 # Only the app/ folder is uploaded. supabase/ stays in the repo but is
 # never served — the SQL and edge functions hold no secrets, but there
