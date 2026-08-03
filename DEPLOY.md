@@ -1,6 +1,6 @@
 # Deploying Pie Timers
 
-Target: **https://app.aibhlinn.ai**, served from GitHub Pages out of
+Target: **https://pietimers.aibhlinn.ai**, served from GitHub Pages out of
 `AibhlinnAI/pie-timers-app`.
 
 Work through this in order. Steps 1–4 get the app live. Steps 5–8 turn on the
@@ -68,16 +68,24 @@ The first deploy runs automatically on push. Watch it in the **Actions** tab.
 
 ## 3. Point the domain
 
-At whoever hosts DNS for `aibhlinn.ai`, add:
+DNS for `aibhlinn.ai` is on Cloudflare. Add:
 
-| Type | Name | Value |
-| --- | --- | --- |
-| CNAME | `app` | `aibhlinnai.github.io` |
+| Type | Name | Target | Proxy |
+| --- | --- | --- | --- |
+| CNAME | `pietimers` | `aibhlinnai.github.io` | **DNS only (grey cloud)** |
 
-Note the trailing behaviour: the value is the *user* domain
-(`aibhlinnai.github.io`), **not** the repo URL.
+Two things that are easy to get wrong here, and both fail quietly:
 
-Then repo → **Settings → Pages → Custom domain** → `app.aibhlinn.ai` → Save.
+- The target is the **user** domain `aibhlinnai.github.io` — not the repo URL,
+  and note the `ai` on the end of `aibhlinnai`. A typo still resolves, because
+  every `*.github.io` shares the same four IP addresses, so the record looks
+  healthy while the domain never verifies.
+- Leave the proxy **grey**. Orange-clouded, GitHub cannot validate the domain
+  and the certificate stays pending forever, which looks like a GitHub fault.
+  You can enable the proxy later, but then Cloudflare's SSL/TLS mode must be
+  Full (strict) or you get a redirect loop.
+
+Then repo → **Settings → Pages → Custom domain** → `pietimers.aibhlinn.ai` → Save.
 `app/CNAME` already contains this, so it survives every redeploy.
 
 Wait for the DNS check to go green, then tick **Enforce HTTPS**. This can take
@@ -86,7 +94,7 @@ the service worker will not register and push notifications cannot work at all.
 
 ## 4. Check it
 
-Open **https://app.aibhlinn.ai/diagnostics.html**.
+Open **https://pietimers.aibhlinn.ai/diagnostics.html**.
 
 At this point expect: secure context PASS, legal pages PASS, Supabase N/A.
 That is a correct result for an app with no backend yet.
@@ -111,8 +119,8 @@ Run the SQL from `supabase/`, in this order:
 
 Deploy the six edge functions, then set **Authentication → URL Configuration**:
 
-- Site URL: `https://app.aibhlinn.ai`
-- Redirect URLs: `https://app.aibhlinn.ai/**`
+- Site URL: `https://pietimers.aibhlinn.ai`
+- Redirect URLs: `https://pietimers.aibhlinn.ai/**`
 
 Sign-in links silently fail to return if this does not match. It is the most
 common cause of "the email arrived but clicking it does nothing".
@@ -141,8 +149,8 @@ which catches the common mistake of pasting the private one.
 
 Paddle will ask for your terms and privacy URLs during seller verification:
 
-- https://app.aibhlinn.ai/terms.html
-- https://app.aibhlinn.ai/privacy.html
+- https://pietimers.aibhlinn.ai/terms.html
+- https://pietimers.aibhlinn.ai/privacy.html
 
 Both are already linked from the footer of every page, which is what they check
 for.
