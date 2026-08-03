@@ -220,11 +220,20 @@
         'local-only: no accounts, no sync, no push.');
       return Promise.resolve(false);
     }
-    return get(cfg.supabaseUrl + '/rest/v1/', { headers: anonHeaders() })
+    /* Probe a real table, not the PostgREST root. The root answers 401
+       to a publishable key even when everything is healthy, so checking
+       it reported a broken project that was working perfectly. */
+    return get(cfg.supabaseUrl + '/rest/v1/timer_profiles?select=id&limit=1',
+               { headers: anonHeaders() })
       .then(function (res) {
         if (res.status === 401 || res.status === 403) {
-          done('fail', 'Rejected the anon key (HTTP ' + res.status +
-            '). Copy it again from Project Settings → API.');
+          done('fail', 'Rejected the key (HTTP ' + res.status +
+            '). Copy it again from Project Settings → API Keys.');
+          return false;
+        }
+        if (res.status === 404) {
+          done('fail', 'Project answers, but the schema is not applied. ' +
+            'Run the SQL files in order — see DEPLOY.md.');
           return false;
         }
         if (!res.ok) { done('fail', 'HTTP ' + res.status + ' from PostgREST.'); return false; }
@@ -446,10 +455,20 @@
       .then(function (up) {
         if (!up) return;
         return checkAuthSettings()
-          .then(function () { return checkTable('profiles', 'schema.sql'); })
+          /* Names checked against the applied schema. Two were wrong here
+             until the database existed to contradict them: the profile
+             table is timer_profiles, and billing lives in subscriptions,
+             not entitlements. A check that names a table you never
+             created reports a failure that no amount of fixing clears. */
+          .then(function () { return checkTable('timer_profiles', 'schema.sql'); })
           .then(function () { return checkTable('push_subscriptions', 'schema.sql'); })
-          .then(function () { return checkTable('entitlements', 'schema-billing.sql'); })
+          .then(function () { return checkTable('notification_log', 'schema.sql'); })
+          .then(function () { return checkTable('subscriptions', 'schema-billing.sql'); })
+          .then(function () { return checkTable('billing_events', 'schema-billing.sql'); })
           .then(function () { return checkTable('access_codes', 'schema-access-codes.sql'); })
+          .then(function () { return checkTable('code_redemptions', 'schema-access-codes.sql'); })
+          .then(function () { return checkTable('code_attempts', 'schema-access-codes.sql'); })
+          .then(function () { return checkTable('signin_attempts', 'schema-ratelimit.sql'); })
           .then(function () { return checkTable('calendar_feeds', 'schema-calendar.sql'); })
           .then(function () { return checkTable('calendar_events', 'schema-calendar.sql'); })
           .then(function () { return checkFunction('signin', 'Needed for rate-limited magic links.'); })

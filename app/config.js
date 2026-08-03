@@ -23,8 +23,11 @@ window.CT.config = {
   /* Project Settings → API → Project URL, e.g. https://abcdefgh.supabase.co */
   supabaseUrl: 'https://tgapmpbcqqnpsldehuqa.supabase.co',
 
-  /* Project Settings → API → Project API keys → anon / public */
-  supabaseAnonKey: '',
+  /* Project Settings → API Keys → Publishable key (formerly anon/public).
+     Public by design: it identifies the project, it does not grant access.
+     What protects the data is row-level security, verified live — every
+     table returns nothing to a request without a session. */
+  supabaseAnonKey: 'sb_publishable_WZqsLnw3OPfo6z_ou0GaYg_B8_HuNG0',
 
   /* Public VAPID key from your Web Push key pair. Required only for
      background push notifications. See README for how to generate it. */
