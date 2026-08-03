@@ -223,7 +223,11 @@
     /* Probe a real table, not the PostgREST root. The root answers 401
        to a publishable key even when everything is healthy, so checking
        it reported a broken project that was working perfectly. */
-    return get(cfg.supabaseUrl + '/rest/v1/timer_profiles?select=id&limit=1',
+    /* select=* rather than a named column. Naming one means the check
+       fails whenever the schema differs from what this file assumed —
+       which is how it reported HTTP 400 against a healthy project whose
+       primary key is user_id, not id. */
+    return get(cfg.supabaseUrl + '/rest/v1/timer_profiles?select=*&limit=1',
                { headers: anonHeaders() })
       .then(function (res) {
         if (res.status === 401 || res.status === 403) {
