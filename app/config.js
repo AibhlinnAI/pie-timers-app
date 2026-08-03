@@ -21,7 +21,7 @@ window.CT.config = {
   privacyUrl: 'privacy.html',
 
   /* Project Settings → API → Project URL, e.g. https://abcdefgh.supabase.co */
-  supabaseUrl: '',
+  supabaseUrl: 'https://tgapmpbcqqnpsldehuqa.supabase.co',
 
   /* Project Settings → API → Project API keys → anon / public */
   supabaseAnonKey: '',
