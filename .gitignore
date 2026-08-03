@@ -1,0 +1,33 @@
+# ── Secrets ───────────────────────────────────────────────────────
+# This repo is public. Nothing in these files may ever be committed:
+# the VAPID private key, the Supabase service-role key, the Paddle
+# webhook secret, the Turnstile secret, the Google client secret.
+# They belong only in Supabase → Edge Functions → Secrets.
+.env
+.env.*
+*.secret
+*secrets*
+supabase/.temp/
+supabase/.branches/
+
+# ── Not for a public repo ─────────────────────────────────────────
+# The original workbook. It is the source this app came from and it
+# contains a real weekly schedule — which is personal information, and
+# the exact category of data this app promises to keep private. Keep
+# your copy locally; publishing it would be an odd first act for a
+# privacy policy that says schedules are yours.
+Countdown Timers.xlsx
+
+# Local Claude Code tool permissions. Harmless, but it is machine
+# config, and it spells out the absolute path of your Drive folder.
+.claude/
+
+# ── Working files ─────────────────────────────────────────────────
+*.bak
+*.tmp
+~$*
+.~lock.*#
+
+# ── Windows / Google Drive noise ──────────────────────────────────
+desktop.ini
+Thumbs.db

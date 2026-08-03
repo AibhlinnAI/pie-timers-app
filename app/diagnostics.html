@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diagnostics — Pie Timers</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+
+<!-- ============================================================
+     Live service checks.
+
+     Everything here runs in the browser against whatever config.js
+     currently points at, using only the anon key — which is public by
+     design. There are no secrets on this page and nothing it does is
+     destructive: no writes, no emails sent, no checkout opened.
+
+     Deploy it, open it, read the reds. Delete it before launch if you
+     would rather it were not public; it exposes nothing, but it does
+     tell a stranger which services you use.
+     ============================================================ -->
+
+<style>
+  .diag-list{ list-style:none; margin:18px 0 0; padding:0; }
+  .diag-item{
+    display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
+    padding:12px 0; border-bottom:1px solid var(--line);
+  }
+  .diag-badge{
+    grid-row:1 / span 2; align-self:start;
+    min-width:74px; text-align:center;
+    padding:3px 8px; border-radius:6px;
+    font-size:.72rem; font-weight:700; letter-spacing:.04em;
+  }
+  .diag-name{ font-weight:600; }
+  .diag-detail{ font-size:.86rem; color:var(--ink-muted); line-height:1.55; }
+  .diag-detail code{ font-size:.82rem; word-break:break-all; }
+
+  /* Fixed colours in both themes: a pass must never read as a fail
+     because someone switched the theme. Contrast checked against both. */
+  .is-pass{ background:#1E5631; color:#EAF7EE; }
+  .is-fail{ background:#8C1D2E; color:#FFECEF; }
+  .is-warn{ background:#8A5200; color:#FFF3DF; }
+  .is-skip{ background:#3F3A46; color:#E6E1EA; }
+  .is-busy{ background:#3F3A46; color:#E6E1EA; }
+
+  .diag-summary{ margin:16px 0 0; font-size:.92rem; }
+  .diag-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+</style>
+</head>
+<body class="legal-page">
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="15" fill="#32493C"/>
+      <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+    </svg>
+    <div class="brand-text">
+      <h1>Pie Timers</h1>
+      <p>Diagnostics</p>
+    </div>
+  </div>
+</header>
+
+<main class="legal">
+  <p class="legal-meta"><a href="index.html">Back to the app</a></p>
+
+  <p>Read-only checks against the services in <code>config.js</code>. Nothing here
+  writes data, sends an email, or opens a checkout. Safe to run any time,
+  including in production.</p>
+
+  <div class="diag-actions">
+    <button class="btn btn-primary" type="button" id="runBtn">Run the checks</button>
+    <button class="btn btn-ghost" type="button" id="copyBtn">Copy results as text</button>
+  </div>
+
+  <p class="diag-summary" id="summary" role="status" aria-live="polite"></p>
+  <ul class="diag-list" id="results"></ul>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var cfg = (window.CT && window.CT.config) || {};
+  var listEl = document.getElementById('results');
+  var summaryEl = document.getElementById('summary');
+  var rows = [];
+
+  /* ── Reporting ─────────────────────────────────────────────────── */
+
+  var LABEL = { pass:'PASS', fail:'FAIL', warn:'CHECK', skip:'N/A', busy:'…' };
+
+  function row(name) {
+    var li = document.createElement('li');
+    li.className = 'diag-item';
+
+    var badge = document.createElement('span');
+    badge.className = 'diag-badge is-busy';
+    badge.textContent = LABEL.busy;
+
+    var title = document.createElement('span');
+    title.className = 'diag-name';
+    title.textContent = name;
+
+    var detail = document.createElement('span');
+    detail.className = 'diag-detail';
+
+    li.appendChild(badge);
+    li.appendChild(title);
+    li.appendChild(detail);
+    listEl.appendChild(li);
+
+    var record = { name:name, state:'busy', detail:'' };
+    rows.push(record);
+
+    return function (state, text) {
+      badge.className = 'diag-badge is-' + state;
+      badge.textContent = LABEL[state];
+      detail.textContent = text || '';
+      record.state = state;
+      record.detail = text || '';
+      tally();
+    };
+  }
+
+  function tally() {
+    var counts = { pass:0, fail:0, warn:0, skip:0, busy:0 };
+    rows.forEach(function (r) { counts[r.state]++; });
+    if (counts.busy) { summaryEl.textContent = 'Running…'; return; }
+    summaryEl.textContent =
+      counts.pass + ' passed, ' + counts.fail + ' failed, ' +
+      counts.warn + ' to check, ' + counts.skip + ' not applicable.' +
+      (counts.fail ? ' Fix the failures before taking payment.' : '');
+  }
+
+  /* A fetch that never hangs the page. A service that is down usually
+     stalls rather than refusing, so a timeout is the honest signal. */
+  function get(url, options, ms) {
+    var opts = options || {};
+    if (typeof AbortController === 'function') {
+      var ctrl = new AbortController();
+      opts.signal = ctrl.signal;
+      setTimeout(function () { ctrl.abort(); }, ms || 10000);
+    }
+    return fetch(url, opts);
+  }
+
+  function anonHeaders() {
+    return { apikey: cfg.supabaseAnonKey,
+             Authorization: 'Bearer ' + cfg.supabaseAnonKey };
+  }
+
+  /* ── The checks ────────────────────────────────────────────────── */
+
+  function checkPageContext() {
+    var done = row('Secure context');
+    var https = location.protocol === 'https:';
+    var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (https || local) {
+      done('pass', 'Served over ' + location.protocol +
+        ' — service workers and push are permitted here.');
+    } else if (location.protocol === 'file:') {
+      done('warn', 'Opened from a file. Service workers, push and sign-in ' +
+        'redirects will not work. Deploy it and run this page again.');
+    } else {
+      done('fail', 'Not HTTPS. Push notifications and the service worker are ' +
+        'blocked by the browser, and sign-in links will not return correctly.');
+    }
+  }
+
+  function checkSupportEmail() {
+    var done = row('Support address');
+    var email = cfg.supportEmail || '';
+    if (!email) {
+      done('fail', 'Not set. The terms, the privacy policy and the hardship ' +
+        'link in the app all have nowhere to point.');
+    } else if (/\.example$|@example\./i.test(email)) {
+      done('fail', 'Still the placeholder (' + email + '). It is printed in ' +
+        'your terms and privacy policy and shown to customers.');
+    } else if (/@(gmail|outlook|hotmail|yahoo|icloud)\./i.test(email)) {
+      done('warn', email + ' is a personal mailbox. It works, but it will be ' +
+        'scraped once published and you cannot hand it over or rotate it later.');
+    } else {
+      done('pass', email);
+    }
+  }
+
+  function checkLegalPage(file, label) {
+    var done = row(label);
+    return get(file, { cache:'no-store' }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    }).then(function (text) {
+      /* Strip HTML comments first — the to-do notes at the top of each
+         document talk *about* placeholders, and matching those would
+         report a failure that can never be cleared. */
+      var visible = text.replace(/<!--[\s\S]*?-->/g, '');
+      var found = visible.match(/\[[A-Z][^\]]{2,40}\]/g) || [];
+      var unique = found.filter(function (v, i) { return found.indexOf(v) === i; });
+      if (unique.length) {
+        done('fail', 'Published, but ' + unique.length +
+          ' placeholder(s) are still in it: ' + unique.join(', '));
+      } else {
+        done('pass', 'Published and no placeholders left.');
+      }
+    }).catch(function (err) {
+      done('fail', 'Could not load ' + file + ' (' + err.message +
+        '). Paddle requires both pages to be publicly reachable.');
+    });
+  }
+
+  function checkSupabaseRest() {
+    var done = row('Supabase — API reachable');
+    if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
+      done('skip', 'No Supabase URL or anon key in config.js. The app runs ' +
+        'local-only: no accounts, no sync, no push.');
+      return Promise.resolve(false);
+    }
+    return get(cfg.supabaseUrl + '/rest/v1/', { headers: anonHeaders() })
+      .then(function (res) {
+        if (res.status === 401 || res.status === 403) {
+          done('fail', 'Rejected the anon key (HTTP ' + res.status +
+            '). Copy it again from Project Settings → API.');
+          return false;
+        }
+        if (!res.ok) { done('fail', 'HTTP ' + res.status + ' from PostgREST.'); return false; }
+        done('pass', 'Responding at ' + cfg.supabaseUrl);
+        return true;
+      }).catch(function (err) {
+        done('fail', 'No response (' + err.message + '). Wrong URL, project ' +
+          'paused, or blocked by the network.');
+        return false;
+      });
+  }
+
+  function checkAuthSettings() {
+    var done = row('Supabase — sign-in service');
+    return get(cfg.supabaseUrl + '/auth/v1/settings', { headers: anonHeaders() })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }).then(function (data) {
+        var providers = data.external || {};
+        var notes = [];
+        notes.push(providers.email === false
+          ? 'Email sign-in is DISABLED — magic links will fail'
+          : 'Email sign-in enabled');
+        notes.push(providers.google ? 'Google enabled' : 'Google not enabled');
+        var bad = providers.email === false;
+        done(bad ? 'fail' : 'pass', notes.join('. ') + '.');
+      }).catch(function (err) {
+        done('fail', 'GoTrue did not respond (' + err.message + ').');
+      });
+  }
+
+  /* Asking for a row we are not entitled to is the point. A healthy
+     table answers 200 with an empty array: it exists, and RLS is doing
+     its job. A 404 means the SQL was never applied. Rows coming back
+     unauthenticated would mean RLS is off, which is a live data leak. */
+  function checkTable(table, sqlFile) {
+    var done = row('Table: ' + table);
+    var url = cfg.supabaseUrl + '/rest/v1/' + table + '?select=*&limit=1';
+    return get(url, { headers: anonHeaders() }).then(function (res) {
+      return res.text().then(function (body) { return { res:res, body:body }; });
+    }).then(function (r) {
+      if (r.res.status === 404 || /PGRST20[05]/.test(r.body)) {
+        done('fail', 'Not found. Run ' + sqlFile + ' in the SQL editor.');
+        return;
+      }
+      if (r.res.status === 401 || r.res.status === 403) {
+        done('pass', 'Exists and is locked down (HTTP ' + r.res.status + ').');
+        return;
+      }
+      if (!r.res.ok) { done('fail', 'HTTP ' + r.res.status + ': ' + r.body.slice(0, 160)); return; }
+
+      var parsed;
+      try { parsed = JSON.parse(r.body); } catch (e) { parsed = null; }
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        done('fail', 'SECURITY: returned ' + parsed.length + ' row(s) to an ' +
+          'unauthenticated request. Row-level security is not enabled on this ' +
+          'table. Anyone with the anon key — which is public — can read it.');
+      } else {
+        done('pass', 'Exists, and returns nothing without a session.');
+      }
+    }).catch(function (err) {
+      done('fail', err.message);
+    });
+  }
+
+  /* Functions are checked with a deliberately empty POST. A deployed
+     function replies 4xx ("that request made no sense"); an undeployed
+     one replies 404. Neither does any work, so this is safe to repeat. */
+  function checkFunction(name, note) {
+    var done = row('Edge function: ' + name);
+    var url = cfg.supabaseUrl + '/functions/v1/' + name;
+    return get(url, {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey,
+                 Authorization: 'Bearer ' + cfg.supabaseAnonKey,
+                 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then(function (res) {
+      if (res.status === 404) {
+        done('fail', 'Not deployed. ' + (note || ''));
+      } else if (res.status === 503) {
+        done('warn', 'Reachable but returned 503 — usually a missing ' +
+          'environment secret. Check the function logs.');
+      } else {
+        done('pass', 'Deployed (answered HTTP ' + res.status + ' to an empty request).');
+      }
+    }).catch(function (err) {
+      done('fail', 'No response (' + err.message + ').');
+    });
+  }
+
+  function checkVapid() {
+    var done = row('Web Push — VAPID key');
+    var key = cfg.vapidPublicKey || '';
+    if (!key) {
+      done('skip', 'Not set. Alerts still work while the app is open; ' +
+        'notifications when it is closed will not.');
+      return;
+    }
+    try {
+      var pad = key.replace(/-/g, '+').replace(/_/g, '/');
+      while (pad.length % 4) pad += '=';
+      var raw = atob(pad);
+      if (raw.length !== 65) {
+        done('fail', 'Decodes to ' + raw.length + ' bytes; a P-256 public key ' +
+          'is 65. This looks like the private key or a truncated copy.');
+      } else if (raw.charCodeAt(0) !== 4) {
+        done('fail', 'Not an uncompressed P-256 point (first byte should be 4).');
+      } else {
+        done('pass', 'Well-formed 65-byte P-256 public key.');
+      }
+    } catch (e) {
+      done('fail', 'Not valid base64url: ' + e.message);
+    }
+  }
+
+  function checkPushSupport() {
+    var done = row('Web Push — browser support');
+    var bits = [];
+    if (!('serviceWorker' in navigator)) bits.push('no service worker');
+    if (!('PushManager' in window)) bits.push('no PushManager');
+    if (!('Notification' in window)) bits.push('no Notification API');
+    if (bits.length) {
+      done('warn', 'This browser: ' + bits.join(', ') +
+        '. Others may still support it — iOS needs the app added to the ' +
+        'Home Screen first.');
+    } else {
+      done('pass', 'Supported here. Permission is currently "' +
+        Notification.permission + '".');
+    }
+  }
+
+  function checkServiceWorker() {
+    var done = row('Service worker');
+    if (!('serviceWorker' in navigator)) { done('skip', 'Not supported in this browser.'); return Promise.resolve(); }
+    return navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (reg) done('pass', 'Registered for ' + reg.scope);
+      else done('warn', 'Not registered yet. Open the app once, then come back.');
+    }).catch(function (err) { done('warn', err.message); });
+  }
+
+  function checkTurnstile() {
+    var done = row('Turnstile bot check');
+    if (!cfg.turnstileSiteKey) {
+      done('warn', 'Not set. Sign-in requests go straight to Supabase with no ' +
+        'throttling — fine while you are the only user, not once sign-up is public.');
+      return;
+    }
+    done(/^0x/.test(cfg.turnstileSiteKey) ? 'pass' : 'warn',
+      'Site key present. Confirm the matching secret is set on the signin ' +
+      'function, or every sign-in will be rejected.');
+  }
+
+  function checkPaddle() {
+    var done = row('Paddle billing');
+    var p = cfg.paddle || {};
+    if (!p.clientToken) {
+      done('skip', 'Not configured. Every signed-in account is treated as ' +
+        'entitled — correct for a private build, wrong once you charge.');
+      return;
+    }
+    var problems = [];
+    var live = /^live_/.test(p.clientToken);
+    var test = /^test_/.test(p.clientToken);
+    if (!live && !test) problems.push('client token does not start with live_ or test_');
+    if (live && p.environment !== 'production') problems.push('a live token with environment "' + p.environment + '"');
+    if (test && p.environment === 'production') problems.push('a sandbox token with environment "production"');
+    if (!/^pri_/.test(p.annualPriceId || '')) problems.push('annual price ID is not a pri_… value');
+    if (p.monthlyPriceId && !/^pri_/.test(p.monthlyPriceId)) problems.push('monthly price ID is not a pri_… value');
+
+    if (problems.length) {
+      done('fail', problems.join('; ') + '.');
+    } else {
+      done('pass', p.environment + ' environment, price IDs look right. ' +
+        'Confirm the displayed prices still match Paddle: ' +
+        p.annualPrice + p.annualPeriod + ', ' + p.monthlyPrice + p.monthlyPeriod + '.');
+    }
+  }
+
+  function checkPaddleWebhookNote() {
+    var done = row('Paddle webhook');
+    if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
+    done('warn', 'Cannot be verified from the browser — it is server to server. ' +
+      'Test it from Paddle → Notifications → Send test event, then confirm the ' +
+      'entitlement row appears in Supabase.');
+  }
+
+  function checkManual() {
+    var done = row('Still to test by hand');
+    done('warn',
+      '1. Sign in with a real email and confirm the link arrives, not in spam. ' +
+      '2. Change your hours on one device and confirm they appear on another. ' +
+      '3. Buy with a Paddle test card and confirm access unlocks. ' +
+      '4. Delete a throwaway account and confirm the rows are gone. ' +
+      '5. Close the app and confirm a milestone alert still arrives.');
+  }
+
+  /* ── Run ───────────────────────────────────────────────────────── */
+
+  function run() {
+    listEl.innerHTML = '';
+    rows = [];
+    summaryEl.textContent = 'Running…';
+
+    checkPageContext();
+    checkSupportEmail();
+    checkVapid();
+    checkPushSupport();
+    checkTurnstile();
+    checkPaddle();
+    checkPaddleWebhookNote();
+
+    var chain = Promise.resolve()
+      .then(function () { return checkLegalPage('terms.html', 'Terms of Service page'); })
+      .then(function () { return checkLegalPage('privacy.html', 'Privacy Policy page'); })
+      .then(checkServiceWorker)
+      .then(checkSupabaseRest)
+      .then(function (up) {
+        if (!up) return;
+        return checkAuthSettings()
+          .then(function () { return checkTable('profiles', 'schema.sql'); })
+          .then(function () { return checkTable('push_subscriptions', 'schema.sql'); })
+          .then(function () { return checkTable('entitlements', 'schema-billing.sql'); })
+          .then(function () { return checkTable('access_codes', 'schema-access-codes.sql'); })
+          .then(function () { return checkTable('calendar_feeds', 'schema-calendar.sql'); })
+          .then(function () { return checkTable('calendar_events', 'schema-calendar.sql'); })
+          .then(function () { return checkFunction('signin', 'Needed for rate-limited magic links.'); })
+          .then(function () { return checkFunction('delete-account', 'Needed for the delete button in Settings.'); })
+          .then(function () { return checkFunction('paddle-webhook', 'Without it, payments never unlock access.'); })
+          .then(function () { return checkFunction('notify-milestones', 'Without it, no alerts when the app is closed.'); })
+          .then(function () { return checkFunction('calendar-sync', 'Needed for calendar feeds.'); })
+          .then(function () { return checkFunction('google-connect', 'Needed for one-click Google Calendar.'); });
+      })
+      .then(checkManual)
+      .then(tally);
+
+    return chain;
+  }
+
+  document.getElementById('runBtn').addEventListener('click', run);
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var text = 'Pie Timers diagnostics — ' + new Date().toISOString() + '\n' +
+      location.href + '\n\n' +
+      rows.map(function (r) {
+        return '[' + LABEL[r.state] + '] ' + r.name + '\n    ' + r.detail;
+      }).join('\n');
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+    summaryEl.textContent = 'Copied ' + rows.length + ' results to the clipboard.';
+  });
+
+  run();
+})();
+</script>
+</body>
+</html>

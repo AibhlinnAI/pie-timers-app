@@ -1,0 +1,88 @@
+# ============================================================
+# Publish the app to GitHub Pages at https://app.aibhlinn.ai
+#
+# Only the app/ folder is uploaded. supabase/ stays in the repo but is
+# never served — the SQL and edge functions hold no secrets, but there
+# is no reason to hand strangers a map of the backend either.
+#
+# There is no build step. The files that run in the browser are the
+# files in the repo, which is the whole point of the no-dependency
+# design: nothing is transformed between what you can read and what
+# your customers execute.
+# ============================================================
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:      # lets you redeploy by hand from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# If you push twice quickly, finish the newer one and drop the older.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Refuse to publish secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A public repo plus a pasted key is the single most common way a
+      # small project gets its bill run up by strangers. Fail loudly
+      # rather than publish. If this ever trips, rotate the key first
+      # and fix the file second — it is already public by then.
+      - name: Scan app/ for private keys
+        run: |
+          set -u
+          fail=0
+
+          # Literal secret formats. None of these has any business in a
+          # file the browser downloads.
+          if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' app/; then
+            echo "::error::A secret is present in app/."
+            fail=1
+          fi
+
+          # The Supabase anon key is a JWT and belongs in config.js. The
+          # service-role key is also a JWT and looks almost identical —
+          # which is exactly why this checks the decoded payload rather
+          # than the variable name it was pasted into.
+          for token in $(grep -rhoE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' app/ || true); do
+            payload=$(printf '%s' "$token" | cut -d. -f2)
+            case $(( ${#payload} % 4 )) in
+              2) payload="$payload==" ;;
+              3) payload="$payload=" ;;
+            esac
+            if printf '%s' "$payload" | tr '_-' '/+' | base64 -d 2>/dev/null | grep -q 'service_role'; then
+              echo "::error::A service-role JWT is in app/. It bypasses row-level security. Rotate it in Supabase now, then remove it."
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "No private keys found in app/."
+
+  deploy:
+    needs: guard
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

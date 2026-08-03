@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy Policy — Pie Timers</title>
+<meta name="theme-color" content="#1C1024">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+
+<!-- ============================================================
+     DRAFT — NOT YET REVIEWED BY A LAWYER.
+
+     Written to describe what the app genuinely does, checked against the
+     actual schema and edge functions rather than copied from a template.
+     Before launch:
+
+     Every placeholder is now filled in. What remains is upkeep:
+
+       1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
+          the project to another region, this becomes a false statement
+          about where Australians' data lives — change it the same day.
+          The same applies to section 6 if you move off GitHub Pages.
+       2. Have it reviewed. If you get EU or UK customers you are a data
+          controller under GDPR/UK GDPR, which brings obligations this
+          document only summarises.
+       3. Re-check section 9 if you ever add analytics. Today there are
+          none, and that claim must stay true.
+     ============================================================ -->
+</head>
+<body class="legal-page">
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="15" fill="#32493C"/>
+      <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+    </svg>
+    <div class="brand-text">
+      <h1>Pie Timers</h1>
+      <p>Privacy Policy</p>
+    </div>
+  </div>
+</header>
+
+<main class="legal">
+  <p class="legal-meta">
+    Last updated: <strong>3 August 2026</strong> &middot;
+    <a href="terms.html">Terms of Service</a> &middot;
+    <a href="index.html">Back to the app</a>
+  </p>
+
+  <h2>The short version</h2>
+  <ul>
+    <li>Without an account, nothing leaves your device. Ever.</li>
+    <li>With an account, we store your email, your schedule and your appointments
+    so they can appear on your other devices.</li>
+    <li>We do not sell your data, and there are no analytics, trackers or
+    advertising in this app.</li>
+    <li>You can delete your account and everything in it from the Settings tab,
+    without asking us.</li>
+  </ul>
+
+  <h2>1. Who is responsible</h2>
+  <p><strong>AibhlinnAI</strong>, <strong>ABN 70 810 791 817</strong>, of South
+  Australia, Australia, is responsible for the personal information described
+  here. Contact:
+  <a href="mailto:support@aibhlinn.ai" data-support-link>support@aibhlinn.ai</a>.</p>
+
+  <h2>2. If you do not create an account</h2>
+  <p>The app works fully offline. Your schedule, appointments and settings are
+  stored only in your browser's local storage on that device. We cannot see them,
+  and no request carrying them is ever sent anywhere.</p>
+  <p>There is no sign-up wall, no email capture, and no tracking on the free
+  version.</p>
+
+  <h2>3. If you create an account</h2>
+  <p>We then store:</p>
+  <ul>
+    <li><strong>Your email address</strong> — to sign you in and to contact you
+    about your account.</li>
+    <li><strong>Your weekly schedule and appointments</strong> — so they appear on
+    your other devices.</li>
+    <li><strong>Your settings</strong> — theme, alert preferences and so on.</li>
+    <li><strong>Push subscription details and your time zone</strong> — only if
+    you switch on alerts for when the app is closed, so we know when and where to
+    send them.</li>
+    <li><strong>Subscription status</strong> — whether you are on a trial, paying,
+    or have complimentary access.</li>
+  </ul>
+  <p>We do <em>not</em> store your name, your location, your device identifiers,
+  your browsing behaviour, or anything you do outside this app.</p>
+
+  <h2>4. If you connect a calendar</h2>
+  <p>This is the most sensitive thing the app touches, so it is worth being
+  precise.</p>
+  <p>Connecting a calendar gives us <strong>read-only</strong> access. We fetch it
+  on a schedule, take the title, start and end of upcoming events, and store those
+  so your next appointment can be shown. Nothing in this app can create, alter or
+  delete anything in your calendar.</p>
+  <p>To do that we hold either a private iCal address or a Google refresh token.
+  Both are effectively keys to that calendar. They are never sent back to your
+  browser after you save them — the app can only see <em>whether</em> a calendar is
+  connected, not the credential itself — and only our sync server can read them.</p>
+  <p><strong>They are not encrypted at rest.</strong> They are held in our database,
+  protected by row-level security and our hosting provider's disk encryption. We
+  would rather tell you that than imply more protection than exists. You can
+  disconnect at any time, which deletes the stored credential and, for Google,
+  revokes our access at Google's end as well.</p>
+  <p>We only fetch events in a short window around today, and we delete stored
+  events older than a day.</p>
+
+  <h2>5. Where your data is held</h2>
+  <p>Account data is stored with <strong>Supabase</strong> in the
+  <strong>ap-southeast-2 (Sydney)</strong> region. Your schedule, appointments,
+  settings and calendar data stay in Australia.</p>
+  <p>Two exceptions, so this is not misleading. Sign-in emails are sent through
+  Resend, and your email address passes through their systems overseas to
+  deliver them. If you pay, Paddle handles the transaction and holds your billing
+  details under their own policy, also overseas. Neither of them receives your
+  schedule, your appointments or your calendar.</p>
+
+  <h2>6. Who else touches your data</h2>
+  <table class="legal-table">
+    <thead><tr><th>Who</th><th>What they get</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Supabase</td><td>Everything in section 3 and 4</td><td>Database, sign-in and server functions</td></tr>
+      <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in link</td></tr>
+      <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
+      <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
+      <tr><td>Cloudflare</td><td>An anonymised bot-check signal</td><td>Stopping the sign-in form being abused to email strangers</td></tr>
+      <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
+    </tbody>
+  </table>
+  <p>That is the complete list. We do not sell, rent or trade personal information
+  to anybody, and we do not use it to train anything.</p>
+
+  <h2>7. Sign-in protection</h2>
+  <p>To stop the sign-in form being used to send unwanted email to other people, we
+  count recent attempts. We store only a one-way hash of the email address and IP
+  address involved, never the values themselves, and we delete those records after
+  a day.</p>
+
+  <h2>8. How long we keep things</h2>
+  <ul>
+    <li><strong>Account data</strong> — until you delete your account.</li>
+    <li><strong>Calendar events</strong> — a rolling window; older than a day is
+    deleted automatically.</li>
+    <li><strong>Sign-in attempt hashes</strong> — one day.</li>
+    <li><strong>Billing records</strong> — held by Paddle under their policy, and
+    for as long as Australian tax law requires.</li>
+  </ul>
+
+  <h2>9. Cookies and tracking</h2>
+  <p>There are none. No analytics, no advertising pixels, no third-party trackers,
+  no cross-site tracking. The app stores your settings in local storage and, if you
+  sign in, a session token in your browser. That is all.</p>
+
+  <h2>10. Your rights</h2>
+  <p>You can, at any time and without contacting us:</p>
+  <ul>
+    <li><strong>See and change</strong> everything we hold, from inside the app.</li>
+    <li><strong>Export it</strong> as a file, from Settings.</li>
+    <li><strong>Delete your account</strong> and all associated data, from Settings.
+    This is immediate and cannot be undone.</li>
+  </ul>
+  <p>If you would prefer we did it, or you want a copy in another format, write to
+  <a href="mailto:support@aibhlinn.ai" data-support-link>support@aibhlinn.ai</a>
+  and we will respond within 30 days.</p>
+  <p>If you are in the EU or UK you also have the rights given by the GDPR,
+  including objection, restriction and portability, and the right to complain to
+  your local supervisory authority. In Australia you may complain to the
+  <a href="https://www.oaic.gov.au/" rel="noopener">Office of the Australian
+  Information Commissioner</a>.</p>
+
+  <h2>11. Children</h2>
+  <p>This app is not directed at children under 16. We do not knowingly collect
+  their information. If you believe a child has created an account, tell us and we
+  will delete it.</p>
+
+  <h2>12. Data breaches</h2>
+  <p>If personal information is exposed in a way likely to cause you serious harm,
+  we will notify you and the relevant regulator as required by the Notifiable Data
+  Breaches scheme, and we will tell you plainly what happened.</p>
+
+  <h2>13. Changes</h2>
+  <p>If we change this policy in a way that materially affects you, we will email
+  you before it takes effect. The date at the top always reflects the current
+  version.</p>
+
+  <p class="legal-foot"><a href="index.html">Back to Pie Timers</a></p>
+</main>
+
+<script src="config.js"></script>
+<script>
+  (function () {
+    var email = (window.CT && window.CT.config && window.CT.config.supportEmail) || '';
+    if (!email) return;
+    var links = document.querySelectorAll('[data-support-link]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].textContent = email;
+      links[i].setAttribute('href', 'mailto:' + email);
+    }
+  })();
+</script>
+</body>
+</html>

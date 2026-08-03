@@ -1,0 +1,19 @@
+{
+  "name": "Pie Timers",
+  "short_name": "Pie Timers",
+  "description": "Watch your day as a pie. Some days you eat the pie. Some days the pie eats you.",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16101B",
+  "theme_color": "#1C1024",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
