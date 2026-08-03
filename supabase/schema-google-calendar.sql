@@ -46,7 +46,15 @@ create unique index if not exists calendar_feeds_one_google_per_user
 
 -- The client-facing view must expose neither the feed URL nor the
 -- refresh token — both are bearer credentials for the whole calendar.
-create or replace view public.my_calendar_feeds
+--
+-- Dropped first, not replaced. schema-calendar.sql already created this
+-- view, and this version inserts `kind` where `active` used to sit.
+-- CREATE OR REPLACE VIEW can append columns but cannot rename or
+-- reorder them, so replacing in place fails with 42P16. Nothing depends
+-- on the view except the client, which reads it by name.
+drop view if exists public.my_calendar_feeds;
+
+create view public.my_calendar_feeds
 with (security_invoker = true) as
   select id, user_id, label, kind, active,
          last_synced, last_error, event_count, created_at,
