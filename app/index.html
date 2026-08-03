@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pie Timers</title>
+<meta name="description" content="Watch your day as a pie. Some days you eat the pie. Some days the pie eats you.">
+<meta name="theme-color" content="#1C1024">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231C1024'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='12'%20fill='%2332493C'/%3E%3Cpath%20d='M16%2016%2022.71%2010.19A8.88%208.88%200%201%201%2016%207.12z'%20fill='%23FF8A00'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <!-- Pie 11.1 : plate 15 — a wider rim than the 512px icon carries, on
+         purpose. This renders around 38–50px, where a proportionally thin
+         ring drops below a pixel and disappears. -->
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="15" fill="#32493C"/>
+      <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+    </svg>
+    <div class="brand-text">
+      <h1>Pie Timers</h1>
+      <p>Some days you eat the pie. Some days the pie eats you.</p>
+    </div>
+  </div>
+  <div class="now">
+    <div class="now-time" id="nowTime">--:--</div>
+    <div class="now-date" id="nowDate">&nbsp;</div>
+  </div>
+</header>
+
+<a class="skip-link" href="#view-dashboard">Skip to content</a>
+
+<nav class="tabs" aria-label="Sections">
+  <!-- The sync pill is a sibling, not a child of the tablist: a tablist may
+       only contain tabs. -->
+  <div class="tablist" id="tabList" role="tablist" aria-label="Sections">
+    <button class="tab is-active" role="tab" id="tab-dashboard"
+            aria-controls="view-dashboard" aria-selected="true" tabindex="0"
+            data-view="dashboard">Dashboard</button>
+    <button class="tab" role="tab" id="tab-schedule"
+            aria-controls="view-schedule" aria-selected="false" tabindex="-1"
+            data-view="schedule">Schedule</button>
+    <button class="tab" role="tab" id="tab-appointments"
+            aria-controls="view-appointments" aria-selected="false" tabindex="-1"
+            data-view="appointments">Appointments</button>
+    <button class="tab" role="tab" id="tab-settings"
+            aria-controls="view-settings" aria-selected="false" tabindex="-1"
+            data-view="settings">Settings</button>
+  </div>
+  <span class="sync-pill" id="syncPill" title="Sync status"><i></i><span id="syncPillText">Local</span></span>
+</nav>
+
+<main>
+
+  <!-- ───────────────────────── DASHBOARD ───────────────────────── -->
+  <section class="view is-active" id="view-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" tabindex="0">
+
+    <!-- First run only. The starting hours are placeholders, and saying so
+         plainly is kinder than letting someone assume they are theirs. -->
+    <section class="welcome" id="welcome" hidden>
+      <h2>Welcome to Pie Timers</h2>
+      <p>The current hours set are default settings.</p>
+      <p>Set your own hours and the day will eat away at your pies.</p>
+      <div class="welcome-actions">
+        <button class="btn btn-primary" data-goto="schedule" id="welcomeSetup">Set my hours</button>
+        <button class="btn btn-ghost" id="welcomeDismiss">Keep the defaults for now</button>
+      </div>
+    </section>
+
+    <div class="daystrip" id="dayStrip">
+      <div class="daystrip-item">
+        <span class="k">Today</span>
+        <strong class="v" id="stripDay">—</strong>
+      </div>
+      <div class="daystrip-item">
+        <span class="k">Start time</span>
+        <strong class="v" id="stripStart">—</strong>
+      </div>
+      <div class="daystrip-item">
+        <span class="k" data-lunch-label>Lunch</span>
+        <strong class="v" id="stripLunch">—</strong>
+      </div>
+      <div class="daystrip-item">
+        <span class="k" data-end-label>End of Day</span>
+        <strong class="v" id="stripEnd">—</strong>
+      </div>
+    </div>
+
+    <div class="timer-grid">
+
+      <article class="timer-card timer-card--purple" id="cardLunch">
+        <header class="timer-head">
+          <h2 data-lunch-label>Lunch</h2>
+          <span class="chip" id="lunchTarget">—</span>
+        </header>
+
+        <div class="dial-wrap">
+          <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="lunchDialLabel">
+            <title id="lunchDialLabel">Proportion of time remaining until lunch</title>
+            <circle class="dial-base" cx="80" cy="80" r="70"/>
+            <g class="dial-ticks" data-ticks id="lunchTicks"></g>
+            <path class="dial-pie" id="lunchPie" d=""/>
+            <g class="dial-ticks dial-ticks--over" data-ticks id="lunchTicksOver"></g>
+            <circle class="dial-rim" cx="80" cy="80" r="70"/>
+          </svg>
+        </div>
+
+        <div class="dial-readout">
+          <div class="dial-big" id="lunchBig">—</div>
+          <div class="dial-small" id="lunchSmall">&nbsp;</div>
+        </div>
+
+        <div class="meter">
+          <div class="meter-bar"><span id="lunchBar" style="width:0%"></span></div>
+          <div class="meter-legend">
+            <span><i class="dot dot-elapsed"></i>Elapsed <b id="lunchElapsed">0</b> min</span>
+            <span><i class="dot dot-remaining"></i>Remaining <b id="lunchRemaining">0</b> min</span>
+          </div>
+        </div>
+
+        <p class="status" id="lunchStatus">&nbsp;</p>
+      </article>
+
+      <article class="timer-card timer-card--green" id="cardEnd">
+        <header class="timer-head">
+          <h2 data-end-label>End of Day</h2>
+          <span class="chip" id="endTarget">—</span>
+        </header>
+
+        <div class="dial-wrap">
+          <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="endDialLabel">
+            <title id="endDialLabel">Proportion of time remaining until end of day</title>
+            <circle class="dial-base" cx="80" cy="80" r="70"/>
+            <g class="dial-ticks" data-ticks id="endTicks"></g>
+            <path class="dial-pie" id="endPie" d=""/>
+            <g class="dial-ticks dial-ticks--over" data-ticks id="endTicksOver"></g>
+            <circle class="dial-rim" cx="80" cy="80" r="70"/>
+          </svg>
+        </div>
+
+        <div class="dial-readout">
+          <div class="dial-big" id="endBig">—</div>
+          <div class="dial-small" id="endSmall">&nbsp;</div>
+        </div>
+
+        <div class="meter">
+          <div class="meter-bar"><span id="endBar" style="width:0%"></span></div>
+          <div class="meter-legend">
+            <span><i class="dot dot-elapsed"></i>Elapsed <b id="endElapsed">0</b> min</span>
+            <span><i class="dot dot-remaining"></i>Remaining <b id="endRemaining">0</b> min</span>
+          </div>
+        </div>
+
+        <p class="status" id="endStatus">&nbsp;</p>
+      </article>
+
+      <article class="timer-card timer-card--amber" id="cardAppt">
+        <header class="timer-head">
+          <h2>Next appointment</h2>
+          <span class="chip" id="apptChip">None</span>
+        </header>
+
+        <div id="apptBody">
+          <div class="dial-wrap">
+            <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="apptDialLabel">
+              <title id="apptDialLabel">Proportion of time remaining until your next appointment</title>
+              <circle class="dial-base" cx="80" cy="80" r="70"/>
+              <g class="dial-ticks" data-ticks id="apptTicks"></g>
+              <path class="dial-pie" id="apptPie" d=""/>
+            <g class="dial-ticks dial-ticks--over" data-ticks id="apptTicksOver"></g>
+              <circle class="dial-rim" cx="80" cy="80" r="70"/>
+            </svg>
+          </div>
+
+          <div class="dial-readout">
+            <div class="dial-big" id="apptBig">—</div>
+            <div class="dial-small" id="apptSmall">&nbsp;</div>
+          </div>
+
+          <p class="status" id="apptStatus">&nbsp;</p>
+        </div>
+
+        <div id="apptEmpty" class="appt-empty">
+          <p>Nothing coming up.</p>
+          <p class="appt-empty-sub">Add a meeting or appointment and the pie counts
+          down here up to three times, one after another:</p>
+          <ul class="appt-empty-list">
+            <li>whole days, when more than a day away</li>
+            <li>24 hours, once within a day</li>
+            <li>60 minutes, for the final countdown</li>
+          </ul>
+          <button class="btn btn-ghost" data-goto="appointments">Add an appointment</button>
+        </div>
+      </article>
+
+    </div>
+
+    <section class="panel">
+      <header class="panel-head">
+        <h2>Weekly schedule</h2>
+        <button class="btn btn-ghost" data-goto="schedule">Edit</button>
+      </header>
+      <div class="table-scroll">
+        <table class="grid" id="weekPreview">
+          <thead>
+            <tr><th>Day</th><th>Start time</th><th data-lunch-name>Lunch</th><th data-end-name>End of Day</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="livenote"><span class="pulse"></span> Live — updates every second. No refresh needed.</p>
+    <p class="byline">Pie Timers from AibhlínnAI</p>
+  </section>
+
+  <!-- ───────────────────────── SCHEDULE ───────────────────────── -->
+  <section class="view" id="view-schedule" role="tabpanel" aria-labelledby="tab-schedule" tabindex="0">
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h2>Weekly schedule</h2>
+          <p class="sub">Set your start, lunch and finish for each day. Untick a day
+          to mark it as time off. Each day of the week then shows a different word
+          for freedom.</p>
+        </div>
+        <button class="btn btn-ghost" id="resetSchedule">Restore defaults</button>
+      </header>
+
+      <div class="table-scroll">
+        <table class="grid grid--edit">
+          <thead>
+            <tr><th>Working</th><th>Day</th><th>Start time</th><th data-lunch-name>Lunch</th><th class="home-col">Head Home</th><th data-end-name>End of Day</th><th class="home-col">Head Home</th></tr>
+          </thead>
+          <tbody id="scheduleBody"></tbody>
+        </table>
+      </div>
+
+      <div class="naming">
+        <label class="field field--grow">
+          <span>Break timer is called:</span>
+          <input type="text" id="lunchLabelInput" maxlength="30" placeholder="Lunch">
+        </label>
+      </div>
+
+      <p class="saved" id="scheduleSaved">Changes save automatically.</p>
+    </section>
+  </section>
+
+  <!-- ───────────────────────── APPOINTMENTS ───────────────────────── -->
+  <section class="view" id="view-appointments" role="tabpanel" aria-labelledby="tab-appointments" tabindex="0">
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h2>Appointments</h2>
+          <p class="sub">Anything with a fixed time — a meeting, a call, a pickup.
+          The next one counts down on the Dashboard.</p>
+        </div>
+      </header>
+
+      <form class="appt-form" id="apptForm" novalidate>
+        <label class="field field--grow">
+          <span>What is it?</span>
+          <input type="text" id="apptTitle" placeholder="Team stand-up" maxlength="80" required>
+        </label>
+        <label class="field">
+          <span>Date</span>
+          <input type="date" id="apptDate" required>
+        </label>
+        <label class="field">
+          <span>Time</span>
+          <input type="time" id="apptTime" required>
+        </label>
+        <button class="btn btn-primary" type="submit">Add</button>
+      </form>
+
+      <p class="status-line" id="apptError" role="alert"></p>
+
+      <ul class="appt-list" id="apptList"></ul>
+      <p class="saved" id="apptEmptyNote">No appointments yet.</p>
+    </section>
+
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h2>Calendar sync</h2>
+          <p class="sub">Connect a calendar and your meetings appear here on their
+          own. Works with Google, Outlook, iCloud and anything else that publishes
+          an iCal address.</p>
+        </div>
+        <span class="chip chip--plan" id="calendarPlanChip" hidden>Plan feature</span>
+      </header>
+
+      <!-- Shown when sync is unavailable for any reason -->
+      <div class="notice notice--info" id="calendarUnavailable" hidden></div>
+
+      <div id="calendarConnected" hidden>
+        <div class="sync-rows" id="calendarFeedRows"></div>
+      </div>
+
+      <div id="googleConnect" hidden>
+        <button class="btn btn-google" id="googleCalendarBtn" type="button">
+          <svg viewBox="0 0 18 18" aria-hidden="true" width="17" height="17">
+            <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"/>
+            <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z"/>
+            <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"/>
+          </svg>
+          Connect Google Calendar
+        </button>
+        <p class="hint">One click. We ask only for permission to <strong>read</strong>
+        your calendar — nothing can be changed or deleted.</p>
+        <div class="or"><span>or paste an iCal address</span></div>
+      </div>
+
+      <form class="calendar-form" id="calendarForm" novalidate hidden>
+        <label class="field field--grow">
+          <span>Private iCal address</span>
+          <input type="url" id="calendarUrl" spellcheck="false" autocomplete="off"
+                 placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+        </label>
+        <label class="field">
+          <span>Name it</span>
+          <input type="text" id="calendarLabel" maxlength="40" placeholder="Work">
+        </label>
+        <button class="btn btn-primary" type="submit" id="calendarAdd">Connect</button>
+      </form>
+
+      <p class="status-line" id="calendarMessage" role="status" aria-live="polite"></p>
+
+      <details class="help" id="calendarHelp" hidden>
+        <summary>Where do I find that address?</summary>
+        <ul>
+          <li><strong>Google Calendar</strong> — Settings → your calendar →
+          Integrate calendar → <strong>Secret address in iCal format</strong>.</li>
+          <li><strong>Outlook / Microsoft 365</strong> — Settings → Calendar →
+          Shared calendars → Publish a calendar → choose <strong>ICS</strong>.</li>
+          <li><strong>Apple iCloud</strong> — Calendar on iCloud.com → share icon
+          beside the calendar → Public Calendar → copy the link.</li>
+        </ul>
+        <p class="notice notice--warn">Treat this address like a password — anyone
+        holding it can read that calendar. It is never shown again once saved, and
+        only the sync server can read it back. You can revoke it at any time from
+        your calendar provider, which immediately makes the old address useless.</p>
+      </details>
+    </section>
+
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h2>Countdown calculator</h2>
+          <p class="sub">Enter a target time and see the remaining time count down live.</p>
+        </div>
+      </header>
+
+      <div class="calc-controls">
+        <label class="field">
+          <span>Target time</span>
+          <input type="time" id="calcTarget" value="13:00">
+        </label>
+        <label class="field">
+          <span>Roll over past midnight</span>
+          <select id="calcRollover">
+            <option value="0">No — stop at zero</option>
+            <option value="1">Yes — count to tomorrow</option>
+          </select>
+        </label>
+        <div class="quickset">
+          <button class="btn btn-quiet" data-quick="15">+15 min</button>
+          <button class="btn btn-quiet" data-quick="30">+30 min</button>
+          <button class="btn btn-quiet" data-quick="60">+1 hr</button>
+        </div>
+      </div>
+
+      <div class="calc-result">
+        <div class="calc-block">
+          <span class="k">Countdown</span>
+          <strong class="calc-big" id="calcBig">—</strong>
+          <span class="calc-sub" id="calcSub">&nbsp;</span>
+        </div>
+        <div class="calc-split">
+          <div class="calc-cell"><span class="k">Hours</span><strong id="calcHours">0</strong></div>
+          <div class="calc-cell"><span class="k">Minutes</span><strong id="calcMins">0</strong></div>
+          <div class="calc-cell"><span class="k">Seconds</span><strong id="calcSecs">0</strong></div>
+          <div class="calc-cell"><span class="k">Target</span><strong id="calcTargetOut">—</strong></div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ───────────────────────── SETTINGS ───────────────────────── -->
+  <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0">
+    <section class="panel">
+      <header class="panel-head"><h2>Settings</h2></header>
+
+      <div class="settings-list">
+        <label class="setting">
+          <div>
+            <strong>Appearance</strong>
+            <span>Dark by default. Light is there if you prefer it.</span>
+          </div>
+          <select id="optTheme" class="mini-select">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">Match my device</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>24-hour clock</strong>
+            <span>Show times as 14:40 instead of 2:40 PM.</span>
+          </div>
+          <input type="checkbox" id="opt24h" class="switch">
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>Show seconds</strong>
+            <span>Show seconds on the clock and in the countdowns.</span>
+          </div>
+          <input type="checkbox" id="optSeconds" class="switch">
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>Urgent warning</strong>
+            <span>When this much time is left, the timer turns crimson and
+            glows. Choose Off if you would rather it stayed calm.</span>
+          </div>
+          <select id="optUrgent" class="mini-select">
+            <option value="0">Off</option>
+            <option value="5">5 minutes left</option>
+            <option value="10">10 minutes left</option>
+            <option value="15">15 minutes left</option>
+            <option value="30">30 minutes left</option>
+            <option value="60">1 hour left</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>Milestone alerts</strong>
+            <span>Notify at 30, 15, 10 and 5 minutes remaining, and on completion.</span>
+          </div>
+          <input type="checkbox" id="optAlerts" class="switch">
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>Alert chime</strong>
+            <span>Play a short tone with each milestone alert.</span>
+          </div>
+          <input type="checkbox" id="optSound" class="switch">
+        </label>
+
+        <label class="setting">
+          <div>
+            <strong>Background alerts</strong>
+            <span id="pushHint">Deliver milestone alerts even when the app is closed.</span>
+          </div>
+          <input type="checkbox" id="optPush" class="switch">
+        </label>
+      </div>
+
+      <div class="notice notice--warn" id="permissionNotice" hidden>
+        <strong>Notifications are blocked.</strong>
+        Milestone alerts will still appear inside the app, but your browser won't show
+        system notifications until you allow them for this site in its site settings.
+      </div>
+
+      <div class="notice notice--info" id="insecureNotice" hidden>
+        <strong>Opened as a local file.</strong>
+        Background alerts and installation need the app served over HTTPS (or from
+        <code>localhost</code>). In-app alerts work either way.
+      </div>
+
+      <div class="danger-row">
+        <button class="btn btn-quiet" id="testNotification">Send a test notification</button>
+      </div>
+
+      <div class="danger-row">
+        <button class="btn btn-ghost" id="exportData">Export settings</button>
+        <button class="btn btn-ghost" id="importData">Import settings</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </div>
+
+      <p class="sub sub--foot">Everything is stored on this device only. Nothing is uploaded.</p>
+    </section>
+
+
+    <!-- Shown when config.js has no Supabase project set -->
+    <section class="panel" id="accountUnconfigured" hidden>
+      <header class="panel-head">
+        <div>
+          <h2>Accounts are not switched on yet</h2>
+          <p class="sub">The app is running fully on this device. Your timers,
+          schedule and appointments all work and are saved here.</p>
+          <p class="setup-note">Setup: add your Supabase project URL and anon key
+          to <code>config.js</code>, then reload. See the README for the full steps.</p>
+        </div>
+      </header>
+      <p class="notice notice--info">
+        Nothing is lost in the meantime — your schedule and settings are saved on this
+        device and will be uploaded the first time you sign in.
+      </p>
+    </section>
+
+    <!-- Signed out -->
+    <section class="panel" id="accountSignedOut" hidden>
+      <header class="panel-head">
+        <div>
+          <h2>Sign in</h2>
+          <p class="sub">Sync your schedule across devices and receive milestone
+          alerts when the app is closed.</p>
+        </div>
+      </header>
+
+      <form class="signin-form" id="magicForm" novalidate>
+        <label class="field field--grow">
+          <span>Email address</span>
+          <input type="email" id="magicEmail" placeholder="you@example.com"
+                 autocomplete="email" required>
+        </label>
+        <button class="btn btn-primary" type="submit" id="magicSubmit">Email me a link</button>
+      </form>
+
+      <!-- Cloudflare Turnstile renders here when a site key is configured.
+           Invisible to nearly all real users. -->
+      <div id="turnstileHost" class="turnstile-host" hidden></div>
+
+      <p class="hint">We'll email you a one-time sign-in link. There is no password to
+      create or remember.</p>
+
+      <div class="or"><span>or</span></div>
+
+      <button class="btn btn-google" id="googleSignIn" type="button">
+        <svg viewBox="0 0 18 18" aria-hidden="true" width="17" height="17">
+          <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"/>
+          <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"/>
+          <path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z"/>
+          <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <p class="status-line" id="authMessage" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- Signed in -->
+    <section class="panel" id="accountSignedIn" hidden>
+      <header class="panel-head">
+        <div>
+          <h2>Account</h2>
+          <p class="sub">Signed in as <strong id="accountEmail">—</strong></p>
+        </div>
+        <button class="btn btn-ghost" id="signOutBtn">Sign out</button>
+      </header>
+
+      <div class="sync-rows">
+        <div class="sync-row">
+          <div>
+            <strong>Plan</strong>
+            <span id="planDetail">—</span>
+          </div>
+          <button class="btn btn-quiet" id="managePlan" hidden>Manage</button>
+        </div>
+        <div class="sync-row">
+          <div>
+            <strong>Sync status</strong>
+            <span id="syncDetail">—</span>
+          </div>
+          <button class="btn btn-quiet" id="syncNow">Sync now</button>
+        </div>
+        <div class="sync-row">
+          <div>
+            <strong>This device</strong>
+            <span id="deviceLabel">—</span>
+          </div>
+        </div>
+        <div class="sync-row">
+          <div>
+            <strong>Last updated</strong>
+            <span id="lastUpdated">—</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="notice notice--info">
+        Your schedule and settings sync automatically. If the same account is edited on
+        two devices at once, the most recent change wins.
+      </p>
+
+      <!-- Upgrade offer. Shown only when billing is configured and the
+           account is not currently entitled. -->
+      <div class="notice notice--info" id="trialNotice" hidden></div>
+
+      <section class="upgrade" id="upgradePanel" hidden>
+        <h3 id="upgradeHeading">Unlock sync and background alerts</h3>
+        <p>The timers, schedule and calculator are free forever on this device.
+        A plan adds your schedule on every device, and milestone alerts that reach
+        you even when the app is closed.</p>
+
+        <div class="plan-options">
+          <button class="plan-card is-best" id="buyAnnual" type="button">
+            <span class="plan-badge" id="annualSaving">Save $10.80 a year</span>
+            <span class="plan-name">Annual</span>
+            <span class="plan-price"><b id="annualPrice">$24</b><small id="annualPeriod">/year</small></span>
+            <span class="plan-note" id="annualNote">Works out at $2 a month</span>
+          </button>
+          <button class="plan-card" id="buyMonthly" type="button">
+            <span class="plan-name">Monthly</span>
+            <span class="plan-price"><b id="monthlyPrice">$2.90</b><small id="monthlyPeriod">/month</small></span>
+            <span class="plan-note">Try it first — cancel any time</span>
+          </button>
+        </div>
+
+        <div class="discount-row">
+          <label class="field field--grow">
+            <span>Discount code (optional)</span>
+            <input type="text" id="discountCode" autocomplete="off" spellcheck="false"
+                   placeholder="Enter a code">
+          </label>
+        </div>
+
+        <p class="hint">Prices include any sales tax or GST. If cost is a genuine
+        barrier for you, <a href="#" data-support-mailto
+        data-support-subject="Pie Timers access">get in
+        touch</a> — free access is available, no explanation needed.</p>
+
+        <div class="access-code-row">
+          <form class="signin-form" id="accessCodeForm" novalidate>
+            <label class="field field--grow">
+              <span>Have an access code?</span>
+              <input type="text" id="accessCode" autocomplete="off" spellcheck="false"
+                     placeholder="MATE-XXXX-XXXX">
+            </label>
+            <button class="btn btn-ghost" type="submit" id="redeemCode">Redeem</button>
+          </form>
+          <p class="status-line" id="accessCodeMessage" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="danger-zone">
+        <h3>Delete account</h3>
+        <p>Permanently deletes your account, your synced schedule and settings, and any
+        registered devices. This cannot be undone and support cannot recover it.</p>
+        <button class="btn btn-danger" id="deleteAccountBtn" type="button">Delete my account</button>
+      </section>
+    </section>
+  </section>
+
+
+</main>
+
+<footer class="site-foot">
+  <a href="terms.html" data-legal-link="terms">Terms of Service</a>
+  <a href="privacy.html" data-legal-link="privacy">Privacy Policy</a>
+  <a href="#" data-support-mailto data-support-subject="Pie Timers">Contact support</a>
+</footer>
+
+<!-- ───────────────────────── Delete confirmation ───────────────────────── -->
+<dialog class="modal" id="deleteDialog" aria-labelledby="deleteTitle">
+  <h2 id="deleteTitle">Delete your account?</h2>
+  <p>This permanently removes:</p>
+  <ul>
+    <li>your account and sign-in</li>
+    <li>your synced schedule and settings</li>
+    <li>every device registered for background alerts</li>
+  </ul>
+  <p class="modal-warn">This cannot be undone.</p>
+
+  <label class="field">
+    <span>Type <b>DELETE</b> to confirm</span>
+    <input type="text" id="deleteConfirmInput" autocomplete="off" spellcheck="false"
+           aria-describedby="deleteError">
+  </label>
+  <p class="status-line" id="deleteError" role="alert"></p>
+
+  <div class="modal-actions">
+    <button class="btn btn-ghost" id="deleteCancel" type="button">Cancel</button>
+    <button class="btn btn-danger" id="deleteConfirm" type="button" disabled>Delete permanently</button>
+  </div>
+</dialog>
+
+<!-- Announced to screen readers once a minute, never once a second: a
+     per-second live region would talk over everything else on the page. -->
+<div class="sr-only" id="srClock" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script src="billing.js"></script>
+<script src="notify.js"></script>
+<script src="sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

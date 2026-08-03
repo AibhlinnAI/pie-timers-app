@@ -1,0 +1,1085 @@
+/* ============================================================
+   Pie Timers — palette lifted verbatim from the workbook.
+   The green is Dulux Australia 'Government Green' (#32493C).
+   ============================================================ */
+:root{
+  /* ── Roles, not just colours ──
+     green    the default. Chrome, set fields, anything already decided.
+     purple   differentiation. Marks out a section that is not the default.
+     orange   highlight. Urgency, and where input is wanted — nowhere else.
+     peach    general fill. Never on a field, or it reads as editable.
+
+     Everything below is from the workbook. What changed is which role each
+     one plays, and a few darker variants added purely so text passes
+     contrast — see --orange-text and --orange-deep. */
+
+  --forest:      #32493C;   /* default — Dulux 'Government Green' */
+  --forest-lift: #4A6B56;
+  --purple:      #4B2A5A;   /* differentiation */
+  --purple-lift: #8A4DA5;
+  --violet:      #7030A0;
+  --orange:      #FF8A00;   /* highlight — fills, strokes, large glyphs */
+  --plum:        #2E1838;
+  --cream:       #F6D7B0;
+
+  /* Gentle fills */
+  --green-tint:  #E8EFEA;   /* softest green */
+  --green-mid:   #D9EAD3;   /* set fields */
+
+  /* The plate every pie sits on. Eaten pie shows the plate, so this is one
+     colour for all three timers rather than a tint of each. */
+  --plate:       #D9EAD3;
+  /* Nothing running today: one quiet colour for text AND plate, so an
+     idle timer never looks like a live one. */
+  --off:         #55645A;   /* dark enough to read on its own muted plate */
+  --off-plate:   #E4E8E5;
+  /* Solid, not translucent. Light-mode pies run from near-black purple to
+     bright orange, so no single plate lightness can separate both. A dark
+     edge clears 3:1 against the plate AND against every pie, which is how
+     WCAG 1.4.11 wants adjacent fills handled. */
+  --pie-edge:    #2C3D31;
+  --pie-edge-w:  2;
+  --purple-tint: #F1EAF5;   /* softest purple */
+  --purple-mid:  #D7CCE2;
+  --peach:       #FBE3D6;   /* general fill, never a field */
+  --amber-tint:  #FFF2CC;   /* input wanted */
+
+  --shell:       #F5F7F5;
+  --card:        #FFFFFF;
+
+  /* Text. #FF8A00 is ~2.6:1 on white, which fails at any size, so these
+     darker oranges carry the same meaning where the colour must be read. */
+  --orange-text: #8A4B00;   /* on amber or peach — 6.7:1 */
+  --orange-deep: #B85C00;   /* large numerals on white — 4.0:1 */
+
+  --ink:         #23301F;
+  --ink-muted:   #5C6B5F;
+  --on-dark:     #FFFFFF;
+
+  --line:        #DCE4DD;
+  --field-border:#C2D2C6;
+
+  /* Component colours that dark mode needs to reach. */
+  --header-from: #22332A;
+  --header-mid:  var(--forest);
+  /* Kept dark enough for orange title text to clear 3:1. */
+  --header-to:   #3E5A48;
+  --appt:        #A04F00;   /* text-safe orange — 5.0:1 on its own chip */
+  --appt-fill:   #FF8A00;   /* the pie itself */
+  /* Urgency is crimson, not a hotter orange — orange is already the
+     appointment colour, so escalation needed a different hue entirely. */
+  --urgent:      #C41E3A;
+  --urgent-text: #A81430;
+  --urgent-edge: var(--pie-edge);
+  --urgent-glow: rgba(196,30,58,.30);
+  --appt-soft:   #FFEAD1;
+  --urgent-appt: #C41E3A;
+  --plan-bg:     #FFFCF7;
+  --danger:      #8C2F2F;
+  --danger-bg:   #FDF6F6;
+  --danger-line: #E7C9C9;
+  --field-input-border: #E8CE8A;
+  --placeholder: #A5885A;
+  /* Ribbon: dulled green at rest, bright green rule under the selection. */
+  /* The calculator block keeps a dark ground in BOTH themes: it carries
+     cream and orange text, and --purple is light in dark mode. */
+  --calc-sub-fg: #D7CCE2;
+  --calc-from:   #2E1838;
+  --calc-to:     #4B2A5A;
+  --tab-active:    #A04F00;   /* orange dark enough for a near-white ribbon */
+  --btn-primary-fg:#FFFFFF;
+  --tab-idle:      #4E6856;   /* dulled, but still clears 4.5:1 */
+  --tab-hover:     #3E5A48;
+  --tab-shadow:    #32493C;
+  --tab-underline: #4E8C64;
+  --today-bg:      #FFF2CC;
+  --today-line:    var(--orange);
+  --thead-bg:    var(--forest);
+  --thead-fg:    #FFFFFF;
+  --tabs-bg:     rgba(255,255,255,.72);
+  --row-alt:     #FBF9FC;
+  --tick-over:   #FFFFFF;
+  --tick-under:  .28;
+  --tick-under-major: .45;
+  --radius:      16px;
+  --radius-sm:   10px;
+  --shadow:      0 1px 2px rgba(46,24,56,.06), 0 8px 24px rgba(46,24,56,.07);
+  --shadow-lg:   0 2px 4px rgba(46,24,56,.08), 0 18px 44px rgba(46,24,56,.12);
+
+  --font: "Aptos", "Aptos Narrow", "Segoe UI Variable Text", "Segoe UI",
+          system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --numeric: "Aptos", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+/* ═══════════════════════ DARK — the default ═══════════════════════
+   Green owns the daytime theme; purple owns the night one. Selected by
+   absence rather than presence, so dark is what you get unless light is
+   explicitly asked for — including before any script has run, which
+   avoids a white flash on load.
+
+   The accent colours invert rather than dim: #4B2A5A is a fine fill on
+   white and unreadable on near-black, so dark mode uses light tints of
+   the same hues and keeps the dark ones for backgrounds. */
+:root:not([data-theme="light"]){
+  --shell:       #16101B;
+  --card:        #241730;
+
+  --ink:         #EFE6F5;
+  --ink-muted:   #B4A3C0;
+  --line:        #3A2A47;
+  --field-border:#4A3559;
+
+  /* Accents, lightened for a dark ground */
+  --forest:      #7FB08C;
+  --forest-lift: #5C8C6B;
+  --purple:      #B07FE0;
+  --purple-lift: #E0BFF0;
+  /* Periwinkle rather than another lavender — two near-identical purple
+     pies side by side defeated the point of telling them apart. */
+  --appt:        #FFA333;
+  --appt-fill:   #FF8A00;
+  --urgent:      #D91E48;
+  --urgent-text: #FF7A96;
+  /* Crimson sits at ~2.2:1 on the Government Green plate, so the urgent
+     pie carries a light edge to keep the boundary readable. */
+  --urgent-edge: #FFD2DC;
+  --urgent-glow: rgba(217,30,72,.55);
+
+  /* Fills become dark shades of the same families */
+  --green-tint:  #22332B;   /* Government Green, darkened */
+  --green-mid:   #2A3D2F;
+  --plate:       #32493C;   /* Government Green itself */
+  --off:         #8B9A90;
+  --off-plate:   #272B29;
+  /* Dark mode pies already clear 3:1 on the plate, so the edge is only
+     there to tidy the join. */
+  --pie-edge:    rgba(0,0,0,.35);
+  --pie-edge-w:  1.5;
+  --purple-tint: #2E1F3A;
+  --purple-mid:  #433052;
+  --appt-soft:   #3A2A18;
+  --urgent-appt: #D91E48;
+  --peach:       #3A2A2E;
+  --amber-tint:  #3A2E14;
+  --plan-bg:     #2E2418;
+
+  /* #FF8A00 is 7.9:1 on the dark card, so bright orange is readable here
+     and the darkened light-mode variants would be too muddy. */
+  --orange-text: #FFB34D;
+  --orange-deep: #FFA333;
+  --field-input-border: #6B5522;
+  --placeholder: #9A8560;
+
+  --header-from: #1C1024;
+  --header-mid:  #3A2147;
+  --header-to:   #2E4438;   /* Government Green, lifted — the touch of green */
+
+  --danger:      #E88A8A;
+  --danger-bg:   #331F22;
+  --danger-line: #52343A;
+
+  /* Notches need more presence against a dark eaten area. */
+  --calc-sub-fg: #C3B0D2;   /* must stay light: the block is dark in both themes */
+  --calc-from:   #2A1B3A;
+  --calc-to:     #43284F;
+  --tab-active:    #FF8A00;
+  --btn-primary-fg:#16101B;   /* the primary button is light green here */
+  --tab-idle:      #8FA894;
+  --tab-hover:     #B6D0BC;
+  --tab-shadow:    #1B2A20;
+  --tab-underline: #6FD08C;
+  --today-bg:      #3A2E14;
+  --today-line:    var(--orange);
+  --thead-bg:    #43284F;
+  --thead-fg:    #EFE6F5;
+  --tabs-bg:     rgba(22,16,27,.82);
+  --row-alt:     #2B1C37;
+  --tick-over:   #16101B;
+  --toast-bg:    #4B2A5A;
+  --tick-under:  .4;
+  --tick-under-major: .6;
+
+  --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
+  --shadow-lg:   0 2px 4px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.42);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"]{ color-scheme: light; }
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+/* A class that sets `display` outranks the UA rule for [hidden], so any
+   element toggled from JS would stay visible without this. */
+[hidden]{ display:none !important; }
+
+html{ -webkit-text-size-adjust:100%; }
+
+/* Present for screen readers, invisible on screen. Not display:none, which
+   would remove it from the accessibility tree entirely. */
+.sr-only{
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+}
+
+/* Hidden until focused, so a keyboard user can jump the tab bar.
+   Fixed, not absolute: an absolutely-positioned skip link sits at the top
+   of the *document*, so once the page is scrolled it stays off-screen even
+   when focused — which is precisely when someone needs it. */
+.skip-link{
+  position:fixed; left:12px; top:-100px; z-index:60;
+  padding:10px 16px; border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  background:var(--card); color:var(--ink);
+  font-size:.9rem; font-weight:600; text-decoration:none;
+  box-shadow:var(--shadow-lg);
+  transition:top .12s ease;
+}
+.skip-link:focus{ top:0; outline:2px solid var(--orange); outline-offset:2px; }
+
+.tablist{ display:flex; gap:4px; }
+
+body{
+  margin:0;
+  font-family:var(--font);
+  color:var(--ink);
+  /* Very low-saturation wash. Enough depth to separate cards from the page,
+     far short of anything that competes with the pies. */
+  background:
+    radial-gradient(1100px 600px at 12% -10%, var(--green-tint) 0%, transparent 60%),
+    radial-gradient(900px 520px at 96% 0%, var(--purple-tint) 0%, transparent 55%),
+    var(--shell);
+  background-attachment:fixed;
+  min-height:100vh;
+  line-height:1.45;
+}
+
+h1,h2,h3{ margin:0; font-weight:700; letter-spacing:-.012em; }
+button{ font:inherit; }
+
+/* ───────────────────────── Top bar ───────────────────────── */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;
+  padding:20px clamp(16px,4vw,40px);
+  /* Green leads, because green is the default. */
+  background:linear-gradient(115deg, var(--header-from) 0%, var(--header-mid) 58%, var(--header-to) 100%);
+  color:var(--on-dark);
+  box-shadow:0 10px 30px rgba(35,48,31,.22);
+}
+
+/* The mark stretches to the text block: top of "Pie Timers" to the bottom
+   of the tagline, and square. */
+/* The mark matches the text block: top of "Pie Timers" to the bottom of
+   the tagline, and square. Sized by the same clamps the text uses rather
+   than by `stretch` + `aspect-ratio`, which feed back into each other on a
+   content-sized flex parent and blow the mark up to hundreds of pixels. */
+.brand{
+  display:flex; align-items:center; gap:14px; min-width:0;
+  --title-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  --tag-size:   clamp(.58rem, 1.55vw, .82rem);
+  --mark-size:  calc(var(--title-size) * 1.2 + 4px + var(--tag-size) * 1.3);
+}
+.mark{ width:var(--mark-size); height:var(--mark-size); flex:none; }
+
+.brand-text{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
+
+/* Orange rather than white, because white was the one dull thing on the
+   page. Government Green as an offset shadow gives it depth without
+   touching legibility — the green is the shadow, never the text, since
+   #32493C on this header would be 1.6:1. */
+.brand-text h1{
+  font-size:var(--title-size); line-height:1.2;
+  color:var(--orange);
+  text-shadow:2px 2px 0 #32493C, 0 2px 10px rgba(0,0,0,.5);
+  letter-spacing:-.01em;
+}
+
+/* One line, always. The clamp is what keeps it unbroken on a phone. */
+.brand-text p{
+  margin:4px 0 0; color:var(--cream); opacity:.92;
+  line-height:1.3;
+  font-size:var(--tag-size);
+  white-space:nowrap;
+}
+
+.now{ text-align:right; }
+.now-time{
+  font-family:var(--numeric);
+  font-size:clamp(1.6rem,4.2vw,2.15rem);
+  font-weight:700; line-height:1;
+  color:var(--orange);
+  font-variant-numeric:tabular-nums;
+}
+.now-date{ font-size:.84rem; color:var(--cream); margin-top:5px; }
+
+/* ───────────────────────── Tabs ───────────────────────── */
+.tabs{
+  display:flex; gap:4px; overflow-x:auto;
+  padding:0 clamp(16px,4vw,40px);
+  background:var(--tabs-bg);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  position:sticky; top:0; z-index:20;
+  scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{ display:none; }
+
+.tab{
+  appearance:none; border:0; background:none; cursor:pointer;
+  padding:14px 16px; white-space:nowrap;
+  font-size:.92rem; font-weight:600; color:var(--ink-muted);
+  border-bottom:3px solid transparent;
+  transition:color .16s ease, border-color .16s ease;
+}
+/* Unselected tabs sit back in a dulled green; the selected one comes
+   forward in orange with the same green shadow as the wordmark, over a
+   brighter green rule. */
+.tab{ color:var(--tab-idle); }
+.tab:hover{ color:var(--tab-hover); }
+
+.tab.is-active{
+  color:var(--tab-active);
+  text-shadow:1px 1px 0 var(--tab-shadow);
+  border-bottom-color:var(--tab-underline);
+}
+.tab:focus-visible{ outline:2px solid var(--tab-underline); outline-offset:-4px; border-radius:6px; }
+
+/* ───────────────────────── Layout ───────────────────────── */
+main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px,4vw,40px) 56px; }
+.view{ display:none; animation:fade .22s ease; }
+.view.is-active{ display:block; }
+@keyframes fade{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none; } }
+
+/* ───────────────────────── Welcome ─────────────────────────
+   A Government Green panel with fixed colours in both themes, like the
+   calculator block. It carries light text, so it cannot inherit --ink,
+   which flips dark in light mode. */
+.welcome{
+  --welcome-btn: #4B2A5A;
+  --welcome-btn-text: #6FD08C;
+  background:#32493C;
+  border:1px solid #4A6B56;
+  border-radius:var(--radius); padding:20px 22px; margin-bottom:22px;
+}
+/* #FF8A00 is only 4.1:1 on Government Green, and at 17.6px bold this needs
+   the full 4.5. The lifted orange gets 5.2:1 and still reads as the brand. */
+.welcome h2{
+  font-size:1.1rem; color:#FFA333;
+  text-shadow:1px 1px 0 rgba(0,0,0,.45);
+}
+/* Two sentences, two lines — the second is the one that explains the point,
+   so it earns its own line rather than trailing the first. Tight spacing
+   between them, a proper gap before the buttons. */
+.welcome p{
+  margin:8px 0 2px; font-size:.9rem; color:#F0EFE6;
+  max-width:60ch; line-height:1.5;
+}
+.welcome p + p{ margin-top:0; }
+.welcome p:last-of-type{ margin-bottom:16px; }
+.welcome-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+/* Both buttons are purple with neon green lettering — the ghost variant
+   included, so the pair reads as one set rather than a primary and an
+   afterthought. */
+.welcome .btn{
+  background:var(--welcome-btn);
+  /* The purple sits at 1.2:1 against Government Green — near-identical
+     luminance, so the button would dissolve into the panel. The neon edge
+     is what makes it a button, and it clears 7.7:1 on the green. */
+  border:2px solid var(--welcome-btn-text);
+  color:var(--welcome-btn-text);
+  font-weight:700;
+}
+.welcome .btn:hover{ background:#5C3570; }
+.welcome .btn:focus-visible{ outline:2px solid var(--welcome-btn-text); outline-offset:2px; }
+
+/* The panel is the first thing on the page, so the view's own focus ring
+   would double up with the button's. */
+.view:focus{ outline:none; }
+.view:focus-visible{ outline:2px solid var(--orange); outline-offset:4px; border-radius:var(--radius); }
+
+/* ───────────────────────── Day strip ───────────────────────── */
+.daystrip{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(160px, 100%),1fr)); gap:1px;
+  background:var(--line);
+  border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; box-shadow:var(--shadow); margin-bottom:22px;
+}
+.daystrip-item{ background:var(--card); padding:14px 18px; }
+.daystrip-item .k{
+  display:block; font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  color:var(--ink-muted);
+}
+.daystrip-item .v{
+  display:block; margin-top:4px; font-size:1.08rem; font-weight:700; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ───────────────────────── Timer cards ───────────────────────── */
+/* min() so the 320px track can shrink below its floor on a narrow phone.
+   Without it an iPhone SE (320px) overflowed by 16px and scrolled sideways. */
+.timer-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap:22px; margin-bottom:26px;
+}
+
+.timer-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:22px 22px 20px;
+  box-shadow:var(--shadow-lg);
+  position:relative; overflow:hidden;
+}
+.timer-card::before{ content:""; position:absolute; inset:0 0 auto; height:4px; }
+.timer-card--purple::before{ background:linear-gradient(90deg, var(--purple), var(--purple-lift)); }
+.timer-card--green::before{  background:linear-gradient(90deg, var(--forest), #5C7A63); }
+
+.timer-card--amber::before{ background:linear-gradient(90deg, var(--appt-fill), var(--appt)); }
+
+.timer-card--purple{ --accent:var(--purple); --accent-soft:var(--purple-tint); }
+.timer-card--green{  --accent:var(--forest); --accent-soft:var(--green-tint); }
+/* A muted purple rather than full violet — three saturated pies side by
+   side was the point at which the dashboard started to shout. */
+.timer-card--amber{ --accent:var(--appt); --accent-fill:var(--appt-fill); --accent-soft:var(--appt-soft); --urgent:var(--urgent-appt); }
+
+.timer-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.timer-head h2{ font-size:1.05rem; color:var(--accent); }
+
+.chip{
+  font-size:.78rem; font-weight:700; padding:5px 11px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent); white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+/* Dial — a solid reducing pie. The filled area is the time remaining, so
+   how much is left reads instantly without processing any numbers. */
+.dial-wrap{ width:216px; max-width:100%; margin:4px auto 0; aspect-ratio:1; }
+.dial{ width:100%; height:100%; display:block; }
+
+.dial-base{ fill:var(--plate); }
+.dial-rim{ fill:none; stroke:var(--pie-edge); stroke-width:var(--pie-edge-w); stroke-opacity:.7; }
+
+.dial-pie{ fill:var(--accent-fill, var(--accent)); stroke:var(--pie-edge); stroke-width:var(--pie-edge-w); }
+/* ── Nothing running today ──
+   Card, text and plate all move to one neutral colour. An idle timer that
+   kept its accent looked like a live one that had simply not started. */
+.timer-card.is-off{
+  --accent:var(--off); --accent-fill:var(--off);
+  --accent-soft:var(--off-plate); --plate:var(--off-plate);
+}
+.timer-card.is-off::before{ background:var(--off); opacity:.5; }
+.timer-card.is-off .dial-rim{ stroke:var(--off); stroke-opacity:.4; }
+.timer-card.is-off .status,
+.timer-card.is-off .dial-small,
+.timer-card.is-off .meter-legend b{ color:var(--off); }
+
+.daystrip-item .v.is-off{ color:var(--off); }
+
+/* ── Urgent ──
+   Crimson, with a warm halo spilling off the pie onto the card behind it.
+   Static, not pulsing: the colour change is the signal, and a throbbing
+   card would be exactly the kind of attention-grab this app avoids. */
+.timer-card.is-urgent{
+  box-shadow:var(--shadow-lg), 0 0 34px -4px var(--urgent-glow);
+  border-color:var(--urgent);
+}
+.timer-card.is-urgent::before{ background:var(--urgent); }
+
+.timer-card.is-urgent .dial-pie{
+  fill:var(--urgent);
+  stroke:var(--urgent-edge);
+  filter:drop-shadow(0 0 7px var(--urgent-glow));
+}
+.timer-card.is-urgent .dial-rim{ stroke:var(--urgent); stroke-opacity:.55; }
+.timer-card.is-urgent .dial-big{ color:var(--urgent-text); }
+
+/* Notches are the timer's own units — 30-minute pieces on a work-day pie,
+   whole days on a distant appointment. Drawn twice: accent-coloured beneath
+   the wedge so they show on the eaten side, and light on top so the pieces
+   still to come stay countable. */
+.dial-ticks line{ stroke:var(--accent); stroke-opacity:var(--tick-under); stroke-width:2; stroke-linecap:round; }
+.dial-ticks line.is-major{ stroke-opacity:var(--tick-under-major); stroke-width:3.5; }
+
+.dial-ticks--over line{ stroke:var(--tick-over); stroke-opacity:.5; }
+.dial-ticks--over line.is-major{ stroke-opacity:.75; }
+
+.dial-readout{ text-align:center; margin:14px 0 18px; }
+.dial-big{
+  font-family:var(--numeric); font-weight:700; line-height:1;
+  font-size:clamp(1.5rem,5.6vw,2.05rem); color:var(--accent);
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+}
+.dial-small{ margin-top:6px; font-size:.75rem; font-weight:600; color:var(--ink-muted); }
+
+/* Meter */
+.meter-bar{
+  height:8px; border-radius:999px; background:var(--accent-soft); overflow:hidden; margin-bottom:10px;
+}
+.meter-bar span{ background:var(--accent-fill, var(--accent));
+  display:block; height:100%; border-radius:999px; background:var(--accent);
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+}
+.timer-card.is-urgent .meter-bar span{ background:var(--urgent); }
+.timer-card.is-urgent .dot-elapsed{ background:var(--urgent); }
+
+.meter-legend{
+  display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  font-size:.79rem; color:var(--ink-muted);
+}
+.meter-legend b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+/* These are <i> elements used as swatches; reset the inherited italic. */
+.dot{
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  margin-right:6px; vertical-align:1px; font-style:normal;
+}
+.dot-elapsed{ background:var(--accent); }
+.dot-remaining{ background:var(--accent-soft); border:1px solid var(--accent); }
+
+.status{
+  margin:14px 0 0; padding-top:13px; border-top:1px solid var(--line);
+  font-size:.86rem; font-weight:600; color:var(--ink-muted); min-height:1.2em;
+}
+.timer-card.is-urgent .status{ color:var(--urgent-text); }
+
+/* ───────────────────────── Appointments ───────────────────────── */
+.appt-empty{ text-align:center; padding:34px 12px 26px; }
+.appt-empty p{ margin:0 0 6px; font-size:.95rem; font-weight:600; color:var(--accent); }
+.appt-empty .appt-empty-sub{
+  font-size:.82rem; font-weight:400; color:var(--ink-muted);
+  margin:0 auto 10px; max-width:34ch; line-height:1.5;
+}
+/* The three tiers as a list rather than a sentence — one idea per line is
+   easier to hold than a clause chain. */
+.appt-empty-list{
+  margin:0 auto 16px; padding:0; list-style:none;
+  max-width:30ch; text-align:left;
+  font-size:.82rem; color:var(--ink-muted); line-height:1.5;
+}
+.appt-empty-list li{ padding-left:16px; position:relative; margin-bottom:3px; }
+.appt-empty-list li::before{
+  content:""; position:absolute; left:2px; top:.62em;
+  width:5px; height:5px; border-radius:50%; background:var(--accent);
+}
+
+.appt-form{
+  display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;
+  padding-bottom:18px; margin-bottom:16px; border-bottom:1px solid var(--line);
+}
+.appt-form .field input{ width:100%; min-width:0; }
+/* Keep name + date + time + button on one row at normal panel widths. */
+.appt-form .field--grow{ flex:1 1 170px; }
+.appt-form .field{ flex:0 1 140px; }
+.appt-form .btn{ flex:none; }
+
+.appt-list{ list-style:none; margin:0; padding:0; }
+.appt-item{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:12px 0; border-bottom:1px solid var(--line);
+}
+.appt-item:last-child{ border-bottom:0; }
+.appt-item strong{ display:block; font-size:.92rem; color:var(--ink); }
+.appt-item span{
+  display:block; margin-top:2px; font-size:.81rem; color:var(--ink-muted);
+  font-variant-numeric:tabular-nums;
+}
+
+.appt-tag{
+  display:inline-block; margin-left:8px; font-style:normal;
+  font-size:.68rem; font-weight:700; letter-spacing:.01em;
+  color:var(--appt); background:var(--appt-soft);
+  padding:2px 7px; border-radius:999px; vertical-align:2px;
+}
+
+/* ───────────────────────── Calendar sync ───────────────────────── */
+.calendar-form{
+  display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:4px;
+}
+.calendar-form .field--grow{ flex:1 1 260px; }
+.calendar-form .field{ flex:0 1 150px; }
+.calendar-form .field input{ width:100%; min-width:0; }
+.calendar-form .btn{ flex:none; }
+
+.chip--plan{ background:var(--purple-tint); color:var(--purple); }
+
+#googleConnect .hint{ margin-top:10px; }
+#googleConnect .or{ margin:20px 0 4px; }
+
+.row-actions{ display:flex; gap:8px; flex-wrap:wrap; flex:none; }
+.sync-row span.is-error{ color:var(--orange-text); }
+
+.help{ margin-top:20px; border-top:1px solid var(--line); padding-top:16px; }
+.help summary{
+  cursor:pointer; font-size:.85rem; font-weight:600; color:var(--violet);
+  list-style:none;
+}
+.help summary::-webkit-details-marker{ display:none; }
+.help summary::before{ content:"▸ "; }
+.help[open] summary::before{ content:"▾ "; }
+.help ul{ margin:12px 0 0; padding-left:20px; font-size:.84rem; color:var(--ink-muted); }
+.help li{ margin-bottom:6px; line-height:1.5; }
+.help strong{ color:var(--ink); }
+
+.mini-select{
+  font:inherit; font-size:.85rem; padding:7px 10px;
+  border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink);
+}
+.mini-select:focus{ outline:2px solid var(--forest); outline-offset:1px; border-color:var(--forest); }
+
+/* ───────────────────────── Panels ───────────────────────── */
+.panel{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:22px clamp(16px,3vw,24px); margin-bottom:22px;
+}
+.panel-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:16px; flex-wrap:wrap; margin-bottom:16px;
+}
+/* Panel headings echo the wordmark: orange lettering, green shadow. */
+.panel-head h2{
+  font-size:1.05rem;
+  color:var(--orange-deep);
+  text-shadow:1px 1px 0 var(--tab-shadow);
+}
+.sub{ margin:5px 0 0; font-size:.85rem; color:var(--ink-muted); max-width:60ch; }
+.sub--foot{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+
+/* ───────────────────────── Tables ───────────────────────── */
+.table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.grid{ width:100%; border-collapse:collapse; font-size:.9rem; min-width:520px; }
+.grid th{
+  text-align:left; padding:10px 14px;
+  font-size:.75rem; font-weight:700; letter-spacing:.01em;
+  color:var(--thead-fg); background:var(--thead-bg); white-space:nowrap;
+}
+.grid th:first-child{ border-top-left-radius:var(--radius-sm); }
+.grid th:last-child{ border-top-right-radius:var(--radius-sm); }
+.grid td{ padding:10px 14px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.grid tbody tr:nth-child(even){ background:var(--row-alt); }
+/* Today should be findable without reading. Amber ground, an orange bar
+   down the leading edge, and heavier type. */
+.grid tbody tr.is-today{ background:var(--today-bg); }
+.grid tbody tr.is-today td{
+  font-weight:700; color:var(--orange-text);
+  border-top:1px solid var(--today-line); border-bottom:1px solid var(--today-line);
+}
+.grid tbody tr.is-today td:first-child{
+  box-shadow:inset 4px 0 0 var(--today-line);
+  border-left:0;
+}
+
+.grid tbody tr.is-off td{ color:var(--off); }
+/* Freedom shares the day name's colour. One state, one colour — a green
+   word beside a grey day read as though something were still running. */
+.grid tbody tr.is-off td.is-freedom{
+  color:var(--off); font-weight:600; letter-spacing:.01em;
+}
+.grid td.day-name{ font-weight:600; }
+
+/* Set fields are green: this is decided, nothing wanted from you. */
+.grid--edit input[type="time"]{
+  font:inherit; font-variant-numeric:tabular-nums;
+  padding:6px 9px; border:1px solid var(--field-border); border-radius:8px;
+  background:var(--green-mid); color:var(--forest); font-weight:600;
+  min-width:118px;
+}
+.grid--edit input[type="time"]:focus{
+  outline:2px solid var(--forest); outline-offset:1px; border-color:var(--forest);
+}
+.grid--edit input[type="time"]:disabled{
+  background:transparent; color:var(--ink-muted); border-color:var(--line); font-weight:400; opacity:.55;
+}
+
+/* "Head Home" is its own column now: the heading carries the words, so the
+   cells hold nothing but a box. Reads far cleaner than a label per row. */
+.grid--edit th.home-col{ text-align:center; white-space:nowrap; }
+.grid--edit td.home-cell{ text-align:center; }
+.grid--edit td.home-cell input{ width:17px; height:17px; }
+.grid--edit td.home-cell input:disabled{ opacity:.35; cursor:not-allowed; }
+
+.saved{ margin:14px 0 0; font-size:.8rem; color:var(--ink-muted); }
+
+/* Checkbox / switch */
+input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cursor:pointer; }
+.switch{ width:20px; height:20px; }
+
+/* ── Where input is wanted ──
+   Amber fill with a dark-orange label. #FF8A00 itself is only ~2:1 on
+   #FFF2CC, so the readable variant carries the meaning and the bright
+   orange stays for fills and marks. Applied to entry forms only —
+   never to a field that already holds a decision. */
+.appt-form .field input,
+.calendar-form .field input,
+.signin-form .field input,
+.discount-row .field input,
+.access-code-row .field input,
+.naming .field input,
+.modal .field input{
+  background:var(--amber-tint);
+  border-color:var(--field-input-border);
+  color:var(--ink);
+}
+.appt-form .field span,
+.calendar-form .field span,
+.signin-form .field span,
+.discount-row .field span,
+.access-code-row .field span,
+.naming .field span{ color:var(--orange-text); }
+
+.appt-form .field input::placeholder,
+.calendar-form .field input::placeholder,
+.signin-form .field input::placeholder,
+.discount-row .field input::placeholder,
+.access-code-row .field input::placeholder,
+.naming .field input::placeholder{ color:var(--placeholder); }
+
+.appt-form .field input:focus,
+.calendar-form .field input:focus,
+.signin-form .field input:focus,
+.discount-row .field input:focus,
+.access-code-row .field input:focus,
+.naming .field input:focus,
+.modal .field input:focus{ outline:2px solid var(--orange); outline-offset:1px; border-color:var(--orange); }
+
+/* Naming controls sit apart from the grid above them. */
+.naming{
+  display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;
+  margin-top:18px; padding:16px 18px;
+  background:var(--peach); border-radius:var(--radius-sm);
+}
+.naming .field--grow{ flex:0 1 240px; }
+.naming .field input{ width:100%; }
+.setting--inline{ flex:1 1 280px; padding:0; border:0; align-items:center; }
+
+/* ───────────────────────── Buttons ───────────────────────── */
+.btn{
+  appearance:none; cursor:pointer; border-radius:999px;
+  padding:8px 16px; font-size:.84rem; font-weight:600;
+  border:1px solid var(--field-border); background:transparent; color:var(--forest);
+  transition:background .15s ease, color .15s ease, border-color .15s ease;
+}
+.btn:hover{ background:var(--green-tint); }
+.btn:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
+.btn-ghost{ background:transparent; }
+.btn-quiet{ border-color:var(--line); color:var(--ink-muted); }
+.btn-quiet:hover{ border-color:var(--orange); color:var(--orange); background:var(--amber-tint); }
+
+/* ───────────────────────── Calculator ───────────────────────── */
+.calc-controls{
+  display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;
+  padding-bottom:20px; margin-bottom:22px; border-bottom:1px solid var(--line);
+}
+.field{ display:flex; flex-direction:column; gap:6px; }
+.field span{
+  font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  color:var(--ink-muted);
+}
+.field input, .field select{
+  font:inherit; padding:9px 12px; border:1px solid var(--line);
+  border-radius:var(--radius-sm); background:var(--card); color:var(--ink);
+  font-variant-numeric:tabular-nums; min-width:150px;
+}
+.field input:focus, .field select:focus{ outline:2px solid var(--forest); outline-offset:1px; border-color:var(--forest); }
+.quickset{ display:flex; gap:8px; flex-wrap:wrap; }
+
+.calc-result{ display:grid; gap:20px; }
+.calc-block{
+  background:linear-gradient(125deg, var(--calc-from), var(--calc-to));
+  border-radius:var(--radius); padding:26px 24px; text-align:center; color:var(--on-dark);
+}
+.calc-block .k{
+  display:block; font-size:.68rem; font-weight:700; letter-spacing:.13em;
+  color:var(--cream);
+}
+.calc-big{
+  display:block; margin-top:10px;
+  font-family:var(--numeric); font-weight:700; line-height:1.05;
+  font-size:clamp(1.9rem,7vw,3rem); color:var(--orange);
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+}
+.calc-sub{ display:block; margin-top:8px; font-size:.86rem; color:var(--calc-sub-fg); }
+
+.calc-split{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(120px, 100%),1fr)); gap:12px; }
+.calc-cell{
+  background:var(--purple-tint); border:1px solid var(--purple-mid);
+  border-radius:var(--radius-sm); padding:14px 16px; text-align:center;
+}
+.calc-cell .k{
+  display:block; font-size:.66rem; font-weight:700; letter-spacing:.09em;
+  color:var(--ink-muted);
+}
+.calc-cell strong{
+  display:block; margin-top:5px; font-size:1.4rem; color:var(--purple);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ───────────────────────── Settings ───────────────────────── */
+.settings-list{ display:flex; flex-direction:column; }
+.setting{
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+  padding:15px 0; border-bottom:1px solid var(--line); cursor:pointer;
+}
+.setting:last-child{ border-bottom:0; }
+.setting strong{ display:block; font-size:.94rem; color:var(--ink); }
+.setting span{ display:block; margin-top:3px; font-size:.82rem; color:var(--ink-muted); }
+.danger-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
+
+/* ───────────────────────── Sync pill ───────────────────────── */
+.sync-pill{
+  display:inline-flex; align-items:center; gap:7px;
+  margin-left:auto; align-self:center;
+  padding:5px 12px; border-radius:999px;
+  font-size:.75rem; font-weight:600; white-space:nowrap;
+  background:var(--green-tint); color:var(--forest);
+}
+.sync-pill i{ width:7px; height:7px; border-radius:50%; background:currentColor; flex:none; }
+.sync-pill[data-status="synced"]{ background:var(--green-mid); color:var(--forest); }
+.sync-pill[data-status="syncing"]{ background:var(--amber-tint); color:#8A5A00; }
+.sync-pill[data-status="offline"]{ background:var(--row-alt); color:var(--ink-muted); }
+.sync-pill[data-status="free"]{ background:var(--purple-tint); color:var(--purple); }
+.sync-pill[data-status="error"]{ background:var(--peach); color:var(--orange-text); }
+.sync-pill[data-status="syncing"] i{ animation:pulse 1.4s ease-in-out infinite; }
+
+/* ───────────────────────── Account ───────────────────────── */
+.signin-form{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+.field--grow{ flex:1 1 260px; }
+.field--grow input{ width:100%; }
+
+.btn-primary{
+  background:var(--forest); border-color:var(--forest); color:var(--btn-primary-fg);
+  padding:10px 22px;
+}
+.btn-primary:hover{ background:var(--header-from); border-color:var(--header-from); }
+.btn-primary:disabled{ opacity:.55; cursor:not-allowed; }
+
+.hint{ margin:12px 0 0; font-size:.82rem; color:var(--ink-muted); }
+
+.or{
+  display:flex; align-items:center; gap:14px;
+  margin:22px 0; color:var(--ink-muted); font-size:.78rem;
+}
+.or::before, .or::after{ content:""; flex:1; height:1px; background:var(--line); }
+
+.btn-google{
+  display:inline-flex; align-items:center; gap:10px;
+  background:var(--card); border:1px solid var(--purple-mid); color:var(--ink);
+  padding:10px 20px; border-radius:999px; cursor:pointer;
+  font-size:.88rem; font-weight:600;
+}
+.btn-google:hover{ background:var(--shell); }
+.btn-google:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
+
+.status-line{ margin:16px 0 0; font-size:.85rem; color:var(--ink-muted); min-height:1.2em; }
+.status-line.is-error{ color:var(--orange-text); font-weight:600; }
+
+.sync-rows{ display:flex; flex-direction:column; }
+.sync-row{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px 0; border-bottom:1px solid var(--line);
+}
+.sync-row:last-child{ border-bottom:0; }
+.sync-row strong{ display:block; font-size:.9rem; color:var(--ink); }
+.sync-row span{
+  display:block; margin-top:3px; font-size:.82rem; color:var(--ink-muted);
+  word-break:break-all;
+}
+
+/* ───────────────────────── Turnstile ───────────────────────── */
+.turnstile-host{ margin-top:14px; min-height:0; }
+
+/* ───────────────────────── Upgrade ───────────────────────── */
+.upgrade{
+  margin-top:24px; padding:20px;
+  border:1px solid var(--purple-mid); border-radius:var(--radius-sm);
+  background:linear-gradient(160deg, var(--purple-tint), var(--card));
+}
+.upgrade h3{ font-size:1rem; color:var(--purple); }
+.upgrade > p{ margin:6px 0 16px; font-size:.85rem; color:var(--ink-muted); max-width:62ch; }
+
+.plan-options{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(180px, 100%),1fr)); gap:12px; }
+
+.plan-card{
+  appearance:none; cursor:pointer; text-align:left;
+  display:flex; flex-direction:column; gap:4px;
+  padding:16px 18px; border-radius:var(--radius-sm);
+  border:1.5px solid var(--purple-mid); background:var(--card); color:var(--ink);
+  transition:border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.plan-card:hover{ border-color:var(--forest); box-shadow:var(--shadow); }
+.plan-card:active{ transform:translateY(1px); }
+.plan-card:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
+.plan-card.is-best{ border-color:var(--orange); background:var(--plan-bg); position:relative; }
+
+.plan-badge{
+  align-self:flex-start; margin-bottom:2px;
+  font-size:.72rem; font-weight:700; letter-spacing:.01em;
+  color:#fff; background:var(--orange);
+  padding:3px 9px; border-radius:999px;
+}
+
+.plan-name{
+  font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  color:var(--ink-muted);
+}
+.plan-price{
+  font-family:var(--numeric); font-size:1.6rem; font-weight:700;
+  color:var(--purple); line-height:1.1;
+}
+.plan-price b{ font-weight:700; }
+.plan-price small{ font-size:.8rem; font-weight:600; color:var(--ink-muted); }
+.plan-card.is-best .plan-price{ color:var(--orange); }
+.plan-note{ font-size:.78rem; color:var(--ink-muted); }
+
+.access-code-row{
+  margin-top:18px; padding-top:16px; border-top:1px solid var(--purple-mid);
+}
+.access-code-row .field span{ color:var(--ink-muted); }
+.access-code-row input{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+.discount-row{ margin-top:16px; }
+.discount-row .field span em{ font-style:normal; color:#9C90A3; font-weight:600; }
+.upgrade .hint a{ color:var(--violet); }
+.upgrade .hint b{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
+  background:var(--card); border:1px solid var(--purple-mid); border-radius:5px;
+  padding:1px 6px; letter-spacing:.04em; }
+
+/* ───────────────────────── Danger zone ───────────────────────── */
+.danger-zone{
+  margin-top:26px; padding:18px 20px;
+  border:1px solid var(--danger-line); border-radius:var(--radius-sm);
+  background:var(--danger-bg);
+}
+.danger-zone h3{ font-size:.95rem; color:var(--danger); }
+.danger-zone p{ margin:6px 0 14px; font-size:.83rem; color:var(--ink-muted); max-width:62ch; }
+
+.btn-danger{
+  background:var(--danger); border-color:var(--danger); color:var(--card);
+}
+.btn-danger:hover{ filter:brightness(.9); }
+.btn-danger:disabled{ opacity:.45; cursor:not-allowed; background:var(--danger); }
+
+/* ───────────────────────── Modal ───────────────────────── */
+.modal{
+  border:0; border-radius:var(--radius); padding:26px;
+  max-width:440px; width:calc(100vw - 32px);
+  box-shadow:var(--shadow-lg); color:var(--ink);
+  background:var(--card);
+}
+.modal::backdrop{ background:rgba(46,24,56,.55); backdrop-filter:blur(2px); }
+.modal h2{ font-size:1.1rem; color:var(--danger); margin-bottom:10px; }
+.modal p{ margin:0 0 10px; font-size:.87rem; color:var(--ink-muted); }
+.modal ul{ margin:0 0 12px; padding-left:20px; font-size:.87rem; color:var(--ink-muted); }
+.modal li{ margin-bottom:3px; }
+.modal-warn{ font-weight:700; color:var(--danger) !important; }
+.modal .field{ margin-top:16px; }
+.modal .field input{ width:100%; }
+.modal .field b{ color:var(--danger); letter-spacing:.06em; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap; }
+
+/* ───────────────────────── Notices ───────────────────────── */
+.notice{
+  margin:18px 0 0; padding:13px 16px; border-radius:var(--radius-sm);
+  font-size:.84rem; line-height:1.5; border-left:3px solid;
+}
+.notice strong{ display:block; margin-bottom:2px; }
+.notice code{
+  font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size:.92em; background:rgba(46,24,56,.07); padding:1px 5px; border-radius:4px;
+}
+.notice--info{ background:var(--purple-tint); border-color:var(--forest); color:var(--ink); }
+
+/* Owner-facing setup hint: present, but clearly secondary to the plain
+   sentence above it. */
+.setup-note{
+  display:block; margin-top:8px; padding-top:8px;
+  border-top:1px solid var(--line);
+  font-size:.78rem; color:var(--ink-muted);
+  max-width:70ch;
+}
+.setup-note code{
+  font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size:.92em; background:var(--green-tint);
+  padding:1px 5px; border-radius:4px;
+}
+/* Inside a settings row the description is already small, so the note
+   needs no rule above it — just separation. */
+.setting .setup-note{ border-top:0; padding-top:0; margin-top:5px; opacity:.85; }
+.notice--warn{ background:var(--amber-tint); border-color:var(--orange); color:var(--orange-text); }
+
+.setting input:disabled{ opacity:.45; cursor:not-allowed; }
+
+/* ───────────────────────── Live note & toast ───────────────────────── */
+.livenote{
+  display:flex; align-items:center; gap:9px; justify-content:center;
+  margin:26px 0 0; font-size:.8rem; color:var(--ink-muted);
+}
+/* Static, deliberately. A dot pulsing all day is ambient motion competing
+   for attention, and the ticking clock already shows the app is live. */
+.pulse{ width:8px; height:8px; border-radius:50%; background:var(--orange); flex:none; }
+
+.byline{
+  margin:10px 0 0; text-align:center;
+  font-size:.74rem; color:var(--ink-muted); opacity:.75;
+}
+
+/* ───────────────────────── Site footer ─────────────────────────
+   Outside the tab panels, so the legal pages are reachable from every
+   view. Paddle requires publicly linked terms and privacy pages. */
+.site-foot{
+  max-width:1180px; margin:0 auto; padding:0 clamp(16px,4vw,40px) 40px;
+  display:flex; flex-wrap:wrap; gap:6px 22px; justify-content:center;
+  font-size:.78rem;
+}
+.site-foot a{ color:var(--ink-muted); text-decoration:underline; }
+.site-foot a:hover, .site-foot a:focus-visible{ color:var(--ink); }
+
+/* ───────────────────────── Legal pages ─────────────────────────
+   Long-form reading, so: one narrow column, generous line height, and
+   no decorative colour. Full body contrast throughout — small print is
+   exactly where people are least well served by grey-on-grey. */
+.legal{ max-width:760px; }
+.legal h2{
+  margin:34px 0 10px; font-size:1.05rem; line-height:1.35;
+}
+.legal p, .legal li{ line-height:1.65; max-width:66ch; }
+.legal li{ margin-bottom:6px; }
+.legal a{ color:var(--ink); text-decoration:underline; }
+.legal-meta{ font-size:.82rem; color:var(--ink-muted); }
+.legal-meta a{ color:var(--ink-muted); }
+.legal-foot{ margin-top:40px; padding-top:18px; border-top:1px solid var(--line); }
+.legal-table{
+  width:100%; border-collapse:collapse; margin:14px 0; font-size:.88rem;
+}
+.legal-table th, .legal-table td{
+  text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+.legal-page .topbar{ margin-bottom:8px; }
+
+.toast{ --toast-bg:var(--plum);
+  position:fixed; left:50%; bottom:26px; transform:translate(-50%,120%);
+  background:var(--toast-bg); color:var(--on-dark);
+  padding:12px 20px; border-radius:999px;
+  font-size:.87rem; font-weight:600;
+  box-shadow:var(--shadow-lg); z-index:60;
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+  max-width:calc(100vw - 32px);
+}
+.toast.is-visible{ transform:translate(-50%,0); }
+
+/* ───────────────────────── Responsive ───────────────────────── */
+@media (max-width:640px){
+  .topbar{ padding:16px; }
+  .now{ text-align:left; }
+  .dial-wrap{ width:190px; }
+  .setting{ align-items:flex-start; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
+
+@media print{
+  .tabs,.livenote,.toast,.btn{ display:none !important; }
+  body{ background:#fff; }
+}

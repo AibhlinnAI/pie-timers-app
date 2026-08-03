@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Matches the default dark theme.
+
+       A timer just started: 3/22 gone, 19/22 still to come. There is no
+       separate colour for the eaten part — eat a slice and you see the
+       plate, which is Dulux 'Government Green'. The same logic drives the
+       pies in the app, so the metaphor holds everywhere. -->
+  <rect width="512" height="512" rx="112" fill="#1C1024"/>
+
+  <!-- The plate. Pie 150 : plate 184 — the rim is ~18% of the pie radius,
+       about what a real plate carries. Deliberately narrower than the small
+       marks use: at this size the rim is decoration, so it can afford to be
+       thin. See index.html for the small-mark geometry and why it differs. -->
+  <circle cx="256" cy="256" r="184" fill="#32493C"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="#3E5A4A" stroke-width="4"/>
+
+  <!-- 19/22 remaining. The gap from 12 o'clock round to here is plate.
+       No notches here: they earn their place on a working dial, but at
+       icon size they only add noise. -->
+  <path d="M256 256 369.4 157.7A150 150 0 1 1 256 106z" fill="#FF8A00"
+        stroke="rgba(0,0,0,.3)" stroke-width="3"/>
+</svg>
