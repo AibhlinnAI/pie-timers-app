@@ -2096,8 +2096,20 @@
     $('hardshipBtn').addEventListener('click', function () {
       var button = $('hardshipBtn');
       var message = $('hardshipMessage');
-      button.disabled = true;
       message.classList.remove('is-error');
+
+      // Checked locally, before any network call: authedFetch() rejects
+      // with a plain "Not signed in." for a missing session, which would
+      // otherwise land in the generic network-failure branch below and
+      // tell someone to "try again" when retrying does nothing until
+      // they sign in. A local check avoids that entirely.
+      if (!CT.auth.isSignedIn()) {
+        message.textContent = 'Please sign in first — the panel above.';
+        message.classList.add('is-error');
+        return;
+      }
+
+      button.disabled = true;
       message.textContent = 'One moment…';
 
       CT.db.grantHardshipAccess().then(function (result) {
