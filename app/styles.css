@@ -1094,6 +1094,19 @@ body.is-focus{
   .focus-actions{ flex-direction:column; }
 }
 
+/* The pie takes the same colour it has on the dashboard, so the focus
+   window is recognisably the same timer rather than a second opinion.
+   Without these the accent is unset outside a timer card and the wedge
+   falls back to black — a black pie on a green plate, which reads as
+   the pie being eaten in reverse. */
+.focus{ --accent:var(--forest); --accent-soft:var(--green-tint); }
+.focus.is-lunch{ --accent:var(--purple); --accent-soft:var(--purple-tint); }
+.focus.is-end{   --accent:var(--forest); --accent-soft:var(--green-tint); }
+.focus.is-appt{
+  --accent:var(--appt); --accent-fill:var(--appt-fill);
+  --accent-soft:var(--appt-soft); --urgent:var(--urgent-appt);
+}
+
 /* Urgent and off reuse the same colours as the dashboard cards, so the
    focus window never disagrees with the app it came from. */
 .focus.is-urgent .dial-pie{
