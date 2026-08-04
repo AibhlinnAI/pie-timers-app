@@ -73,6 +73,27 @@ jobs:
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "No private keys found in app/ or identity/."
 
+      # No ads, no tracking, no third-party analytics is a permanent
+      # product principle (see ARCHITECTURE.md), not a preference that
+      # can quietly drift the next time someone adds "just one" SDK to
+      # debug a bug or measure growth. This is what makes that a build
+      # failure instead of a hope. First-party, aggregate, disclosed
+      # analytics are still allowed — this only catches known
+      # third-party ad/tracking vendors' own domains and script globals.
+      - name: Refuse to publish ad or tracking dependencies
+        run: |
+          set -u
+          fail=0
+          pattern='google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|amazon-adsystem\.com|facebook\.net|connect\.facebook\.com|fbq\(|gtag\(|mixpanel|segment\.(io|com)|hotjar|amplitude\.com|clarity\.ms|matomo|posthog|sentry\.io|bugsnag|fullstory|crazyegg|adroll'
+
+          if grep -rniE "$pattern" app/ identity/; then
+            echo "::error::An ad or tracking dependency's domain/global was found in app/ or identity/. This app's no-ads-no-tracking commitment (ARCHITECTURE.md) is meant to break the build if this happens, not just be a promise on a page. Remove it, or if this is a genuine first-party analytics addition, update this pattern deliberately alongside the ARCHITECTURE.md note explaining what changed and why."
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "No ad or tracking dependencies found in app/ or identity/."
+
   deploy:
     needs: guard
     runs-on: ubuntu-latest
