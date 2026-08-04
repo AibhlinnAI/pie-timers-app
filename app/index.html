@@ -503,6 +503,12 @@
     </section>
 
 
+    <!-- One of the three panels below is visible at a time, depending on
+         configuration/sign-in state — this label is what makes the
+         cluster read as "Account" regardless of which one is showing,
+         rather than only once someone is already signed in. -->
+    <p class="section-label">Account</p>
+
     <!-- Shown when config.js has no Supabase project set -->
     <section class="panel" id="accountUnconfigured" hidden>
       <header class="panel-head">
@@ -565,7 +571,7 @@
     <section class="panel" id="accountSignedIn" hidden>
       <header class="panel-head">
         <div>
-          <h2>Account</h2>
+          <h2>Your account</h2>
           <p class="sub">Signed in as <strong id="accountEmail">—</strong></p>
         </div>
         <button class="btn btn-ghost" id="signOutBtn">Sign out</button>
@@ -597,6 +603,17 @@
             <strong>Last updated</strong>
             <span id="lastUpdated">—</span>
           </div>
+        </div>
+        <div class="sync-row">
+          <div>
+            <strong>Calendar</strong>
+            <span>Connect or disconnect a calendar to show your next appointment.</span>
+          </div>
+          <!-- Connecting/disconnecting itself lives on Appointments, next
+               to the events it affects — this jumps straight there rather
+               than duplicating that UI here. Reuses the existing generic
+               [data-goto] handler; no new script needed. -->
+          <button class="btn btn-quiet" type="button" data-goto="appointments">Manage</button>
         </div>
       </div>
 
