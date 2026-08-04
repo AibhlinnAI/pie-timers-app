@@ -1,9 +1,13 @@
 # ============================================================
 # Publish the app to GitHub Pages at https://pietimers.aibhlinn.ai
 #
-# Only the app/ folder is uploaded. supabase/ stays in the repo but is
-# never served — the SQL and edge functions hold no secrets, but there
-# is no reason to hand strangers a map of the backend either.
+# The published site is app/ plus identity/. identity/ lives at the
+# repo root, a sibling of app/ rather than nested inside it, because it
+# is the shared AibhlínnAI sign-in module a future suite app will also
+# use — keeping it out of app/ is what makes that literally true, not
+# just a comment. The deploy step assembles the two into one folder
+# before upload; nothing else in the repo (supabase/, DEPLOY.md, the
+# workflow itself) is served.
 #
 # There is no build step. The files that run in the browser are the
 # files in the repo, which is the whole point of the no-dependency
@@ -38,15 +42,15 @@ jobs:
       # small project gets its bill run up by strangers. Fail loudly
       # rather than publish. If this ever trips, rotate the key first
       # and fix the file second — it is already public by then.
-      - name: Scan app/ for private keys
+      - name: Scan app/ and identity/ for private keys
         run: |
           set -u
           fail=0
 
           # Literal secret formats. None of these has any business in a
           # file the browser downloads.
-          if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' app/; then
-            echo "::error::A secret is present in app/."
+          if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' app/ identity/; then
+            echo "::error::A secret is present in app/ or identity/."
             fail=1
           fi
 
@@ -54,7 +58,7 @@ jobs:
           # service-role key is also a JWT and looks almost identical —
           # which is exactly why this checks the decoded payload rather
           # than the variable name it was pasted into.
-          for token in $(grep -rhoE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' app/ || true); do
+          for token in $(grep -rhoE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' app/ identity/ || true); do
             payload=$(printf '%s' "$token" | cut -d. -f2)
             case $(( ${#payload} % 4 )) in
               2) payload="$payload==" ;;
@@ -67,7 +71,7 @@ jobs:
           done
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "No private keys found in app/."
+          echo "No private keys found in app/ or identity/."
 
   deploy:
     needs: guard
@@ -80,9 +84,19 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # app/ and identity/ are separate folders in the repo (identity/
+      # deliberately outside app/, see the note at the top of this
+      # file) but one folder on the served site. site/identity/ is
+      # what app/index.html actually requests.
+      - name: Assemble the published site
+        run: |
+          mkdir -p site
+          cp -r app/. site/
+          cp -r identity site/identity
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: app
+          path: site
 
       - id: deployment
         uses: actions/deploy-pages@v4

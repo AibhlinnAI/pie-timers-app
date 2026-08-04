@@ -10,6 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231C1024'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='12'%20fill='%2332493C'/%3E%3Cpath%20d='M16%2016%2022.71%2010.19A8.88%208.88%200%201%201%2016%207.12z'%20fill='%23FF8A00'/%3E%3C/svg%3E">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="identity/identity-ui.css">
 </head>
 <body>
 
@@ -31,6 +32,7 @@
     <div class="now-time" id="nowTime">--:--</div>
     <div class="now-date" id="nowDate">&nbsp;</div>
   </div>
+  <div class="topbar-signin" id="topbarSignin"></div>
 </header>
 
 <a class="skip-link" href="#view-dashboard">Skip to content</a>
@@ -611,6 +613,12 @@
         A plan adds your schedule on every device, and milestone alerts that reach
         you even when the app is closed.</p>
 
+        <!-- Secondary sign-in entry point. The header carries the primary
+             one; a person reading about paid features is also a sensible
+             moment to offer signing in, without repeating the same button
+             twice in one glance. -->
+        <div class="upgrade-signin" id="upgradeSignin"></div>
+
         <div class="plan-options">
           <button class="plan-card is-best" id="buyAnnual" type="button">
             <span class="plan-badge" id="annualSaving">Save $10.80 a year</span>
@@ -723,7 +731,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="identity/identity.js"></script>
+<script src="identity/entitlements.js"></script>
+<script src="identity/identity-ui.js"></script>
 <script src="config.js"></script>
+<script src="identity-bridge.js"></script>
 <script src="supabase.js"></script>
 <script src="billing.js"></script>
 <script src="notify.js"></script>

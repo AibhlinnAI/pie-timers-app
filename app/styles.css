@@ -281,6 +281,26 @@ button{ font:inherit; }
 
 .brand-text{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
 
+/* ── Sign-in slot ──
+   The button sits directly on the green header gradient, so it needs
+   light-on-dark-glass colours the header already uses elsewhere
+   (.now-time etc share this pattern). The panel that opens underneath
+   is a normal floating card, so it falls straight back to the app's
+   real --card/--ink/--line/--accent from :root — no override needed
+   there, only on the button that sits on the gradient. */
+.topbar-signin{ flex:none; }
+.topbar-signin > .aib-signin{ position:relative; }
+.topbar-signin .aib-signin-btn{
+  background:rgba(0,0,0,.24);
+  border-color:rgba(255,255,255,.4);
+  color:var(--on-dark);
+}
+.topbar-signin .aib-signin-btn:hover,
+.topbar-signin .aib-signin-btn:focus-visible{ border-color:#FF8A00; outline-color:#FF8A00; }
+
+.upgrade-signin{ margin-top:14px; }
+.upgrade-signin .aib-signin-context{ margin-top:6px; }
+
 /* Orange rather than white, because white was the one dull thing on the
    page. Government Green as an offset shadow gives it depth without
    touching legibility — the green is the shadow, never the text, since

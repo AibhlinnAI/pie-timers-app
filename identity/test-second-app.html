@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Identity isolation test — not a real app</title>
+<!-- ============================================================
+     This page pretends to be a second AibhlínnAI product — call it
+     "Pomodoro" — that has never seen a line of Pie Timers code. It
+     imports exactly two files from this folder and nothing else in
+     the repository. If it can authenticate someone and check a
+     capability using only these, the identity/entitlements
+     separation described in identity/README.md actually holds. If it
+     can't, the separation isn't clean enough — fix identity.js or
+     entitlements.js, not this file.
+
+     Not linked from anywhere in the deployed app. Open it directly to
+     run the check by hand:
+       identity/test-second-app.html?supabaseUrl=...&supabaseAnonKey=...
+     ============================================================ -->
+</head>
+<body>
+<h1>Identity isolation test</h1>
+<p>Pretends to be a second AibhlínnAI app. Imports only <code>identity.js</code>
+and <code>entitlements.js</code> — nothing from <code>app/</code>.</p>
+<pre id="out">Waiting for supabaseUrl and supabaseAnonKey in the query string…</pre>
+
+<script src="identity.js"></script>
+<script src="entitlements.js"></script>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('out');
+  var log = [];
+  function print(line) { log.push(line); out.textContent = log.join('\n'); }
+
+  var params = new URLSearchParams(location.search);
+  var supabaseUrl = params.get('supabaseUrl');
+  var supabaseAnonKey = params.get('supabaseAnonKey');
+  if (!supabaseUrl || !supabaseAnonKey) return;
+
+  print('Imports found: ' + JSON.stringify({
+    identity: !!window.Aibhlinn && !!window.Aibhlinn.identity,
+    entitlements: !!window.Aibhlinn && !!window.Aibhlinn.entitlements
+  }));
+
+  // A second app would use its OWN product id here — this test uses
+  // one that has never appeared in any Pie Timers file, on purpose.
+  var PRODUCT_ID = 'test-second-app';
+
+  window.Aibhlinn.identity.init({ supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey });
+  window.Aibhlinn.entitlements.init({ supabaseUrl: supabaseUrl, supabaseAnonKey: supabaseAnonKey });
+
+  print('isSignedIn(): ' + window.Aibhlinn.identity.isSignedIn());
+
+  if (window.Aibhlinn.identity.isSignedIn()) {
+    window.Aibhlinn.entitlements.hasCapability(PRODUCT_ID, 'can_sync').then(function (allowed) {
+      print('hasCapability("' + PRODUCT_ID + '", "can_sync"): ' + allowed);
+      print('(false is correct here — nobody has been granted that product/capability pair)');
+    });
+  } else {
+    print('Not signed in. Sign in via the real app first (shares the same account),');
+    print('then reload this page with the same query string to see a live session.');
+  }
+})();
+</script>
+</body>
+</html>
