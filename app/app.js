@@ -1682,12 +1682,12 @@
     if (working) {
       var lunch = computeTimer(now, cfg.start, cfg.lunch);
       if (lunch.available && !lunch.done && !lunch.notStarted) {
-        candidates.push({ timer: lunch, label: lunchLabel(today),
+        candidates.push({ timer: lunch, label: lunchLabel(today), tone: 'is-lunch',
                           totalMin: Math.round(lunch.totalSec / 60), forced: null });
       }
       var end = computeTimer(now, cfg.start, cfg.end);
       if (end.available && !end.done && !end.notStarted) {
-        candidates.push({ timer: end, label: endLabel(today),
+        candidates.push({ timer: end, label: endLabel(today), tone: 'is-end',
                           totalMin: Math.round(end.totalSec / 60), forced: null });
       }
     }
@@ -1696,6 +1696,7 @@
     var appt = computeAppointmentTimer(now, appointment);
     if (appt.available) {
       candidates.push({ timer: appt, label: appointment.title || 'Next appointment',
+                        tone: 'is-appt',
                         totalMin: appt.scaleMin, forced: appt.forcedInterval });
     }
 
@@ -1717,13 +1718,14 @@
       renderNotchPair('focus', 0);
       $('focusTime').textContent = freedomFor(dayNameOf(now), 'end');
       $('focusLabel').textContent = 'Nothing running right now.';
-      view.classList.remove('is-urgent');
+      view.classList.remove('is-urgent', 'is-lunch', 'is-end', 'is-appt');
       view.classList.add('is-off');
       document.title = 'Pie Timers';
       return;
     }
 
-    view.classList.remove('is-off');
+    view.classList.remove('is-off', 'is-lunch', 'is-end', 'is-appt');
+    view.classList.add(pick.tone);
     pie.setAttribute('d', wedgePath(1 - pick.timer.progress));
     renderNotchPair('focus', pick.totalMin, pick.forced);
 
