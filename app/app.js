@@ -1660,6 +1660,115 @@
     toastTimer = setTimeout(function () { el.classList.remove('is-visible'); }, 3200);
   }
 
+  /* ─────────────────────────── Focus view ───────────────────────────
+     One pie in its own window, meant to sit snapped beside real work.
+
+     Which pie is not a setting: it is whichever milestone is nearest,
+     so the view is always showing the thing that is about to happen.
+     Choosing is the cognitive load this app exists to remove. */
+
+  /* Hash as well as query: some launchers and shortcut handlers drop a
+     query string, and a focus window that silently opens as the full
+     app is a confusing thing to hand someone. */
+  var FOCUS = /(^|[?&])focus(=|&|$)/.test(location.search) ||
+              /^#focus$/.test(location.hash);
+
+  function pickFocusTimer(now) {
+    var today = dayNameOf(now);
+    var cfg = state.schedule[today];
+    var working = cfg && cfg.working;
+    var candidates = [];
+
+    if (working) {
+      var lunch = computeTimer(now, cfg.start, cfg.lunch);
+      if (lunch.available && !lunch.done && !lunch.notStarted) {
+        candidates.push({ timer: lunch, label: lunchLabel(today),
+                          totalMin: Math.round(lunch.totalSec / 60), forced: null });
+      }
+      var end = computeTimer(now, cfg.start, cfg.end);
+      if (end.available && !end.done && !end.notStarted) {
+        candidates.push({ timer: end, label: endLabel(today),
+                          totalMin: Math.round(end.totalSec / 60), forced: null });
+      }
+    }
+
+    var appointment = nextAppointment(now);
+    var appt = computeAppointmentTimer(now, appointment);
+    if (appt.available) {
+      candidates.push({ timer: appt, label: appointment.title || 'Next appointment',
+                        totalMin: appt.scaleMin, forced: appt.forcedInterval });
+    }
+
+    if (!candidates.length) return null;
+
+    candidates.sort(function (a, b) {
+      return a.timer.remainingSec - b.timer.remainingSec;
+    });
+    return candidates[0];
+  }
+
+  function renderFocus(now) {
+    var view = $('focusView');
+    var pie = $('focusPie');
+    var pick = pickFocusTimer(now);
+
+    if (!pick) {
+      pie.setAttribute('d', '');
+      renderNotchPair('focus', 0);
+      $('focusTime').textContent = freedomFor(dayNameOf(now), 'end');
+      $('focusLabel').textContent = 'Nothing running right now.';
+      view.classList.remove('is-urgent');
+      view.classList.add('is-off');
+      document.title = 'Pie Timers';
+      return;
+    }
+
+    view.classList.remove('is-off');
+    pie.setAttribute('d', wedgePath(1 - pick.timer.progress));
+    renderNotchPair('focus', pick.totalMin, pick.forced);
+
+    $('focusTime').textContent = formatCompact(pick.timer.remainingSec);
+    $('focusLabel').textContent = pick.label;
+
+    view.classList.toggle('is-urgent', isUrgent(pick.timer.remainingSec));
+
+    // The window is often snapped narrow enough that the title bar is
+    // all you can read, so put the countdown there too.
+    document.title = formatCompact(pick.timer.remainingSec) + ' · ' + pick.label;
+  }
+
+  if (FOCUS) {
+    document.body.classList.add('is-focus');
+    $('focusView').hidden = false;
+
+    $('focusFullscreen').addEventListener('click', function () {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(function () {
+          // Refused (permissions, or an embedded context). Nothing to
+          // recover: the view is already filling the window.
+        });
+      }
+    });
+
+    document.addEventListener('fullscreenchange', function () {
+      $('focusFullscreen').textContent =
+        document.fullscreenElement ? 'Leave full screen' : 'Full screen';
+    });
+  }
+
+  var openFocusBtn = $('openFocus');
+  if (openFocusBtn) {
+    openFocusBtn.addEventListener('click', function () {
+      // Tall and narrow by default, which is the shape it ends up in
+      // when snapped down the side of a screen.
+      var opened = window.open('index.html?focus=1', 'pieTimersFocus',
+                               'width=360,height=560');
+      if (!opened) toast('Your browser blocked the pop-up. Allow pop-ups for this site.');
+    });
+  }
+
   /* ─────────────────────────── Main render loop ─────────────────────────── */
 
   var lastDayKey = null;
@@ -1712,6 +1821,12 @@
     document.title = working && lunchTimer.available && !lunchTimer.done
       ? formatCompact(lunchTimer.remainingSec) + ' · Pie Timers'
       : 'Pie Timers';
+
+    /* Last, so its title wins. The rest of the render still runs in a
+       focus window: the elements are hidden, not absent, and it keeps
+       milestone alerts firing when the focus window is the only one
+       open — which is exactly when someone is relying on it. */
+    if (FOCUS) renderFocus(now);
   }
 
   /* Align the tick to the top of each second so the clock never visibly stalls. */

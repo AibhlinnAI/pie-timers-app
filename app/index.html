@@ -215,6 +215,11 @@
       </div>
     </section>
 
+    <p class="focus-launch">
+      <button class="btn btn-ghost" type="button" id="openFocus">Open focus view</button>
+      <span class="hint">One pie in a small window you can snap beside your work.</span>
+    </p>
+
     <p class="livenote"><span class="pulse"></span> Live — updates every second. No refresh needed.</p>
     <p class="byline">Pie Timers from AibhlínnAI</p>
   </section>
@@ -657,6 +662,30 @@
 
 
 </main>
+
+<!-- ───────────────────────── Focus view ─────────────────────────
+     One pie, nothing else. Opened in its own window so it can be
+     snapped beside whatever you are actually doing. Hidden entirely
+     unless the page was opened with ?focus, so it costs the normal
+     app nothing. -->
+<section class="focus" id="focusView" hidden>
+  <div class="focus-pie">
+    <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="focusDialLabel">
+      <title id="focusDialLabel">Proportion of time remaining</title>
+      <circle class="dial-base" cx="80" cy="80" r="70"/>
+      <g class="dial-ticks" data-ticks id="focusTicks"></g>
+      <path class="dial-pie" id="focusPie" d=""/>
+      <g class="dial-ticks dial-ticks--over" data-ticks id="focusTicksOver"></g>
+      <circle class="dial-rim" cx="80" cy="80" r="70"/>
+    </svg>
+  </div>
+  <p class="focus-time" id="focusTime">—</p>
+  <p class="focus-label" id="focusLabel">Nothing running</p>
+  <div class="focus-actions">
+    <button class="btn btn-ghost" type="button" id="focusFullscreen">Full screen</button>
+    <a class="btn btn-ghost" href="index.html">Open the full app</a>
+  </div>
+</section>
 
 <footer class="site-foot">
   <a href="terms.html" data-legal-link="terms">Terms of Service</a>

@@ -1022,6 +1022,97 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   font-size:.74rem; color:var(--ink-muted); opacity:.75;
 }
 
+/* ───────────────────────── Focus view ─────────────────────────
+   A window that does one thing. Everything else on the page is hidden,
+   so the pie can take whatever space there is.
+
+   Sized with min(vw, vh) rather than a fixed width: snapped to the side
+   of a screen the window is tall and narrow, full-screen it is wide and
+   short, and the pie has to stay a circle that fits either way. */
+body.is-focus > *:not(.focus){ display:none !important; }
+
+body.is-focus{
+  /* Fills the window whatever its shape, with no page scroll — a view
+     you glance at must never need scrolling to see the whole pie. */
+  min-height:100vh;
+  min-height:100dvh;
+  overflow:hidden;
+}
+
+.focus{
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(6px, 2vmin, 18px);
+  padding:clamp(10px, 3vmin, 28px);
+  text-align:center;
+}
+
+.focus-pie{
+  width:min(78vw, 62vh);
+  aspect-ratio:1;
+  flex:none;
+}
+.focus-pie .dial{ width:100%; height:100%; display:block; }
+
+.focus-time{
+  margin:0;
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(1.9rem, 9vmin, 4.6rem);
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-.01em;
+}
+
+.focus-label{
+  margin:0;
+  font-size:clamp(.82rem, 3vmin, 1.15rem);
+  color:var(--ink-muted);
+}
+
+/* Kept quiet and only shown on hover or keyboard focus. In peripheral
+   vision, two buttons sitting under the pie are two things to ignore
+   all day; they are still reachable by Tab, which is what matters. */
+.focus-actions{
+  display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+  opacity:0; transition:opacity .18s ease;
+}
+.focus:hover .focus-actions,
+.focus-actions:focus-within{ opacity:1; }
+@media (prefers-reduced-motion: reduce){
+  .focus-actions{ transition:none; }
+}
+
+/* Very short windows — a wide strip snapped along the top or bottom of
+   a screen. Drop to a row so the pie keeps its size. */
+@media (max-height: 420px) and (min-width: 420px){
+  .focus{ flex-direction:row; gap:clamp(10px, 3vmin, 28px); }
+  .focus-pie{ width:min(38vw, 82vh); }
+  .focus-actions{ flex-direction:column; }
+}
+
+/* Urgent and off reuse the same colours as the dashboard cards, so the
+   focus window never disagrees with the app it came from. */
+.focus.is-urgent .dial-pie{
+  fill:var(--urgent);
+  stroke:var(--urgent-edge);
+  filter:drop-shadow(0 0 9px var(--urgent-glow));
+}
+.focus.is-urgent .dial-rim{ stroke:var(--urgent); stroke-opacity:.55; }
+.focus.is-urgent .focus-time{ color:var(--urgent-text); }
+
+.focus.is-off .dial-rim{ stroke:var(--off); stroke-opacity:.4; }
+.focus.is-off .focus-time{ color:var(--off); }
+
+.focus-launch{
+  margin:22px 0 0;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.focus-launch .hint{ margin:0; }
+
 /* ───────────────────────── Site footer ─────────────────────────
    Outside the tab panels, so the legal pages are reachable from every
    view. Paddle requires publicly linked terms and privacy pages. */
