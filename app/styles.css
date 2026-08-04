@@ -1187,9 +1187,16 @@ body.is-focus{
    view. Paddle requires publicly linked terms and privacy pages. */
 .site-foot{
   max-width:1180px; margin:0 auto; padding:0 clamp(16px,4vw,40px) 40px;
-  display:flex; flex-wrap:wrap; gap:6px 22px; justify-content:center;
-  font-size:.78rem;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  text-align:center; font-size:.78rem;
 }
+/* Stated plainly, not as marketing copy tucked below the links — this
+   is a promise the app is expected to keep, not a claim to skim past. */
+.site-foot-promise{
+  margin:0; font-weight:700; font-size:.82rem;
+  color:var(--ink);
+}
+.site-foot-links{ display:flex; flex-wrap:wrap; gap:6px 22px; justify-content:center; }
 .site-foot a{ color:var(--ink-muted); text-decoration:underline; }
 .site-foot a:hover, .site-foot a:focus-visible{ color:var(--ink); }
 
