@@ -65,7 +65,15 @@
   /* Kept dark enough for orange title text to clear 3:1. */
   --header-to:   #3E5A48;
   --appt:        #A04F00;   /* text-safe orange — 5.0:1 on its own chip */
-  --appt-fill:   #FF8A00;   /* the pie itself */
+  /* "Marmalade" — three-quarters of the way from brand orange (#FF8A00)
+     back toward a muted amber, in HSL: same ~33° hue, saturation and
+     lightness interpolated 75/25 (orange/amber). Still genuinely vivid
+     — it needs to catch the eye — with just enough saturation pulled
+     back that escalating to --urgent below reads as a real state
+     change (a hue shift to crimson) rather than the same warm colour
+     turning up louder. Shown against three alternatives, chosen by
+     the user: https://claude.ai/code/artifact/11b97df8-d63c-4b5d-94b9-74194a9c145e */
+  --appt-fill:   #F18A10;   /* the pie itself */
   /* Urgency is crimson, not a hotter orange — orange is already the
      appointment colour, so escalation needed a different hue entirely. */
   --urgent:      #C41E3A;
@@ -137,7 +145,7 @@
   /* Periwinkle rather than another lavender — two near-identical purple
      pies side by side defeated the point of telling them apart. */
   --appt:        #FFA333;
-  --appt-fill:   #FF8A00;
+  --appt-fill:   #F3921B;   /* Marmalade, dark-theme value — see the light-theme note above */
   --urgent:      #D91E48;
   --urgent-text: #FF7A96;
   /* Crimson sits at ~2.2:1 on the Government Green plate, so the urgent
