@@ -122,6 +122,19 @@
     });
   }
 
+  /* ─────────────────────────── Google Play anti-steering ───────────────
+     If this app is ever wrapped for Google Play (a Trusted Web Activity
+     over this same site), the in-app experience must not link, mention,
+     or hint at web/Paddle pricing — Play's policy on external purchase
+     links (and, for many app categories, the User Choice Billing pilot
+     aside, the default requirement) prohibits steering a Play user to
+     pay outside Play Billing. The annual-only offer stays exclusive to
+     this page's normal web context. Do not add a "cheaper on the web"
+     message, a link to this pricing section, or a coupon reference
+     anywhere reachable from the Play-wrapped build. If a Play-specific
+     build variant is ever introduced, gate this whole panel out of it
+     rather than editing its copy. */
+
   /* ─────────────────────────── Paddle ─────────────────────────── */
 
   var paddleReady = null;
