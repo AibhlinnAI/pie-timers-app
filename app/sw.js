@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v6';
+var CACHE = 'countdown-timers-v7';
 
 var SHELL = [
   './',
@@ -18,6 +18,11 @@ var SHELL = [
   'privacy.html',
   'styles.css',
   'config.js',
+  'identity-bridge.js',
+  'identity/identity.js',
+  'identity/entitlements.js',
+  'identity/identity-ui.js',
+  'identity/identity-ui.css',
   'supabase.js',
   'billing.js',
   'notify.js',

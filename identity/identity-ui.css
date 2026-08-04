@@ -1,0 +1,123 @@
+/* ============================================================
+   AibhlínnAI shared sign-in UI.
+   Deliberately unbranded — colours come from the host app's own CSS
+   custom properties (--ink, --card, --line, --accent, etc.), which
+   every AibhlínnAI app is expected to define. This file supplies
+   structure and behaviour, not a palette.
+   ============================================================ */
+
+.aib-signin-btn{
+  display:inline-flex; align-items:center; gap:8px;
+  min-width:44px; min-height:44px;
+  padding:0 16px;
+  border-radius:999px;
+  border:1px solid var(--line, #3A2A47);
+  background:var(--card, #241730);
+  color:var(--ink, #EFE6F5);
+  font:inherit; font-weight:600; font-size:.92rem;
+  cursor:pointer;
+}
+.aib-signin-btn:hover{ border-color:var(--accent, #B07FE0); }
+.aib-signin-btn:focus-visible{
+  outline:3px solid var(--accent, #B07FE0);
+  outline-offset:2px;
+}
+
+.aib-signin-context{
+  font-size:.78rem;
+  color:var(--ink-muted, #B4A3C0);
+  margin:4px 0 0;
+  max-width:32ch;
+}
+
+/* ── Panel ──
+   A dropdown/dialog anchored under the button, not a full-screen
+   modal — no interruption, no trapped focus stealing attention from
+   whatever the person was doing. */
+.aib-signin-panel{
+  position:absolute; z-index:80;
+  margin-top:8px;
+  width:min(320px, 92vw);
+  border-radius:16px;
+  border:1px solid var(--line, #3A2A47);
+  background:var(--card, #241730);
+  color:var(--ink, #EFE6F5);
+  box-shadow:0 18px 40px -12px rgba(0,0,0,.5);
+  padding:18px;
+}
+.aib-signin-panel[hidden]{ display:none; }
+
+.aib-signin-panel h2{
+  margin:0 0 4px; font-size:1.05rem;
+}
+.aib-signin-panel .aib-sub{
+  margin:0 0 14px; font-size:.84rem; color:var(--ink-muted, #B4A3C0);
+}
+
+.aib-signin-field{
+  display:block; margin-bottom:12px;
+}
+.aib-signin-field span{
+  display:block; margin-bottom:6px; font-size:.82rem; font-weight:600;
+}
+.aib-signin-field input{
+  width:100%; box-sizing:border-box;
+  min-height:44px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid var(--line, #3A2A47);
+  background:var(--bg, #1C1024);
+  color:inherit;
+  font:inherit; font-size:1rem;
+}
+.aib-signin-field input:focus-visible{
+  outline:3px solid var(--accent, #B07FE0);
+  outline-offset:1px;
+}
+
+.aib-signin-submit{
+  width:100%; min-height:44px;
+  border-radius:10px; border:none;
+  background:var(--accent, #B07FE0);
+  color:#1C1024;
+  font:inherit; font-weight:700; font-size:.96rem;
+  cursor:pointer;
+}
+.aib-signin-submit:focus-visible{ outline:3px solid var(--ink, #EFE6F5); outline-offset:2px; }
+.aib-signin-submit:disabled{ opacity:.6; cursor:default; }
+
+.aib-signin-divider{
+  display:flex; align-items:center; gap:10px;
+  margin:14px 0; font-size:.76rem; color:var(--ink-muted, #B4A3C0);
+}
+.aib-signin-divider::before, .aib-signin-divider::after{
+  content:''; flex:1; height:1px; background:var(--line, #3A2A47);
+}
+
+.aib-signin-google{
+  width:100%; min-height:44px;
+  border-radius:10px; border:1px solid var(--line, #3A2A47);
+  background:transparent; color:inherit;
+  font:inherit; font-weight:600; font-size:.9rem;
+  cursor:pointer;
+}
+.aib-signin-google:focus-visible{ outline:3px solid var(--accent, #B07FE0); outline-offset:2px; }
+
+.aib-signin-status{
+  margin:12px 0 0; font-size:.84rem; min-height:1.2em;
+}
+.aib-signin-status[data-tone="error"]{ color:var(--urgent-text, #FF9E9E); }
+
+.aib-signin-close{
+  position:absolute; top:10px; right:10px;
+  width:32px; height:32px;
+  border-radius:8px; border:none; background:transparent;
+  color:var(--ink-muted, #B4A3C0);
+  font-size:1.1rem; line-height:1; cursor:pointer;
+}
+.aib-signin-close:focus-visible{ outline:3px solid var(--accent, #B07FE0); outline-offset:1px; }
+
+@media (prefers-reduced-motion: no-preference){
+  .aib-signin-panel{ animation:aib-panel-in .14s ease; }
+}
+@keyframes aib-panel-in{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
