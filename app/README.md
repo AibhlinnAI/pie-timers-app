@@ -251,12 +251,15 @@ is the best advertising the app has.
 | Sync across devices | — | ✅ |
 | Alerts when the app is fully closed | — | ✅ |
 
-**Annual $24/yr. Monthly $2.90/mo** (=$34.80 a year). The monthly price is a low
-barrier to try; the annual price saves $10.80 and is the one to convert people onto
-once the timers have proved themselves.
+**Annual $19/yr. Monthly $2.90/mo** (=$34.80 a year). Priced low on purpose — the
+goal is as many people as possible able to reach premium, not maximum revenue per
+subscriber. The monthly price is a low barrier to try; the annual price saves
+$15.80 and is the one to convert people onto once the timers have proved
+themselves.
 
-$24/yr is exactly **$2 a month**, which is the number to lead with in any
-marketing — it is a far easier figure to hear than the annual total.
+$19/yr is **$1.58 a month**, which is the number to lead with in any marketing —
+it is a far easier figure to hear than the annual total, and it undercuts most
+single-app subscriptions people already carry.
 
 Display prices live in `config.js` under `paddle` — change them there, not in the
 markup, and keep them in step with the actual prices set in Paddle. Paddle's
@@ -268,19 +271,20 @@ Paddle takes roughly 5% + a **fixed 50c per transaction**:
 
 | | Customer pays | Fees | You keep |
 | --- | --- | --- | --- |
-| Annual | $24.00/yr | $1.70 | **$22.30/yr** |
+| Annual | $19.00/yr | $1.45 | **$17.55/yr** |
 | Monthly | $34.80/yr | $7.74 (12 × 64.5c) | **$27.06/yr** |
 
 Worth knowing: at these prices a monthly subscriber who stays a full year is worth
 *more* to you than an annual one. Annual still wins in practice — cash up front,
 no monthly churn, no failed-card dunning, and far less admin for the user. But the
-$10 discount is a genuine cost to you, not a free lever, so don't deepen it
+$15.80 discount is a genuine cost to you, not a free lever, so don't deepen it
 casually.
 
-**Against the goal:** at ~$22.30 net per annual subscriber, covering Claude Max at
-roughly $100–200/month needs about **54–108 active subscribers**. That is more than
-a higher price would need, so the bet is that "$2 a month" converts enough extra
-people to more than cover the difference.
+**Against the goal:** at ~$17.55 net per annual subscriber, covering Claude Max at
+roughly $100–200/month (~$1,200–2,400/year) needs about **69–137 active
+subscribers**. That's meaningfully more than the $24 price needed — a deliberate
+trade: lower revenue per person, in exchange for the price being less of a barrier
+to the people this app is built for.
 
 **Nobody is locked out of their own data.** If a plan lapses, automatic sync stops
 but "Sync now" still downloads the schedule, and Settings → Export still works.

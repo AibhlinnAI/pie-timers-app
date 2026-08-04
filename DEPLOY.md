@@ -167,6 +167,51 @@ Diagnostics checks this pairing.
 
 ---
 
+## 9. Google Play (not built yet — this is the plan)
+
+Three things have to exist before a `play-webhook` function is worth writing,
+and none of them exist in this repo today:
+
+1. **A Play Console developer account** ($25 one-off) and an app listing.
+2. **An Android wrapper.** Pie Timers is a PWA, so this is a Trusted Web
+   Activity — typically generated with
+   [PWABuilder](https://www.pwabuilder.com/), not written by hand. The
+   wrapper's own code is where a purchase is initiated, and it must pass
+   your AibhlínnAI account id as Play Billing's `obfuscatedAccountId` —
+   that value is the *only* way a later server notification can be linked
+   back to an account, since Play's Real-Time Developer Notifications
+   (RTDN) carry a purchase token and a product id, never your user id.
+3. **A service account** with Android Publisher API access, to look up
+   what a purchase token actually means (plan, status, expiry) — RTDN
+   itself is just a ping saying "something changed", not the detail.
+
+Once those exist, `play-webhook` (Deno, matching `paddle-webhook`'s shape)
+would:
+
+- Verify the incoming request is genuinely from Google Pub/Sub — an OIDC
+  bearer token, RS256-signed, checked against Google's published JWKS,
+  with `aud` and `iss` verified. Same category of work as the HMAC check
+  in `paddle-webhook`, just a different signing scheme.
+- Decode the RTDN envelope, extract `purchaseToken` and `subscriptionId`.
+- Exchange the service account's private key for an OAuth2 access token
+  (a self-signed JWT to Google's token endpoint), then call
+  `purchases.subscriptionsv2.get` to read the real subscription state and
+  the `externalAccountId` set in step 2.
+- Upsert into `identity.subscriptions` with `provider: 'play'`, and call
+  `identity.grant_capability` for `can_sync` / `can_use_calendar` — the
+  same identity-schema tables Paddle should eventually write to as well
+  (see the note in `supabase/identity-schema.sql` about that migration
+  being deliberately not done yet).
+- Dedupe on Pub/Sub's `messageId`, the same idempotency shape as
+  `claimEvent` in `paddle-webhook`.
+
+**Anti-steering, already true today and worth keeping true deliberately:**
+nothing in the app links to Paddle, mentions a price, or references the web
+checkout from inside what would become the Play-wrapped build — see the
+comment above `initPaddle()` in `app/billing.js`. If a Play build variant
+is ever introduced, gate the whole upgrade panel out of it rather than
+editing its copy.
+
 ## Redeploying
 
 ```bash
