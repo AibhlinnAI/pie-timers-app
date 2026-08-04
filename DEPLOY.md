@@ -115,7 +115,15 @@ Run the SQL from `supabase/`, in this order:
 4. `schema-ratelimit.sql`
 5. `schema-calendar.sql`
 6. `schema-google-calendar.sql`
-7. `cron.sql`
+7. `identity-schema.sql` — then, in the dashboard (no SQL for this part):
+   **Project Settings → Data API → Exposed schemas → add `identity`**
+   alongside `public`. Nothing that reads the identity schema works
+   until this is ticked.
+8. `schema-hardship.sql` — depends on both `schema-billing.sql` (writes
+   to `public.subscriptions`) and `identity-schema.sql`
+   (`identity.grant_capability`) already existing; run it after both.
+9. `cron.sql` — last, because it schedules a job against edge functions
+   that don't exist until the next step.
 
 Deploy the six edge functions, then set **Authentication → URL Configuration**:
 
