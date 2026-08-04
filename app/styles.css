@@ -1040,6 +1040,7 @@ body.is-focus{
 }
 
 .focus{
+  position:relative;
   min-height:100vh;
   min-height:100dvh;
   display:flex;
@@ -1076,7 +1077,12 @@ body.is-focus{
 /* Kept quiet and only shown on hover or keyboard focus. In peripheral
    vision, two buttons sitting under the pie are two things to ignore
    all day; they are still reachable by Tab, which is what matters. */
+/* Taken out of the flow: an invisible row still occupies height, which
+   pushes the pie above the centre of the window it is meant to sit in
+   the middle of. */
 .focus-actions{
+  position:absolute;
+  left:0; right:0; bottom:clamp(10px, 3vmin, 26px);
   display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
   opacity:0; transition:opacity .18s ease;
 }
