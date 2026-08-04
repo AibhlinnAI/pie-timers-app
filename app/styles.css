@@ -268,8 +268,13 @@ button{ font:inherit; }
 /* Sign in and the clock are one right-hand cluster, not two items
    space-between would otherwise spread across the whole header — this
    is what keeps Sign in sitting immediately left of the clock rather
-   than drifting toward the middle. */
-.topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+   than drifting toward the middle.
+
+   nowrap is deliberate: this pair must stay side by side at every
+   width. .topbar itself still wraps, so on a narrow phone the whole
+   cluster drops to its own row under the brand — but Sign in and the
+   clock never separate from each other within that row. */
+.topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:nowrap; }
 
 /* The mark stretches to the text block: top of "Pie Timers" to the bottom
    of the tagline, and square. */
