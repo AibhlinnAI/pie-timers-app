@@ -676,6 +676,16 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .sub{ margin:5px 0 0; font-size:.85rem; color:var(--ink-muted); max-width:60ch; }
 .sub--foot{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
 
+/* Groups the sign-in/subscription/delete panels as "Account" even
+   though only one shows at a time depending on state — without this,
+   nothing on the page says "account" until you're already signed in. */
+.section-label{
+  margin:28px 0 10px;
+  font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-muted);
+}
+.section-label:first-child{ margin-top:0; }
+
 /* ───────────────────────── Tables ───────────────────────── */
 .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
 .grid{ width:100%; border-collapse:collapse; font-size:.9rem; min-width:520px; }
