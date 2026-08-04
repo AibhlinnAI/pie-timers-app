@@ -660,10 +660,18 @@
           </label>
         </div>
 
-        <p class="hint">Prices include any sales tax or GST. If cost is a genuine
-        barrier for you, <a href="#" data-support-mailto
-        data-support-subject="Pie Timers access">get in
-        touch</a> — free access is available, no explanation needed.</p>
+        <p class="hint">Prices include any sales tax or GST.</p>
+
+        <!-- Self-certified hardship access. One click, no form, no
+             "are you sure?" — clicking IS the certification. If you
+             change this, keep it that way; a justification field or a
+             confirmation dialog defeats the point of this tier. -->
+        <div class="hardship-row">
+          <p class="hint">If cost is a barrier, this is yours. No explanation
+          needed, no questions asked.</p>
+          <button class="btn btn-ghost" type="button" id="hardshipBtn">Get free access</button>
+          <p class="status-line" id="hardshipMessage" role="status" aria-live="polite"></p>
+        </div>
 
         <div class="access-code-row">
           <form class="signin-form" id="accessCodeForm" novalidate>
