@@ -31,3 +31,10 @@ Countdown Timers.xlsx
 # ── Windows / Google Drive noise ──────────────────────────────────
 desktop.ini
 Thumbs.db
+
+# ── .NET build output ────────────────────────────────────────────
+# The published .scr is 150+MB (a self-contained runtime bundle) and
+# is a build artifact, not source -- same reasoning as node_modules/
+# in a JS repo. `dotnet publish` regenerates it from source in seconds.
+windows-screensaver/bin/
+windows-screensaver/obj/

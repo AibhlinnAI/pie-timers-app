@@ -42,15 +42,22 @@ jobs:
       # small project gets its bill run up by strangers. Fail loudly
       # rather than publish. If this ever trips, rotate the key first
       # and fix the file second — it is already public by then.
-      - name: Scan app/ and identity/ for private keys
+      - name: Scan app/, identity/ and windows-screensaver/ for private keys
         run: |
           set -u
           fail=0
 
+          # windows-screensaver/ is never served by this workflow (see the
+          # deploy job below), but the repo itself is public regardless of
+          # what Pages serves, so a secret committed there is just as
+          # exposed. bin/ and obj/ are gitignored build output, never
+          # checked out here, so this only ever scans source.
+          SCAN_DIRS="app/ identity/ windows-screensaver/"
+
           # Literal secret formats. None of these has any business in a
           # file the browser downloads.
-          if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' app/ identity/; then
-            echo "::error::A secret is present in app/ or identity/."
+          if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' $SCAN_DIRS; then
+            echo "::error::A secret is present in app/, identity/ or windows-screensaver/."
             fail=1
           fi
 
@@ -58,7 +65,7 @@ jobs:
           # service-role key is also a JWT and looks almost identical —
           # which is exactly why this checks the decoded payload rather
           # than the variable name it was pasted into.
-          for token in $(grep -rhoE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' app/ identity/ || true); do
+          for token in $(grep -rhoE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' $SCAN_DIRS || true); do
             payload=$(printf '%s' "$token" | cut -d. -f2)
             case $(( ${#payload} % 4 )) in
               2) payload="$payload==" ;;
@@ -71,12 +78,13 @@ jobs:
           done
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "No private keys found in app/ or identity/."
+          echo "No private keys found in app/, identity/ or windows-screensaver/."
 
       # No ads, no tracking, no third-party analytics is a permanent
-      # product principle (see ARCHITECTURE.md), not a preference that
-      # can quietly drift the next time someone adds "just one" SDK to
-      # debug a bug or measure growth. This is what makes that a build
+      # product principle (see ARCHITECTURE.md) covering every surface
+      # this product ships on, not just the website — not a preference
+      # that can quietly drift the next time someone adds "just one" SDK
+      # to debug a bug or measure growth. This is what makes that a build
       # failure instead of a hope. First-party, aggregate, disclosed
       # analytics are still allowed — this only catches known
       # third-party ad/tracking vendors' own domains and script globals.
@@ -84,10 +92,11 @@ jobs:
         run: |
           set -u
           fail=0
+          SCAN_DIRS="app/ identity/ windows-screensaver/"
           pattern='google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|amazon-adsystem\.com|facebook\.net|connect\.facebook\.com|fbq\(|gtag\(|mixpanel|segment\.(io|com)|hotjar|amplitude\.com|clarity\.ms|matomo|posthog|sentry\.io|bugsnag|fullstory|crazyegg|adroll'
 
-          if grep -rniE "$pattern" app/ identity/; then
-            echo "::error::An ad or tracking dependency's domain/global was found in app/ or identity/. This app's no-ads-no-tracking commitment (ARCHITECTURE.md) is meant to break the build if this happens, not just be a promise on a page. Remove it, or if this is a genuine first-party analytics addition, update this pattern deliberately alongside the ARCHITECTURE.md note explaining what changed and why."
+          if grep -rniE "$pattern" $SCAN_DIRS; then
+            echo "::error::An ad or tracking dependency's domain/global was found. This app's no-ads-no-tracking commitment (ARCHITECTURE.md) is meant to break the build if this happens, not just be a promise on a page. Remove it, or if this is a genuine first-party analytics addition, update this pattern deliberately alongside the ARCHITECTURE.md note explaining what changed and why."
             fail=1
           fi
 
