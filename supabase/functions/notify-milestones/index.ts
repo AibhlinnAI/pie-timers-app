@@ -17,6 +17,16 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
+// pg_cron calls this server-to-server, so it is never subject to CORS --
+// these headers exist only so a browser (diagnostics.html's own health
+// check) gets a real response instead of a blocked preflight.
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 const MILESTONES = [30, 15, 10, 5];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -206,19 +216,26 @@ async function claim(userId: string, day: string, timerKey: string, milestone: s
 }
 
 Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   // pg_cron passes the shared secret; without it this endpoint is closed.
-  if (CRON_SECRET) {
-    const provided = request.headers.get("x-cron-secret");
-    if (provided !== CRON_SECRET) {
-      return new Response("Forbidden", { status: 403 });
-    }
+  // Deliberately fail-closed: `if (CRON_SECRET)` here would skip this
+  // check entirely -- and let anyone trigger a real push send -- for as
+  // long as the secret happens to be unset, which is exactly backwards
+  // for a guard whose own comment says "without it this endpoint is
+  // closed." calendar-sync's identical guard already gets this right;
+  // this one didn't match it until now.
+  if (!CRON_SECRET || request.headers.get("x-cron-secret") !== CRON_SECRET) {
+    return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }
 
   try {
     const summary = await run();
-    return Response.json({ ok: true, ...summary });
+    return Response.json({ ok: true, ...summary }, { headers: corsHeaders });
   } catch (error) {
     console.error(error);
-    return Response.json({ ok: false, error: String(error) }, { status: 500 });
+    return Response.json({ ok: false, error: String(error) }, { status: 500, headers: corsHeaders });
   }
 });
