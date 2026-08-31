@@ -42,7 +42,7 @@ window.CT.config = {
      sign-in form is bot-checked and magic links are throttled. Leaving
      it blank sends sign-ins straight to Supabase, unthrottled — fine
      while you are the only user, not fine once sign-up is public. */
-  turnstileSiteKey: '',
+  turnstileSiteKey: '0x4AAAAAAEjN3Ts18xs7ZDpk',
 
   /* Paddle checkout. Leave blank to run with no billing: every signed-in
      account is then treated as entitled. */
