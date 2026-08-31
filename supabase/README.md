@@ -94,12 +94,20 @@ Every file can simply be run again. The common causes:
   enable `pg_cron` and `pg_net` under Database → Extensions.
 - **`relation "subscriptions" does not exist`** — step 2 has not run yet. The order
   in the table above matters.
-- **Placeholders in `cron.sql`** — `<PROJECT_REF>`, `<SERVICE_KEY>` and
+- **Placeholders in `cron.sql`** — `<PROJECT_REF>`, `<ANON_KEY>` and
   `<CRON_SECRET>` must all be replaced with real values, or the jobs will be
   created but silently fail.
 
 ## A note on secrets
 
-`cron.sql` contains your service-role key once filled in. That key bypasses every
-row-level security policy. Keep the filled-in copy out of public source control,
-and treat it as you would a database password.
+`cron.sql`'s `Authorization` header only has to satisfy the edge function
+gateway's own JWT check, not grant any real permission -- the functions it
+calls read their own service-role key from their own environment, never from
+this header — so it deliberately uses the anon key (already public in
+`app/config.js`) instead of the service-role key. `<CRON_SECRET>` is the
+real gate: it must match the `CRON_SECRET` set on both the
+`notify-milestones` and `calendar-sync` functions, and both those functions
+now fail closed (reject every request) if it is ever unset, rather than
+silently accepting anything. Keep the filled-in copy of this file out of
+public source control regardless — the cron secret is still worth
+protecting, just not at "database password" severity.

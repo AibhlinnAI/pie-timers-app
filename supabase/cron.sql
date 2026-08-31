@@ -5,7 +5,17 @@
 -- Replace the three placeholders below before running:
 --   <PROJECT_REF>   your Supabase project ref (the subdomain)
 --   <CRON_SECRET>   the same value set on the edge function
---   <SERVICE_KEY>   Project Settings → API → service_role key
+--   <ANON_KEY>      Project Settings → API → anon / publishable key
+--
+-- The Authorization header below only has to satisfy the edge function
+-- gateway's own "is this a real Supabase JWT" check -- the functions
+-- this calls read their own SUPABASE_SERVICE_ROLE_KEY from their own
+-- environment for anything privileged, never from this header. The
+-- anon key is public already (it's in app/config.js), so using it here
+-- means a leaked cron.job row -- pg_cron stores this command's literal
+-- text in the database -- exposes nothing that wasn't already public,
+-- instead of exposing a key that bypasses every row-level security
+-- policy in the project.
 --
 -- Keep this file out of public source control once filled in.
 -- ============================================================
@@ -25,7 +35,7 @@ select cron.schedule(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/notify-milestones',
     headers := jsonb_build_object(
       'Content-Type',   'application/json',
-      'Authorization',  'Bearer <SERVICE_KEY>',
+      'Authorization',  'Bearer <ANON_KEY>',
       'x-cron-secret',  '<CRON_SECRET>'
     ),
     body    := '{}'::jsonb,
@@ -47,7 +57,7 @@ select cron.schedule(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/calendar-sync',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer <SERVICE_KEY>',
+      'Authorization', 'Bearer <ANON_KEY>',
       'x-cron-secret', '<CRON_SECRET>'
     ),
     body    := '{"all": true}'::jsonb,
