@@ -15,9 +15,32 @@ internal static class Program
     public const string SaverUrl = "https://pietimers.aibhlinn.ai/index.html?focus=1";
     public const string HomeUrl = "https://pietimers.aibhlinn.ai/";
 
+    // A quiet crash log in %TEMP%, not shown to anyone -- cheap
+    // insurance if this ever needs diagnosing on a real desktop the
+    // way it had to be diagnosed here. See SaverForm.cs's fallback
+    // hardening for the specific failure this caught during testing.
+    private static void LogCrash(string message)
+    {
+        try
+        {
+            File.AppendAllText(Path.Combine(Path.GetTempPath(), "pietimers-saver-crash.log"),
+                $"{DateTime.Now:O} {message}{Environment.NewLine}");
+        }
+        catch { /* best-effort */ }
+    }
+
     [STAThread]
     private static void Main(string[] args)
     {
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            LogCrash("AppDomain.UnhandledException: " + e.ExceptionObject);
+        Application.ThreadException += (_, e) =>
+            LogCrash("Application.ThreadException: " + e.Exception);
+
+        // Without this, an exception on the UI thread can bypass
+        // ThreadException entirely and take the whole process down.
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
         ApplicationConfiguration.Initialize();
 
         var mode = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : string.Empty;

@@ -21,8 +21,12 @@ create schema if not exists identity;
 
 -- ─────────────────────────── product_entitlements ───────────────────────────
 -- One row per (account, product, capability). A capability is a verb —
--- "can_sync", "can_use_calendar" — never a plan name, so the app never
--- has to know what "Pro" means; it only asks "can this account do X".
+-- "can_sync", "can_use_calendar", "can_use_screensaver" — never a plan
+-- name, so the app never has to know what "Pro" means; it only asks
+-- "can this account do X". No CHECK constraint on the capability
+-- column deliberately — grant_capability() below is fully generic, so
+-- adding a new gated feature is a client + webhook change, never a
+-- migration.
 --
 -- product_id is a short slug ('pie-timers', 'pomodoro', ...). This is
 -- the ONLY table in the identity schema that mentions a product at

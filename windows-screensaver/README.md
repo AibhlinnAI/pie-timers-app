@@ -81,11 +81,13 @@ written and assumed to work:
 Two things I could not get a clean answer on, from *this* environment
 specifically, and want you to check the first time you run it for real:
 
-1. **The pie actually loading.** The sandbox this was built in blocks
-   *any* spawned process's network access outright — I proved this by
-   spawning plain `curl.exe` the same way and watching DNS resolution
-   itself time out, unrelated to this app. WebView2 starts up fine here;
-   whether the live page actually loads is untested from this machine.
+1. **The pie actually loading.** In an earlier session this build environment
+   blocked *any* spawned process's network access outright — proved it by
+   spawning plain `curl.exe` the same way and watching DNS resolution itself
+   time out. In a later session that was no longer true — a clean run got all
+   the way through gate.html loading `identity.js`/`entitlements.js` and
+   posting `ready`. Inconsistent enough between sessions that it's worth
+   confirming on your own machine rather than trusting either result.
 2. **Dismissing on mouse movement/keypress.** The input hook installs
    successfully (confirmed non-error handles both times), but synthesized
    input in this same sandboxed environment never reached the callback —
@@ -97,3 +99,49 @@ specifically, and want you to check the first time you run it for real:
 Both are one-second checks. If either doesn't behave as described, that's
 worth telling me — it would mean there's a real bug the sandbox hid from me,
 not that you did anything wrong.
+
+The screen saver is now Premium-gated (`gate.html`, wired up in
+`SaverForm.cs`) — sign in with Google, then the entitlement check against
+`can_use_screensaver` decides whether the real pie ever loads. One more
+thing to verify live, and this one the sandbox genuinely cannot answer at
+all, not even partially:
+
+3. **Google sign-in actually completing inside WebView2.** `gate.html` uses
+   `signInWithGoogle()` deliberately, not a magic link, because a magic
+   link opens in the system's default browser — a separate process this
+   embedded WebView2 instance would never see the redirect from. What's
+   untested is the other side of that: whether Google's own anti-phishing
+   heuristics treat WebView2's default user agent as an "embedded browser"
+   and refuse to complete OAuth there at all (Google has done this to other
+   embedded webviews before). If sign-in itself fails or gets blocked
+   inside the gate, that's this, not a bug in the entitlement check — the
+   fix would be a custom user agent string on the WebView2 instance, or
+   moving the OAuth leg out to the system browser with a redirect back in.
+
+## If it crashes instead of showing the fallback
+
+Chased a real crash to ground during testing, worth knowing about if you ever
+see the same shape of failure: `EnsureCoreWebView2Async()` threw
+`COMException 0x80004004 (E_ABORT)` from deep inside WebView2's own SDK
+(`CreateCoreWebView2ControllerAsync`), and — because that path had never been
+exercised before — the fallback it fell back to *also* threw
+(`Win32Exception: Error creating window handle`), taking the whole process
+down instead of showing the black "waiting for a connection" screen it was
+supposed to.
+
+Root cause: **26 orphaned `msedgewebview2.exe` processes**, some three days
+old, left behind by repeatedly force-killing this app during testing.
+`Stop-Process` on the `.exe`/`.scr` only kills that process — WebView2's own
+Chromium subprocesses are children that a hard kill never signals to clean up
+after themselves, and enough of them piling up over days genuinely exhausts a
+Windows session's window-handle quota. If you ever see this: check Task
+Manager for `Microsoft Edge WebView2` processes with no obvious parent, end
+them, and retry — or just reboot, which clears them all at once.
+
+Hardened `SaverForm.cs`'s fallback path regardless (it now tears down the
+broken WebView2 control before trying to show the fallback label, so a
+broken sibling control can never drag the fallback down with it) — but that
+fix alone did **not** resolve the underlying handle exhaustion once it had
+already happened; only clearing the orphaned processes did. Something to
+watch for if this ever gets tested in another long-running, heavily-reused
+environment.

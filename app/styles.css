@@ -82,6 +82,18 @@
   --urgent-glow: rgba(196,30,58,.30);
   --appt-soft:   #FFEAD1;
   --urgent-appt: #C41E3A;
+  /* Lunch and End-of-day escalate to green, not crimson: running out of
+     time there is a good thing — the workday's nearly over — so it needs
+     its own hue rather than borrowing the appointment/danger one.
+     Appointments keep --urgent-appt above; a looming appointment is
+     exactly what crimson is for. #1B7A44 (not the fill colour itself) for
+     text: #29A35C only clears ~3.2:1 on white, fine for the pie and its
+     3px+ edge but not for body-sized text, so text gets the same
+     darker-shade treatment --urgent-text already uses above. */
+  --urgent-good:      #29A35C;
+  --urgent-good-text: #1B7A44;
+  --urgent-good-edge: var(--pie-edge);
+  --urgent-good-glow: rgba(41,163,92,.30);
   --plan-bg:     #FFFCF7;
   --danger:      #8C2F2F;
   --danger-bg:   #FDF6F6;
@@ -167,6 +179,16 @@
   --purple-mid:  #433052;
   --appt-soft:   #3A2A18;
   --urgent-appt: #D91E48;
+  /* Same neon green as the sign-in/brand accent (#6FD08C), reused rather
+     than invented — it already clears ~5.1:1 against this plate colour
+     (Government Green, #32493C), better separated than the crimson urgent
+     state manages on the same plate (~2.2:1, which is why THAT one needs
+     a lightened edge below). It also clears ~8.9:1 on the dark card, so
+     unlike the light theme above, fill and text can be the same shade. */
+  --urgent-good:      #6FD08C;
+  --urgent-good-text: #6FD08C;
+  --urgent-good-edge: var(--pie-edge);
+  --urgent-good-glow: rgba(111,208,140,.55);
   --peach:       #3A2A2E;
   --amber-tint:  #3A2E14;
   --plan-bg:     #2E2418;
@@ -482,6 +504,18 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    side was the point at which the dashboard started to shout. */
 .timer-card--amber{ --accent:var(--appt); --accent-fill:var(--appt-fill); --accent-soft:var(--appt-soft); --urgent:var(--urgent-appt); }
 
+/* Lunch and End escalate to green, Appointment stays crimson (above) —
+   see --urgent-good's own comment for why. All four urgent tokens move
+   together, not just --urgent, so the edge, glow and on-card text switch
+   hue as one unit instead of a green pie with crimson status text. */
+.timer-card--purple,
+.timer-card--green{
+  --urgent:      var(--urgent-good);
+  --urgent-text: var(--urgent-good-text);
+  --urgent-edge: var(--urgent-good-edge);
+  --urgent-glow: var(--urgent-good-glow);
+}
+
 .timer-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
 .timer-head h2{ font-size:1.05rem; color:var(--accent); }
 
@@ -516,9 +550,14 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .daystrip-item .v.is-off{ color:var(--off); }
 
 /* ── Urgent ──
-   Crimson, with a warm halo spilling off the pie onto the card behind it.
-   Static, not pulsing: the colour change is the signal, and a throbbing
-   card would be exactly the kind of attention-grab this app avoids. */
+   A halo spilling off the pie onto the card behind it, in whichever
+   --urgent hue the card type set — crimson for Appointment, neon green
+   for Lunch/End (see --urgent-good above). This block itself is
+   colour-agnostic on purpose: it only ever reads the --urgent* custom
+   properties, never a literal colour, so the two hues share one set of
+   rules instead of forking into two near-identical blocks. Static, not
+   pulsing: the colour change is the signal, and a throbbing card would
+   be exactly the kind of attention-grab this app avoids. */
 .timer-card.is-urgent{
   box-shadow:var(--shadow-lg), 0 0 34px -4px var(--urgent-glow);
   border-color:var(--urgent);
@@ -1161,6 +1200,17 @@ body.is-focus{
 .focus.is-appt{
   --accent:var(--appt); --accent-fill:var(--appt-fill);
   --accent-soft:var(--appt-soft); --urgent:var(--urgent-appt);
+}
+
+/* Lunch and End escalate to green in the focus window too — see the
+   dashboard cards' own --urgent-good rule for why Appointment (above)
+   is the one that stays crimson. */
+.focus.is-lunch,
+.focus.is-end{
+  --urgent:      var(--urgent-good);
+  --urgent-text: var(--urgent-good-text);
+  --urgent-edge: var(--urgent-good-edge);
+  --urgent-glow: var(--urgent-good-glow);
 }
 
 /* Urgent and off reuse the same colours as the dashboard cards, so the

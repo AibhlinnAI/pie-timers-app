@@ -8,12 +8,35 @@ namespace PieTimersScreensaver;
 /// One instance per monitor when actually running (see Program.cs), or a
 /// single instance reparented into the small preview box in Windows'
 /// Screen Saver Settings dialog when launched with /p.
+///
+/// Premium-gated: every instance loads the local entitlement gate
+/// (gate.html) first, over a virtual host so it has a stable origin for
+/// its own sign-in session, and only navigates to the real live pie once
+/// the gate posts back 'entitled'. Applies to the preview thumbnail too,
+/// deliberately -- gating only the full-screen case would let anyone see
+/// the live pie for free just by opening Settings and clicking Preview.
 /// </summary>
 public class SaverForm : Form
 {
+    // IANA reserves .internal for exactly this -- a hostname guaranteed
+    // never to collide with a real, routable domain. WebView2 intercepts
+    // requests to it before any real DNS lookup happens.
+    private const string GateVirtualHost = "pietimers-screensaver.internal";
+    private const string GateUrl = "https://" + GateVirtualHost + "/gate.html";
+
+    // How long the gate page gets to prove it is even running (loading
+    // its scripts, calling identity.init()) before this gives up and
+    // shows the fallback. Deliberately generous, and deliberately NOT
+    // the same timeout gate.html uses for the entitlement check itself
+    // -- that one already fails closed on its own, with its own message;
+    // this one only exists to catch the page never running at all.
+    private const int GateReadyTimeoutMs = 20000;
+
     private readonly WebView2 _webView = new();
     private readonly Label _fallback;
     private readonly nint? _previewParent;
+    private System.Windows.Forms.Timer? _gateReadyTimeout;
+    private bool _gateIsAlive;
 
     public SaverForm(Rectangle? bounds = null, nint? previewParent = null)
     {
@@ -46,7 +69,11 @@ public class SaverForm : Form
         Controls.Add(_fallback);
 
         Load += OnLoadAsync;
-        FormClosed += (_, _) => { if (!_previewParent.HasValue) Cursor.Show(); };
+        FormClosed += (_, _) =>
+        {
+            _gateReadyTimeout?.Dispose();
+            if (!_previewParent.HasValue) Cursor.Show();
+        };
     }
 
     private async void OnLoadAsync(object? sender, EventArgs e)
@@ -56,8 +83,26 @@ public class SaverForm : Form
         try
         {
             await _webView.EnsureCoreWebView2Async();
+
+            _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                GateVirtualHost, AppContext.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
+
+            _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             _webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
-            _webView.Source = new Uri(Program.SaverUrl);
+
+            // The only path that is allowed to ever show the fallback
+            // BEFORE the gate has had a chance to answer for itself --
+            // see the 'ready' handling below, which is what cancels this
+            // the moment the gate page proves its own JS is running.
+            _gateReadyTimeout = new System.Windows.Forms.Timer { Interval = GateReadyTimeoutMs };
+            _gateReadyTimeout.Tick += (_, _) =>
+            {
+                _gateReadyTimeout?.Stop();
+                if (!_gateIsAlive) ShowFallback();
+            };
+            _gateReadyTimeout.Start();
+
+            _webView.Source = new Uri(GateUrl);
         }
         catch
         {
@@ -65,10 +110,58 @@ public class SaverForm : Form
             // directory -- whatever the cause, a black screen with a
             // plain sentence beats a crash or an unexplained blank
             // full-screen window.
+            //
+            // A broken WebView2 control left sitting in the form can
+            // itself throw when the fallback Label is later made
+            // visible -- SetVisibleCore forces the whole control tree
+            // to realize real window handles, including this one.
+            // Confirmed live, not theorized: this exact chain took the
+            // whole process down during testing, with the second
+            // exception (a plain "Error creating window handle") giving
+            // no hint it started with a failed WebView2 init. Removing
+            // the broken control first is what stops the fallback path
+            // -- the one thing that must never itself fail -- from
+            // being able to fail the same way.
+            try
+            {
+                Controls.Remove(_webView);
+                _webView.Dispose();
+            }
+            catch { /* best-effort -- ShowFallback below is what must not fail */ }
             ShowFallback();
         }
 
         if (_previewParent.HasValue) EmbedAsPreview(_previewParent.Value);
+    }
+
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        string message;
+        try { message = e.TryGetWebMessageAsString(); }
+        catch { return; }
+
+        switch (message)
+        {
+            case "ready":
+                // The gate page's own JS is alive and now owns whatever
+                // this window shows -- sign-in prompt, a spinner, or a
+                // plain "Premium feature" message are all legitimate,
+                // deliberate states of its own, never a failure this
+                // process should paper over with the generic fallback.
+                _gateIsAlive = true;
+                _gateReadyTimeout?.Stop();
+                break;
+
+            case "entitled":
+                // The only signal that is ever allowed to reveal the
+                // real pie. Everything else -- false, an error, a
+                // timeout inside the gate page itself -- leaves the
+                // gate's own UI on screen instead, which is the
+                // fail-closed default this exists to guarantee.
+                _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+                _webView.Source = new Uri(Program.SaverUrl);
+                break;
+        }
     }
 
     private void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
