@@ -783,7 +783,13 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    cells hold nothing but a box. Reads far cleaner than a label per row. */
 .grid--edit th.home-col{ text-align:center; white-space:nowrap; }
 .grid--edit td.home-cell{ text-align:center; }
-.grid--edit td.home-cell input{ width:17px; height:17px; }
+/* WCAG 2.2 SC 2.5.8 (Target Size Minimum): 17px was under the 24px
+   floor, with no label wrapping the cell to enlarge the effective hit
+   area the way every other checkbox in this app has (they all sit
+   inside a clickable <label>; this one, built per-row in app.js, does
+   not). Raised to the minimum directly rather than adding a wrapper,
+   since a table cell's own padding already gives it room. */
+.grid--edit td.home-cell input{ width:24px; height:24px; }
 .grid--edit td.home-cell input:disabled{ opacity:.35; cursor:not-allowed; }
 
 .saved{ margin:14px 0 0; font-size:.8rem; color:var(--ink-muted); }
@@ -923,7 +929,13 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 }
 .sync-pill i{ width:7px; height:7px; border-radius:50%; background:currentColor; flex:none; }
 .sync-pill[data-status="synced"]{ background:var(--green-mid); color:var(--forest); }
-.sync-pill[data-status="syncing"]{ background:var(--amber-tint); color:#8A5A00; }
+/* WCAG audit finding: the literal #8A5A00 was never given a dark-theme
+   value, unlike --amber-tint underneath it -- 2.24:1 in dark mode, an
+   almost-invisible pill. --orange-text is the existing theme-aware
+   token already used for this exact "orange text on a tinted amber/
+   peach chip" pattern elsewhere (see the error-status pill below):
+   6.1:1 light, 7.47:1 dark, verified live. */
+.sync-pill[data-status="syncing"]{ background:var(--amber-tint); color:var(--orange-text); }
 .sync-pill[data-status="offline"]{ background:var(--row-alt); color:var(--ink-muted); }
 .sync-pill[data-status="free"]{ background:var(--purple-tint); color:var(--purple); }
 .sync-pill[data-status="error"]{ background:var(--peach); color:var(--orange-text); }
@@ -999,10 +1011,16 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .plan-card:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
 .plan-card.is-best{ border-color:var(--orange); background:var(--plan-bg); position:relative; }
 
+/* WCAG audit finding: white on --orange (#FF8A00) measures 2.36:1 —
+   fails 4.5:1 in both themes, since --orange isn't redefined for dark
+   mode. Reuses --appt (already an existing "text-safe dark orange"
+   token, 5.0:1+ documented elsewhere in this file) rather than
+   inventing a new colour — same brand hue, same role, already
+   verified. 5.81:1 measured live against white. */
 .plan-badge{
   align-self:flex-start; margin-bottom:2px;
   font-size:.72rem; font-weight:700; letter-spacing:.01em;
-  color:#fff; background:var(--orange);
+  color:#fff; background:var(--appt);
   padding:3px 9px; border-radius:999px;
 }
 
@@ -1016,7 +1034,14 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 }
 .plan-price b{ font-weight:700; }
 .plan-price small{ font-size:.8rem; font-weight:600; color:var(--ink-muted); }
-.plan-card.is-best .plan-price{ color:var(--orange); }
+/* WCAG audit finding: --orange text on --plan-bg measured 2.31:1 in
+   light theme (fails the 3:1 large-text minimum) -- --plan-bg is
+   near-white there, and --orange was never meant to sit on white
+   (see --orange-text/-deep's own comment above). --orange-deep is
+   already the documented text-safe sibling for exactly this case
+   ("large numerals on white") and is already theme-aware, unlike
+   --orange itself: 4.49:1 light, 7.63:1 dark, both verified live. */
+.plan-card.is-best .plan-price{ color:var(--orange-deep); }
 .plan-note{ font-size:.78rem; color:var(--ink-muted); }
 
 .access-code-row{
@@ -1026,7 +1051,13 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .access-code-row input{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; }
 
 .discount-row{ margin-top:16px; }
-.discount-row .field span em{ font-style:normal; color:#9C90A3; font-weight:600; }
+/* WCAG audit finding: literal #9C90A3, meant to de-emphasise "(optional)"
+   below the already-muted .field span colour, measured 3.03:1 in light
+   theme on --card (needs 4.5, and this text is 11px -- no large-text
+   exception). Simplest correct fix: drop the override and let it
+   inherit --ink-muted from .field span, the token this app already
+   relies on everywhere else for readable secondary text. */
+.discount-row .field span em{ font-style:normal; font-weight:600; }
 .upgrade .hint a{ color:var(--violet); }
 .upgrade .hint b{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
   background:var(--card); border:1px solid var(--purple-mid); border-radius:5px;
