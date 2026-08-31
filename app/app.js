@@ -43,6 +43,11 @@
     lunchLabel: 'Lunch',
     /* 'dark' | 'light' | 'system'. Dark is the default. */
     theme: 'dark',
+    /* Flattens gradients, mutes the strongest accent colours, and turns
+       off animation -- independent of light/dark, since someone might
+       want either theme with less visual intensity, not a third theme
+       to choose between. */
+    calmMode: false,
     /* Minutes remaining at which a timer turns crimson. 0 turns it off —
      one control rather than a switch plus a number, because two controls
      for one idea is exactly the load this app is meant to remove. */
@@ -360,6 +365,9 @@
 
     if (light) document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
+
+    if (state.settings.calmMode) document.documentElement.setAttribute('data-calm', '1');
+    else document.documentElement.removeAttribute('data-calm');
 
     // Keep the browser chrome in step with the page.
     var meta = document.querySelector('meta[name="theme-color"]');
@@ -1620,10 +1628,17 @@
     $('calcRollover').value = state.settings.calcRollover ? '1' : '0';
     $('lunchLabelInput').value = state.settings.lunchLabel;
       $('optTheme').value = state.settings.theme;
+    $('optCalm').checked = Boolean(state.settings.calmMode);
     $('optUrgent').value = String(state.settings.urgentMinutes);
     applyLunchLabel();
     applyTheme();
   }
+
+  $('optCalm').addEventListener('change', function () {
+    state.settings.calmMode = this.checked;
+    save();
+    applyTheme();
+  });
 
   $('optUrgent').addEventListener('change', function () {
     var value = parseInt(this.value, 10);
