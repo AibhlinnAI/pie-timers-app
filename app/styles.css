@@ -1058,7 +1058,6 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
    inherit --ink-muted from .field span, the token this app already
    relies on everywhere else for readable secondary text. */
 .discount-row .field span em{ font-style:normal; font-weight:600; }
-.upgrade .hint a{ color:var(--violet); }
 .upgrade .hint b{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace;
   background:var(--card); border:1px solid var(--purple-mid); border-radius:5px;
   padding:1px 6px; letter-spacing:.04em; }
