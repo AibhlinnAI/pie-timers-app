@@ -31,7 +31,7 @@ window.CT.config = {
 
   /* Public VAPID key from your Web Push key pair. Required only for
      background push notifications. See README for how to generate it. */
-  vapidPublicKey: '',
+  vapidPublicKey: 'BNPjlp5QIR16Lg4XVAt7tkFd32z8H8ermRzROm3lBfcSHvg0Pg4-f2vv-JiQYcJRZTOplU58OTbSY0UzTdvsm-Y',
 
   /* Where auth links return to. Leave blank to use the current page,
      which is right for most deployments. Must be listed in
