@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Pie Timers</title>
+<!-- ============================================================
+     Entitlement gate for the Windows screen saver. Hosted locally
+     (see SaverForm.cs's virtual-host mapping) so it has a stable,
+     normal https-like origin for localStorage/fetch — not shipped as
+     part of the public web app, since its only job is deciding
+     whether to hand off to the real one.
+
+     Loads identity.js/entitlements.js from the live site rather than
+     a local copy — one source of truth for the identity layer, not a
+     second copy to keep in sync. See identity/README.md.
+
+     Google sign-in only, deliberately — not magic link. A magic-link
+     email opens in the person's normal default browser, an entirely
+     separate process from this embedded WebView2 instance; the
+     redirect could never find its way back here. Google's redirect
+     happens as a normal in-place navigation of THIS page, which stays
+     inside the same WebView2 instance throughout. Known open
+     question, not yet verified live: whether Google's own anti-
+     phishing checks treat WebView2's default user agent as an
+     "embedded browser" and block sign-in outright — see
+     windows-screensaver/README.md.
+
+     Protocol with the C# host (SaverForm.cs), via
+     window.chrome.webview.postMessage:
+       'ready'    — this page's JS is alive and has taken over its own
+                    UI. Cancels the host's fail-safe timer, whose only
+                    job is catching total failure (no network, no
+                    WebView2 runtime) — never fired again after this,
+                    so it can never clobber whatever this page decides
+                    to show on its own.
+       'entitled' — hasCapability() resolved true. The only signal
+                    that ever navigates the host to the real pie.
+     Nothing else is ever sent. Not sending 'entitled' — a false
+     result, an error, or a timeout — IS the fail-closed state: this
+     page's own UI is the terminal state, not a hand-off.
+     ============================================================ -->
+<style>
+  :root{
+    --bg:#1C1024; --card:#241730; --line:#3A2A47;
+    --ink:#EFE6F5; --ink-muted:#B4A3C0; --purple:#B07FE0;
+  }
+  *{box-sizing:border-box;}
+  html,body{ height:100%; margin:0; }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-user-select:none; user-select:none;
+  }
+  .card{
+    width:min(340px, 88vw);
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:28px 26px; text-align:center;
+  }
+  .mark{ width:44px; height:44px; margin:0 auto 14px; display:block; }
+  h1{ font-size:1.1rem; font-weight:700; margin:0 0 6px; }
+  p{ font-size:.86rem; line-height:1.5; color:var(--ink-muted); margin:0 0 20px; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; min-height:44px; border-radius:10px; border:1px solid var(--line);
+    background:transparent; color:var(--ink); font:inherit; font-weight:600; font-size:.9rem;
+    cursor:pointer;
+  }
+  .btn:focus-visible{ outline:2px solid var(--purple); outline-offset:2px; }
+  .spinner{
+    width:20px; height:20px; margin:0 auto 14px;
+    border:2.5px solid var(--line); border-top-color:var(--purple); border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce){ .spinner{ animation:none; } }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+    <circle cx="16" cy="16" r="15" fill="#32493C"/>
+    <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+  </svg>
+
+  <div id="stateChecking">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Checking…</p>
+  </div>
+
+  <div id="stateSignIn" hidden>
+    <h1>Sign in for Premium</h1>
+    <p>The screen saver is a Premium feature. Sign in with the account you upgraded with.</p>
+    <button class="btn" type="button" id="googleBtn">
+      <svg viewBox="0 0 18 18" aria-hidden="true" width="17" height="17">
+        <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"/>
+        <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z"/>
+        <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"/>
+      </svg>
+      Continue with Google
+    </button>
+  </div>
+
+  <div id="stateNotEntitled" hidden>
+    <h1>Premium feature</h1>
+    <p id="notEntitledText">This screen saver is part of Pie Timers Premium.</p>
+  </div>
+</div>
+
+<script src="https://pietimers.aibhlinn.ai/identity/identity.js"></script>
+<script src="https://pietimers.aibhlinn.ai/identity/entitlements.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var SUPABASE_URL = 'https://tgapmpbcqqnpsldehuqa.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_WZqsLnw3OPfo6z_ou0GaYg_B8_HuNG0';
+  var PRODUCT_ID = 'pie-timers';
+  var CAPABILITY = 'can_use_screensaver';
+  var CHECK_TIMEOUT_MS = 12000;
+
+  function post(message) {
+    try {
+      if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(message);
+    } catch (e) { /* not running inside WebView2 (e.g. opened for local testing) */ }
+  }
+
+  function show(id) {
+    ['stateChecking', 'stateSignIn', 'stateNotEntitled'].forEach(function (s) {
+      document.getElementById(s).hidden = (s !== id);
+    });
+  }
+
+  function showNotEntitled(uncertain) {
+    document.getElementById('notEntitledText').textContent = uncertain
+      ? "Couldn't verify your Premium access just now — no connection. This will check again next time."
+      : 'This screen saver is part of Pie Timers Premium.';
+    show('stateNotEntitled');
+  }
+
+  /* Races the real check against a local timeout so a hung network
+     call can never leave this page stuck on the spinner forever —
+     entitlements.js itself has no timeout of its own. Resolves rather
+     than rejects on timeout, so the caller doesn't need two branches
+     for "checked and false" vs "never got an answer" — both end up
+     fail-closed, they just show a different sentence about why. */
+  function checkEntitlementWithTimeout() {
+    var timedOut = false;
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        timedOut = true;
+        resolve({ allowed: false, uncertain: true });
+      }, CHECK_TIMEOUT_MS);
+
+      window.Aibhlinn.entitlements.hasCapability(PRODUCT_ID, CAPABILITY).then(function (allowed) {
+        if (timedOut) return;
+        clearTimeout(timer);
+        resolve({ allowed: allowed, uncertain: false });
+      }).catch(function () {
+        if (timedOut) return;
+        clearTimeout(timer);
+        resolve({ allowed: false, uncertain: true });
+      });
+    });
+  }
+
+  function runCheck() {
+    show('stateChecking');
+    checkEntitlementWithTimeout().then(function (result) {
+      if (result.allowed) { post('entitled'); return; }
+      showNotEntitled(result.uncertain);
+    });
+  }
+
+  window.Aibhlinn.identity.init({
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+  window.Aibhlinn.entitlements.init({
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+
+  // This page's JS is now in control of its own UI — see the file
+  // header for why this is the host's cue to stop watching.
+  post('ready');
+
+  document.getElementById('googleBtn').addEventListener('click', function () {
+    window.Aibhlinn.identity.signInWithGoogle();
+  });
+
+  window.Aibhlinn.identity.onChange(function (session) {
+    if (session) runCheck(); else show('stateSignIn');
+  });
+
+  if (window.Aibhlinn.identity.isSignedIn()) runCheck();
+  else show('stateSignIn');
+})();
+</script>
+</body>
+</html>

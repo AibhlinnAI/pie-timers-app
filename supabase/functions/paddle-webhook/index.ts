@@ -87,6 +87,90 @@ function planFromInterval(interval: string | undefined) {
   return null;
 }
 
+/* Grants (or refreshes) one identity-schema capability for an account.
+   Requires the `identity` schema to be added under Project Settings →
+   Data API → Exposed schemas (see identity-schema.sql's own note) --
+   until that's done, every call here fails, every time, not just
+   transiently. */
+async function grantCapability(
+  accountId: string,
+  productId: string,
+  capability: string,
+  expiresAt: string | null,
+) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/grant_capability`, {
+    method: "POST",
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      "Content-Profile": "identity",
+    },
+    body: JSON.stringify({
+      p_account_id: accountId,
+      p_product_id: productId,
+      p_capability: capability,
+      p_source: "subscription",
+      p_expires_at: expiresAt,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`grant_capability(${capability}) failed: ${response.status} ${await response.text()}`);
+  }
+}
+
+/* Mirrors this event's outcome into identity.product_entitlements, so
+   the suite-wide capability check (identity/entitlements.js --
+   currently the Windows screen saver's *only* gate) agrees with
+   public.subscriptions without Pie Timers' own gating having migrated
+   onto the identity schema yet (see identity-schema.sql's header
+   note -- still deliberately not done).
+
+   Deliberately time-bounded (expiresAt, never null-forever): a
+   subscription's access is only ever as good as its current period.
+   Granting once and leaving it to expire on its own -- rather than
+   requiring an explicit revoke on cancellation -- is what stops
+   access surviving a cancellation forever. Nothing calls this for a
+   status this function decides is NOT currently entitled, which is
+   what makes the omission double as the revocation: no fresh grant
+   call means the previous expiry (already in the database) is left to
+   lapse on its own, exactly the mechanism schema-hardship.sql already
+   uses for its own grants. */
+async function mirrorToIdentitySchema(
+  accountId: string,
+  status: string,
+  currentPeriodEnd: string | null,
+) {
+  const stillWithinPeriod = !currentPeriodEnd || new Date(currentPeriodEnd).getTime() > Date.now();
+  const isActiveish = ["active", "trialing", "past_due"].includes(status);
+  if (!isActiveish || !stillWithinPeriod) return; // let the existing grant lapse; nothing to write
+
+  const capabilities = ["can_sync", "can_use_calendar", "can_use_screensaver"];
+  const results = await Promise.allSettled(
+    capabilities.map((cap) => grantCapability(accountId, "pie-timers", cap, currentPeriodEnd)),
+  );
+
+  const failed = results
+    .map((r, i) => (r.status === "rejected" ? capabilities[i] : null))
+    .filter((c): c is string => c !== null);
+
+  if (failed.length > 0) {
+    // Logged, not thrown: claimEvent() above has already marked this
+    // event processed, so a Paddle retry (which a 500 here would
+    // trigger) would hit that claim and short-circuit to "duplicate"
+    // without actually retrying this step -- returning 500 would
+    // promise a safety net that does not exist. public.subscriptions
+    // (this account's real, authoritative entitlement today) is
+    // already correct by the time this runs; this only affects the
+    // identity-schema mirror the screen saver depends on. Surfaced
+    // here so it is visible in the function's logs, not silently lost.
+    console.error(
+      `identity-schema grant failed for ${accountId}, capabilities [${failed.join(", ")}]: ` +
+      `check Project Settings → Data API → Exposed schemas includes 'identity'.`,
+    );
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
@@ -153,6 +237,13 @@ Deno.serve(async (request) => {
     if (!upsert.ok) {
       throw new Error(`upsert failed: ${upsert.status} ${await upsert.text()}`);
     }
+
+    // public.subscriptions (above) stays the authoritative write and can
+    // still trigger a Paddle retry via the throw/500 path above it. This
+    // one can't safely do the same -- see mirrorToIdentitySchema's own
+    // comment -- so it runs after, and failures there are logged, not
+    // thrown.
+    await mirrorToIdentitySchema(userId, status, row.current_period_end);
 
     return Response.json({ ok: true, status, plan: row.plan });
   } catch (error) {

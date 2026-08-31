@@ -58,18 +58,28 @@ separate from Pie Timers' own `public` tables:
   service-role code (an edge function, or a `security definer` function like
   `grant_hardship_access`) can call it.
 
-**What isn't migrated yet, and why that's deliberate:** Pie Timers' actual
-gating today still reads `public.subscriptions` / `public.my_entitlement`
-(`supabase/schema-billing.sql`) — the mechanism that predates the identity
-schema and that the live `paddle-webhook` function already writes to.
-`supabase/schema-hardship.sql` dual-writes: it grants through
-`public.subscriptions.complimentary` so access takes effect in the app
-*today*, and calls `identity.grant_capability` so a future suite app sees the
-same grant without any Pie Timers-specific knowledge. Moving Paddle's own
-webhook onto the identity schema — so `public.subscriptions` stops being the
-source of truth entirely — is real surgery on live, working, money-handling
-code. It's flagged as its own reviewed task, not folded into a feature commit
-that happened to touch entitlements.
+**What isn't migrated yet, and why that's deliberate:** the in-app gating
+(sync, background push) still reads `public.subscriptions` /
+`public.my_entitlement` (`supabase/schema-billing.sql`), the mechanism that
+predates the identity schema. `supabase/schema-hardship.sql` dual-writes: it
+grants through `public.subscriptions.complimentary` so access takes effect in
+the app *today*, and calls `identity.grant_capability` so a future suite app
+sees the same grant without any Pie Timers-specific knowledge. Moving the
+in-app gating itself onto the identity schema, so `public.subscriptions`
+stops being that gate's source of truth, is real surgery on live, working
+code and stays its own reviewed task.
+
+`paddle-webhook` now writes **both**: `public.subscriptions` stays the
+authoritative record it always was, and — after that succeeds —
+`mirrorToIdentitySchema()` grants `can_sync`, `can_use_calendar` and
+`can_use_screensaver` in the identity schema too, time-bounded to the
+subscription's own `current_period_end` rather than granted forever. That
+expiry, not an explicit revoke call, is what stops access surviving a
+cancellation: nothing re-grants once a subscription stops being active, so
+the last grant simply lapses on schedule. The Windows screen saver
+(`windows-screensaver/gate.html`) is the first surface that reads *only* the
+identity schema for its gating — it has no `public.subscriptions` fallback,
+which is exactly why that mirror write has to actually work.
 
 ## 3. No ads, no tracking — permanent, not a preference
 

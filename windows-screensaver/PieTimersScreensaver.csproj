@@ -18,4 +18,13 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The entitlement gate SaverForm.cs loads before the real pie.
+         Must sit next to the built .exe: AppContext.BaseDirectory is
+         where the virtual host mapping points. -->
+    <None Include="gate.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

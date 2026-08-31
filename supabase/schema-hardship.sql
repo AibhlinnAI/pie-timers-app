@@ -54,6 +54,7 @@ begin
   -- deliberately unrushed work rather than done here.
   perform identity.grant_capability(v_user, 'pie-timers', 'can_sync', 'hardship', null);
   perform identity.grant_capability(v_user, 'pie-timers', 'can_use_calendar', 'hardship', null);
+  perform identity.grant_capability(v_user, 'pie-timers', 'can_use_screensaver', 'hardship', null);
 
   return jsonb_build_object('ok', true);
 end;
