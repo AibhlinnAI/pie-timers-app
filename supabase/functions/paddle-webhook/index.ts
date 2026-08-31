@@ -18,6 +18,16 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WEBHOOK_SECRET = Deno.env.get("PADDLE_WEBHOOK_SECRET")!;
 
+// Paddle calls this server-to-server, so it is never subject to CORS --
+// these headers exist only so a browser (diagnostics.html's own health
+// check) gets a real response instead of a blocked preflight.
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, paddle-signature",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 /* Paddle sends: Paddle-Signature: ts=1700000000;h1=<hex hmac> */
 async function signatureValid(header: string | null, rawBody: string) {
   if (!header) return false;
@@ -203,20 +213,25 @@ async function mirrorToIdentitySchema(
 }
 
 Deno.serve(async (request) => {
-  if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  }
 
   const rawBody = await request.text();
 
   if (!await signatureValid(request.headers.get("Paddle-Signature"), rawBody)) {
     // Deliberately terse: do not help an attacker probe the difference.
-    return new Response("Invalid signature", { status: 401 });
+    return new Response("Invalid signature", { status: 401, headers: corsHeaders });
   }
 
   let event: Record<string, unknown>;
   try {
     event = JSON.parse(rawBody);
   } catch {
-    return new Response("Malformed JSON", { status: 400 });
+    return new Response("Malformed JSON", { status: 400, headers: corsHeaders });
   }
 
   const eventId = String(event.event_id ?? "");
@@ -227,18 +242,18 @@ Deno.serve(async (request) => {
   // user_id is passed as custom_data when the checkout is opened.
   const userId: string | null = data?.custom_data?.user_id ?? null;
 
-  if (!eventId) return new Response("Missing event id", { status: 400 });
+  if (!eventId) return new Response("Missing event id", { status: 400, headers: corsHeaders });
 
   try {
     if (await wasAlreadyProcessed(eventId)) {
-      return Response.json({ ok: true, duplicate: true });
+      return Response.json({ ok: true, duplicate: true }, { headers: corsHeaders });
     }
 
     if (!eventType.startsWith("subscription.")) {
       // Nothing to do for this event type -- recorded so a retry of
       // the same delivery doesn't repeat this check for no reason.
       await recordEvent(eventId, eventType, userId, event);
-      return Response.json({ ok: true, ignored: eventType });
+      return Response.json({ ok: true, ignored: eventType }, { headers: corsHeaders });
     }
 
     if (!userId) {
@@ -247,7 +262,7 @@ Deno.serve(async (request) => {
       // unusable event doesn't need re-diagnosing on every retry.
       console.error(`No user_id in custom_data for ${eventType} (${eventId})`);
       await recordEvent(eventId, eventType, userId, event);
-      return Response.json({ ok: true, unattributed: true });
+      return Response.json({ ok: true, unattributed: true }, { headers: corsHeaders });
     }
 
     const interval = data?.billing_cycle?.interval;
@@ -288,12 +303,12 @@ Deno.serve(async (request) => {
     // between here and there.
     await recordEvent(eventId, eventType, userId, event);
 
-    return Response.json({ ok: true, status, plan: row.plan });
+    return Response.json({ ok: true, status, plan: row.plan }, { headers: corsHeaders });
   } catch (error) {
     console.error(error);
     // A 500 makes Paddle retry. Nothing on this path was recorded, so
     // the retry actually redoes whatever failed instead of the
     // duplicate check silently absorbing it.
-    return Response.json({ ok: false, error: String(error) }, { status: 500 });
+    return Response.json({ ok: false, error: String(error) }, { status: 500, headers: corsHeaders });
   }
 });
