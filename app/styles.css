@@ -236,6 +236,42 @@
 
 :root[data-theme="light"]{ color-scheme: light; }
 
+/* ───────────────────────── Calm mode ─────────────────────────
+   Orthogonal to light/dark, not a third theme -- someone might want
+   either theme with less visual intensity, not a third one to choose
+   between. Placed after both theme blocks so these overrides win
+   regardless of which theme is active (equal specificity to both,
+   later in source order).
+
+   Deliberately leaves the pie fills and urgent colour themselves
+   alone -- that colour coding is the core information the app exists
+   to show, not decoration. What's toned down is the decoration
+   around it: gradients, the crimson glow, animation, and the one
+   broad "loud" accent token used for UI chrome rather than the pies. */
+:root[data-calm="1"]{
+  --orange:      var(--orange-deep);
+  --urgent-glow:      rgba(0,0,0,0);
+  --urgent-good-glow: rgba(0,0,0,0);
+}
+
+[data-calm="1"] *,
+[data-calm="1"] *::before,
+[data-calm="1"] *::after{
+  animation:none !important;
+  transition:none !important;
+}
+
+/* Flattened to one flat colour apiece, rather than removed outright --
+   each still separates the section it's on from the page around it,
+   just without the gradient sweep. */
+[data-calm="1"] body{ background:var(--shell); }
+[data-calm="1"] .topbar{ background:var(--header-mid); }
+[data-calm="1"] .calc-block{ background:var(--calc-to); }
+[data-calm="1"] .upgrade{ background:var(--card); }
+[data-calm="1"] .timer-card--purple::before{ background:var(--purple); }
+[data-calm="1"] .timer-card--green::before{ background:var(--forest); }
+[data-calm="1"] .timer-card--amber::before{ background:var(--appt); }
+
 *,*::before,*::after{ box-sizing:border-box; }
 
 /* A class that sets `display` outranks the UA rule for [hidden], so any
