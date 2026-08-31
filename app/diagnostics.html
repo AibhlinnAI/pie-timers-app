@@ -478,6 +478,7 @@
           .then(function () { return checkFunction('signin', 'Needed for rate-limited magic links.'); })
           .then(function () { return checkFunction('delete-account', 'Needed for the delete button in Settings.'); })
           .then(function () { return checkFunction('paddle-webhook', 'Without it, payments never unlock access.'); })
+          .then(function () { return checkFunction('manage-subscription', 'Without it, the Manage button in Settings has nowhere to send people.'); })
           .then(function () { return checkFunction('notify-milestones', 'Without it, no alerts when the app is closed.'); })
           .then(function () { return checkFunction('calendar-sync', 'Needed for calendar feeds.'); })
           .then(function () { return checkFunction('google-connect', 'Needed for one-click Google Calendar.'); });
