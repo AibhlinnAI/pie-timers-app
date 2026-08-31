@@ -23,6 +23,7 @@ These must **never** be committed:
 | Supabase service-role key | Supabase → Edge Functions → Secrets |
 | VAPID **private** key | Supabase → Edge Functions → Secrets |
 | Paddle webhook secret | Supabase → Edge Functions → Secrets |
+| Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from `manage-subscription`, that one only opens a checkout in the browser. |
 | Turnstile secret key | Supabase → Edge Functions → Secrets |
 | Google client secret | Supabase → Edge Functions → Secrets |
 | Resend API key | Supabase → Authentication → SMTP |

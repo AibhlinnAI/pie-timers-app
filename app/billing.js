@@ -204,6 +204,37 @@
     });
   }
 
+  /* Opens Paddle's own hosted customer portal (payment method,
+     invoices, cancel) in a new tab. Deliberately does not build a
+     cancellation UI of our own -- Paddle is the merchant of record
+     (terms.html §5), so the portal already reflects their actual
+     buyer terms and refund policy instead of us reimplementing a
+     second copy of it. */
+  function openManagePortal() {
+    if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
+
+    var user = CT.auth.getUser();
+    if (!user) return Promise.reject(new Error('Please sign in first.'));
+
+    return CT.auth.validToken().then(function (token) {
+      if (!token) throw new Error('Please sign in first.');
+      return fetch(cfg.supabaseUrl + '/functions/v1/manage-subscription', {
+        method: 'POST',
+        headers: {
+          apikey: cfg.supabaseAnonKey,
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: '{}'
+      });
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) throw new Error(data.error || 'Could not open your billing portal.');
+        return data;
+      });
+    });
+  }
+
   CT.turnstile = turnstile;
 
   CT.billing = {
@@ -215,6 +246,7 @@
     },
     refresh: refresh,
     openCheckout: openCheckout,
+    openManagePortal: openManagePortal,
     onChange: function (fn) {
       listeners.push(fn);
       return function () {

@@ -2137,9 +2137,38 @@
     $('buyMonthly').addEventListener('click', function () { startCheckout('monthly'); });
 
     $('managePlan').addEventListener('click', function () {
-      CT.billing.refresh().then(function () {
-        renderPlan();
-        toast('Plan refreshed.');
+      var button = $('managePlan');
+      var message = $('managePlanMessage');
+      message.classList.remove('is-error');
+      message.textContent = '';
+
+      // Opened synchronously, before the network call -- most browsers'
+      // popup blockers only allow window.open() inside the click's own
+      // call stack, not after an awaited fetch resolves. Filled in once
+      // Paddle actually returns a URL, so this never shows about:blank
+      // for longer than the request takes.
+      //
+      // Deliberately NOT passing 'noopener' to window.open(): compliant
+      // browsers return null instead of a window reference when it's
+      // set, which would silently break the redirect below before it
+      // ever ran. Setting .opener = null by hand afterwards gets the
+      // same protection (the new tab can't navigate this one) while
+      // still leaving us the reference we need to control it.
+      var portalTab = window.open('', '_blank');
+      if (portalTab) portalTab.opener = null;
+
+      button.disabled = true;
+      button.textContent = 'Opening…';
+
+      CT.billing.openManagePortal().then(function (result) {
+        if (portalTab) portalTab.location.href = result.url;
+      }).catch(function (err) {
+        if (portalTab) portalTab.close();
+        message.textContent = (err && err.message) || 'Could not open your billing portal.';
+        message.classList.add('is-error');
+      }).then(function () {
+        button.disabled = false;
+        button.textContent = 'Manage';
       });
     });
 
