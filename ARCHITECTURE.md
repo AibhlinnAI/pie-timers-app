@@ -81,6 +81,16 @@ the last grant simply lapses on schedule. The Windows screen saver
 identity schema for its gating — it has no `public.subscriptions` fallback,
 which is exactly why that mirror write has to actually work.
 
+That requirement caught a real bug: `paddle-webhook` used to log an event id
+*before* processing it, as a combined claim-and-audit write. A failure partway
+through — the subscriptions upsert, or this mirror — left the event already
+logged, so Paddle's retry saw it as a duplicate and never redid the part that
+failed. Fixed by splitting that into a read-only duplicate check up front and
+a record-as-processed write at the very end, only once every write the event
+triggers has actually succeeded. If this function is ever touched again,
+keep it that way — recording the event id anywhere before its work is done
+quietly brings the bug back.
+
 ## 3. No ads, no tracking — permanent, not a preference
 
 No advertising SDK, no third-party analytics, no tracking pixel, no data sale
