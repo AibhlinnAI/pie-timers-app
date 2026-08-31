@@ -4,8 +4,14 @@
    Two things make this safe:
    1. The Paddle-Signature header is verified before anything is
       read from the body. An unsigned request is never trusted.
-   2. Every event id is recorded first. Paddle retries on failure,
-      so a duplicate must be a no-op rather than a second grant.
+   2. An event id is recorded only once everything it triggers has
+      actually succeeded -- not before. Paddle retries on failure, so
+      a genuine duplicate must be a no-op, but a *partial* failure
+      must NOT look like one: recording the id first (an earlier
+      version of this function did exactly that) makes a retry after
+      a mid-processing failure see the id already logged and report
+      "already processed" without redoing the part that failed. See
+      wasAlreadyProcessed()/recordEvent() below.
    ============================================================ */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -63,8 +69,25 @@ async function rest(path: string, init: RequestInit = {}) {
   return response;
 }
 
-/* Record the event id. Returns false if we have already handled it. */
-async function claimEvent(eventId: string, eventType: string, userId: string | null, payload: unknown) {
+/* Read-only duplicate check. Does NOT record anything -- recording
+   happens only via recordEvent() below, once this event's work has
+   actually finished, which is what makes a retry after a partial
+   failure reprocess instead of silently no-op-ing. */
+async function wasAlreadyProcessed(eventId: string): Promise<boolean> {
+  const response = await rest(
+    `/billing_events?event_id=eq.${encodeURIComponent(eventId)}&select=event_id&limit=1`,
+  );
+  if (!response.ok) {
+    throw new Error(`duplicate check failed: ${response.status} ${await response.text()}`);
+  }
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/* Records an event as fully processed. Call this LAST, only after
+   every write the event triggers has actually succeeded -- see the
+   file header for why the ordering is the whole point. */
+async function recordEvent(eventId: string, eventType: string, userId: string | null, payload: unknown) {
   const response = await rest("/billing_events", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -75,9 +98,13 @@ async function claimEvent(eventId: string, eventType: string, userId: string | n
       payload,
     }),
   });
-  if (response.status === 409) return false; // already processed
-  if (!response.ok) throw new Error(`claim failed: ${response.status} ${await response.text()}`);
-  return true;
+  // A 409 here means a concurrent duplicate delivery finished its own
+  // (idempotent) processing microseconds before this one and logged
+  // the event first -- the work was done twice safely, so losing the
+  // race to log it is not a failure.
+  if (!response.ok && response.status !== 409) {
+    throw new Error(`record failed: ${response.status} ${await response.text()}`);
+  }
 }
 
 /* Map a Paddle billing cycle onto our two plan names. */
@@ -135,7 +162,19 @@ async function grantCapability(
    what makes the omission double as the revocation: no fresh grant
    call means the previous expiry (already in the database) is left to
    lapse on its own, exactly the mechanism schema-hardship.sql already
-   uses for its own grants. */
+   uses for its own grants.
+
+   Throws on failure, so a transient fault here (a timeout, Supabase
+   hiccuping, or -- see grantCapability's own note -- the identity
+   schema not yet exposed under Project Settings → Data API) makes
+   Paddle retry the whole event, same as a public.subscriptions
+   failure does. That only works because recordEvent() is no longer
+   called until every write this function makes has succeeded -- an
+   earlier version of this function swallowed its own errors here
+   specifically because throwing couldn't have triggered a real retry
+   under the old claim-first ordering. The screen saver has no
+   fallback onto public.subscriptions (ARCHITECTURE.md §2), so a
+   silent, permanent miss here is worse than a loud, retried one. */
 async function mirrorToIdentitySchema(
   accountId: string,
   status: string,
@@ -155,19 +194,11 @@ async function mirrorToIdentitySchema(
     .filter((c): c is string => c !== null);
 
   if (failed.length > 0) {
-    // Logged, not thrown: claimEvent() above has already marked this
-    // event processed, so a Paddle retry (which a 500 here would
-    // trigger) would hit that claim and short-circuit to "duplicate"
-    // without actually retrying this step -- returning 500 would
-    // promise a safety net that does not exist. public.subscriptions
-    // (this account's real, authoritative entitlement today) is
-    // already correct by the time this runs; this only affects the
-    // identity-schema mirror the screen saver depends on. Surfaced
-    // here so it is visible in the function's logs, not silently lost.
     console.error(
       `identity-schema grant failed for ${accountId}, capabilities [${failed.join(", ")}]: ` +
       `check Project Settings → Data API → Exposed schemas includes 'identity'.`,
     );
+    throw new Error(`identity-schema grant failed for capabilities [${failed.join(", ")}]`);
   }
 }
 
@@ -199,16 +230,23 @@ Deno.serve(async (request) => {
   if (!eventId) return new Response("Missing event id", { status: 400 });
 
   try {
-    const fresh = await claimEvent(eventId, eventType, userId, event);
-    if (!fresh) return Response.json({ ok: true, duplicate: true });
+    if (await wasAlreadyProcessed(eventId)) {
+      return Response.json({ ok: true, duplicate: true });
+    }
 
     if (!eventType.startsWith("subscription.")) {
+      // Nothing to do for this event type -- recorded so a retry of
+      // the same delivery doesn't repeat this check for no reason.
+      await recordEvent(eventId, eventType, userId, event);
       return Response.json({ ok: true, ignored: eventType });
     }
 
     if (!userId) {
-      // Nothing we can attribute this to. Logged above for manual repair.
+      // Nothing we can attribute this to, and retrying won't add a
+      // user_id that isn't in the payload -- recorded so this specific
+      // unusable event doesn't need re-diagnosing on every retry.
       console.error(`No user_id in custom_data for ${eventType} (${eventId})`);
+      await recordEvent(eventId, eventType, userId, event);
       return Response.json({ ok: true, unattributed: true });
     }
 
@@ -238,17 +276,24 @@ Deno.serve(async (request) => {
       throw new Error(`upsert failed: ${upsert.status} ${await upsert.text()}`);
     }
 
-    // public.subscriptions (above) stays the authoritative write and can
-    // still trigger a Paddle retry via the throw/500 path above it. This
-    // one can't safely do the same -- see mirrorToIdentitySchema's own
-    // comment -- so it runs after, and failures there are logged, not
-    // thrown.
+    // public.subscriptions (above) is the authoritative write; this
+    // mirrors the same outcome into the identity schema for the screen
+    // saver and any future suite app. Also throws on failure now -- see
+    // its own comment for why that's safe (and necessary) here.
     await mirrorToIdentitySchema(userId, status, row.current_period_end);
+
+    // Recorded only now that every write above has actually succeeded.
+    // See the file header and recordEvent()'s own comment: this used to
+    // run first, which quietly defeated Paddle's retry on any failure
+    // between here and there.
+    await recordEvent(eventId, eventType, userId, event);
 
     return Response.json({ ok: true, status, plan: row.plan });
   } catch (error) {
     console.error(error);
-    // A 500 makes Paddle retry, which is what we want for a transient fault.
+    // A 500 makes Paddle retry. Nothing on this path was recorded, so
+    // the retry actually redoes whatever failed instead of the
+    // duplicate check silently absorbing it.
     return Response.json({ ok: false, error: String(error) }, { status: 500 });
   }
 });
