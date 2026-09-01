@@ -48,11 +48,11 @@ window.CT.config = {
      account is then treated as entitled. */
   paddle: {
     /* 'sandbox' while testing, 'production' when live. */
-    environment: 'sandbox',
-    clientToken: '',
+    environment: 'production',
+    clientToken: 'live_f40ba5ce81b1aff0afd6ab1ff86',
     /* Price IDs from Paddle → Catalogue → Products. */
-    annualPriceId: '',
-    monthlyPriceId: '',
+    annualPriceId: 'pri_01m1effmxgfb45pmtyfz1dnh77',
+    monthlyPriceId: 'pri_01m1efkevnwpn0rj7g2kzjne0j',
 
     /* What the upgrade panel displays. These are labels only — Paddle's
        checkout shows the real, tax-inclusive, localised price. Keep them
