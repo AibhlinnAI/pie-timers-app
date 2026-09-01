@@ -57,21 +57,21 @@ window.CT.config = {
     /* What the upgrade panel displays. These are labels only — Paddle's
        checkout shows the real, tax-inclusive, localised price. Keep them
        in step with the actual prices set in Paddle. */
-    annualPrice: '$19',
+    annualPrice: 'A$19',
     annualPeriod: '/year',
-    monthlyPrice: '$2.90',
+    monthlyPrice: 'A$2.90',
     monthlyPeriod: '/month',
 
     /* Shown on the annual card. Deliberately concrete: a dollar figure
-       beats a percentage. $2.90 × 12 = $34.80 against $19, so the saving
-       is $15.80 — keep this exact rather than rounding a price claim up.
+       beats a percentage. A$2.90 × 12 = A$34.80 against A$19, so the saving
+       is A$15.80 — keep this exact rather than rounding a price claim up.
        Set deliberately low (not just "double-digit savings") so premium
        stays reachable for as many people as possible. */
-    annualSaving: 'Save $15.80 a year',
+    annualSaving: 'Save A$15.80 a year',
 
-    /* Sub-line on the annual card. $19/yr is $1.58 a month, which is a
+    /* Sub-line on the annual card. A$19/yr is A$1.58 a month, which is a
        far easier thing to say than the annual figure. */
-    annualNote: 'Works out at $1.58 a month'
+    annualNote: 'Works out at A$1.58 a month'
   }
 };
 
