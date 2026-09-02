@@ -164,15 +164,63 @@ Paddle will ask for your terms and privacy URLs during seller verification:
 Both are already linked from the footer of every page, which is what they check
 for.
 
-Set the webhook to your `paddle-webhook` function URL, put the secret in
-Supabase, and send a test event from **Paddle → Notifications**. Then confirm an
-`entitlements` row appears. Diagnostics cannot check this for you — it is
-server to server — so it is the one you must watch happen.
+### 8.1 Catalogue
 
-**Before switching `environment` to `'production'`:** make sure the client
-token starts with `live_`. A `test_` token with `environment: 'production'`, or
-the reverse, produces a checkout that opens and then fails at payment.
-Diagnostics checks this pairing.
+- [ ] Create the product and its two prices in **Catalogue → Products**.
+- [ ] Copy the two price ids into `app/config.js` → `paddle.annualPriceId` and
+      `monthlyPriceId`.
+- [ ] Check the base currency. `annualPrice`, `monthlyPrice`, `annualSaving`
+      and `annualNote` in `config.js` are display labels only — Paddle charges
+      the real localised amount. Prices are set in **AUD**, so the labels read
+      `A$`. A bare `$` quotes one figure and charges another to anyone outside
+      Australia.
+
+### 8.2 Notification destination
+
+**This is the step that entitles customers. Without it, checkout still takes
+money and nobody is ever entitled — silently, with no error the customer or the
+app can see. Do not skip it, and do not treat a working checkout as evidence it
+is done.**
+
+Order matters: Paddle mints the signing secret when the destination is created,
+so the secret cannot be put in Supabase first.
+
+- [ ] **Developer tools → Notifications → New destination**, in the
+      **Production** environment.
+- [ ] Type **Webhook**, URL = your `paddle-webhook` function URL:
+      `https://<project-ref>.supabase.co/functions/v1/paddle-webhook`
+- [ ] Notification version **v2**.
+- [ ] Tick exactly `subscription.created`, `subscription.updated`,
+      `subscription.canceled`. Nothing else — the handler ignores every other
+      event type, so extra ticks only add noise to the delivery log.
+- [ ] Save, then reveal and copy the **signing secret** (`pdl_ntfset_…`).
+- [ ] Supabase → **Edge Functions → Secrets** → set `PADDLE_WEBHOOK_SECRET` to
+      that exact value.
+
+### 8.3 Prove it end to end
+
+- [ ] Send a test event from the destination's own page.
+- [ ] Confirm a row appears in `public.subscriptions`, **and** the mirrored
+      `entitlements` row appears.
+
+Diagnostics cannot check any of 8.2 or 8.3 for you — it is server to server, so
+it is the one you must watch happen.
+
+Reading a failure:
+
+- **401** — the secret in Supabase does not match the destination's. Recopy it.
+- **500** — the signature passed and a write failed. Read the Supabase function
+  logs, not the Paddle delivery log.
+- **200 but no row** — the event carried no `custom_data.user_id`. That means
+  the checkout was opened outside `billing.js`, which always attaches it.
+
+### 8.4 Before switching `environment` to `'production'`
+
+- [ ] Confirm the client token starts with `live_`. A `test_` token with
+      `environment: 'production'`, or the reverse, produces a checkout that
+      opens and then fails at payment. Diagnostics checks this pairing.
+- [ ] Confirm 8.2 is actually done. Going live without it is the one failure
+      that costs real customers real money.
 
 ---
 
