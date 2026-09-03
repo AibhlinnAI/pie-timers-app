@@ -124,6 +124,30 @@ $$;
 
 revoke all on function identity.grant_capability from public, anon, authenticated;
 
+-- The service role is the ONLY caller, so it needs saying explicitly.
+-- Postgres grants no USAGE on a newly created schema, and Supabase's
+-- default privileges cover `public`, not schemas added later -- so
+-- without these two lines paddle-webhook's grantCapability() fails on
+-- every event, forever: the public.subscriptions row writes, the
+-- mirror throws, recordEvent() never runs, and Paddle retries the same
+-- event indefinitely while the screen saver stays locked. Found the
+-- hard way on 2026-09-02, one query short of a live purchase.
+grant usage on schema identity to service_role;
+grant execute on function identity.grant_capability(
+  uuid, text, text, text, timestamptz
+) to service_role;
+
+-- anon and authenticated need USAGE on the schema, plus SELECT on the
+-- relations, before the RLS policies above ever get a say: RLS filters
+-- rows a role can already reach, it does not grant the reach. Without
+-- these the screen saver's only entitlement check (identity/
+-- entitlements.js, ARCHITECTURE.md section 2) reads a permission error
+-- rather than an empty set -- and there is no fallback behind it.
+grant usage on schema identity to anon, authenticated;
+grant select on identity.product_entitlements to authenticated;
+grant select on identity.subscriptions        to authenticated;
+grant select on identity.my_entitlements      to authenticated;
+
 -- ============================================================
 -- After running this file, one manual step in the dashboard:
 -- Project Settings → Data API → Exposed schemas → add `identity`
