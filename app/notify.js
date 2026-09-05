@@ -35,7 +35,17 @@
     if (!supported) return Promise.resolve(null);
     if (readyPromise) return readyPromise;
 
-    readyPromise = navigator.serviceWorker.register('sw.js', { scope: './' })
+    readyPromise = navigator.serviceWorker.register('sw.js', {
+      scope: './',
+      /* Without this the browser may serve sw.js itself from HTTP cache --
+         GitHub Pages sends max-age=600 -- so a new worker is not even
+         noticed for ten minutes after a deploy, and users sit on a stale
+         build with no way to know. skipWaiting/clients.claim in sw.js
+         cannot help: they only run once the browser has fetched a worker
+         it considers new. 'none' makes the update check always hit the
+         network. */
+      updateViaCache: 'none'
+    })
       .then(function (reg) {
         registration = reg;
         return navigator.serviceWorker.ready;
