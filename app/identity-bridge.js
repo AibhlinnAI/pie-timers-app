@@ -37,6 +37,43 @@
     refresh: function () { return window.Aibhlinn.entitlements.refresh(); }
   };
 
+
+  /* ── Session bridge ──────────────────────────────────────────────
+     Both this file's identity module and CT.auth (supabase.js) keep
+     their own session under their own localStorage key, and BOTH parse
+     the magic-link `#access_token=` out of the URL and then strip it.
+     identity-bridge.js is loaded before supabase.js, so identity always
+     wins the race: it adopts the token, cleans the hash, and CT.auth
+     finds nothing left to read.
+
+     The result was a user who is genuinely signed in -- Supabase logs
+     the sign-in, the identity UI shows the account -- while CT.auth
+     reports signed out. openCheckout() then rejects every purchase with
+     "Please sign in first", and sync, calendar and background alerts
+     stay dark, because those all gate on CT.auth.isSignedIn().
+
+     So: hand identity's session to CT.auth, now and whenever it
+     changes. Deliberately one-directional. identity is the layer that
+     wins the hash, so it is the source of truth; making CT.auth push
+     back would reintroduce the same race in the other direction.
+
+     This is glue, not the fix. The real fix is CT.auth becoming a
+     facade over Aibhlinn.identity so there is one session and one
+     store -- the migration identity-schema.sql's header already calls
+     a deliberate follow-up. */
+  function syncSessionToCTAuth() {
+    if (!CT.auth || typeof CT.auth.adoptSession !== 'function') return;
+    CT.auth.adoptSession(window.Aibhlinn.identity.getSession());
+  }
+
+  syncSessionToCTAuth();
+  window.Aibhlinn.identity.onChange(syncSessionToCTAuth);
+
+  /* supabase.js loads after this file, so CT.auth may not exist yet on
+     first run. Catch it once the document is ready, by which point
+     every script tag has executed. */
+  document.addEventListener('DOMContentLoaded', syncSessionToCTAuth);
+
   document.addEventListener('DOMContentLoaded', function () {
     var header = document.getElementById('topbarSignin');
     if (header) {

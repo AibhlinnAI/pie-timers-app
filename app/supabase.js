@@ -292,6 +292,27 @@
       });
     },
 
+    /* Adopt a session minted elsewhere -- specifically by the shared
+       identity module, which parses the magic-link hash before this
+       file is even loaded (see identity-bridge.js for why). Takes a
+       stored session object, not a token endpoint response, so there
+       is no refresh round trip. Idempotent on the access token, so the
+       bridge can call it on load and on every change without churn. */
+    adoptSession: function (next) {
+      if (!next || !next.access_token) {
+        if (session) storeSession(null);
+        return null;
+      }
+      if (session && session.access_token === next.access_token) return session;
+      storeSession({
+        access_token: next.access_token,
+        refresh_token: next.refresh_token,
+        expires_at: next.expires_at || (Date.now() + 3600000),
+        user: next.user || null
+      });
+      return session;
+    },
+
     getSession: function () { return session; },
     getUser: function () { return session && session.user; },
     isSignedIn: function () { return Boolean(session && session.access_token); },
