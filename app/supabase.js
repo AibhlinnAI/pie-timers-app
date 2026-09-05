@@ -367,7 +367,7 @@
     savePushSubscription: function (subscription, timezone) {
       var user = auth.getUser();
       if (!user) return Promise.reject(new Error('Not signed in.'));
-      return authedFetch('/push_subscriptions', {
+      return authedFetch('/push_subscriptions?on_conflict=endpoint', {
         method: 'POST',
         headers: {
           Prefer: 'resolution=merge-duplicates,return=representation'
