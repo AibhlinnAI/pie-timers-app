@@ -17,6 +17,13 @@
   var listeners = [];
   var refreshTimer = null;
   var refreshInFlight = null;
+  /* True once the session came from Aibhlinn.identity via the bridge.
+     Supabase rotates the refresh token on every use, so two modules
+     refreshing the same one race: the loser presents a spent token,
+     gets a 401, and the sync status flaps between syncing and error.
+     When adopted, identity owns refresh and pushes each new token here
+     through onChange -- so this module must not refresh on its own. */
+  var adopted = false;
 
   /* ─────────────────────────── Utilities ─────────────────────────── */
 
@@ -99,6 +106,7 @@
 
   function scheduleRefresh() {
     clearTimeout(refreshTimer);
+    if (adopted) return;   // identity refreshes; see `adopted` above
     if (!session || !session.refresh_token) return;
     var delay = session.expires_at - Date.now() - REFRESH_MARGIN_MS;
     // setTimeout saturates past ~24.8 days; clamp well below that anyway.
@@ -106,6 +114,7 @@
   }
 
   function refresh() {
+    if (adopted) return Promise.resolve(session);   // not ours to rotate
     if (!session || !session.refresh_token) return Promise.resolve(null);
     if (refreshInFlight) return refreshInFlight;
 
@@ -299,6 +308,7 @@
        is no refresh round trip. Idempotent on the access token, so the
        bridge can call it on load and on every change without churn. */
     adoptSession: function (next) {
+      adopted = true;
       if (!next || !next.access_token) {
         if (session) storeSession(null);
         return null;
