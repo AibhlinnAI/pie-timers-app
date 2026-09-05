@@ -17,6 +17,7 @@
   var listeners = [];
   var refreshTimer = null;
   var refreshInFlight = null;
+  var lastEmittedKey = null;
   /* True once the session came from Aibhlinn.identity via the bridge.
      Supabase rotates the refresh token on every use, so two modules
      refreshing the same one race: the loser presents a spent token,
@@ -35,7 +36,23 @@
     return location.origin + location.pathname;
   }
 
+  /* Identity of the current session, for change detection. Listeners
+     react to WHO is signed in, not to the session object being
+     rewritten -- and at least one of them (sync.js) calls loadUser(),
+     which writes the user back onto the session and stores it again.
+     Emitting on every store therefore re-entered that listener and
+     looped: user fetch, entitlement, calendar, profile, push, repeat,
+     tens of times a second. Emit only when the answer to "who is
+     signed in" has actually changed. */
+  function sessionKey() {
+    if (!session || !session.access_token) return '';
+    return session.access_token + '|' + ((session.user && session.user.id) || '');
+  }
+
   function emit() {
+    var key = sessionKey();
+    if (key === lastEmittedKey) return;
+    lastEmittedKey = key;
     listeners.forEach(function (fn) {
       try { fn(session); } catch (e) { /* a listener must not break the chain */ }
     });
