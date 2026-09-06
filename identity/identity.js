@@ -194,6 +194,22 @@
     return { signedIn: true, providerRefreshToken: providerRefreshToken || null };
   }
 
+  /* The plain path: straight to Supabase, no bot check and no throttle
+     in front of it. A product that has either supplies a `signIn`
+     delegate to init(); this is what runs when none is supplied, or
+     when the delegate stands aside. */
+  function sendMagicLink(email) {
+    return request(authUrl('/otp'), {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        create_user: true,
+        options: { email_redirect_to: redirectTarget() }
+      })
+    });
+  }
+
   var identity = {
     /* Call once per page load, before anything else in this module. */
     init: function (config) {
@@ -224,19 +240,16 @@
     },
 
     signInWithEmail: function (email, ctx) {
+      /* A delegate returning null means "I could not do it, you go
+         ahead". Pie Timers uses that when its bot check will not
+         render, so a widget that fails cannot become a sign-in nobody
+         can complete. Anything else it returns is the answer. */
       if (cfg && typeof cfg.signIn === 'function') {
-        return Promise.resolve(cfg.signIn(email, ctx || {}));
+        return Promise.resolve(cfg.signIn(email, ctx || {})).then(function (result) {
+          return result === null ? sendMagicLink(email) : result;
+        });
       }
-      var body = {
-        email: email,
-        create_user: true,
-        options: { email_redirect_to: redirectTarget() }
-      };
-      return request(authUrl('/otp'), {
-        method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+      return sendMagicLink(email);
     },
 
     /* Optional, secondary. Hands off to Supabase, which returns to
