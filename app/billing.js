@@ -85,7 +85,7 @@
           currentHost = host;
           widgetId = window.turnstile.render(host, {
             sitekey: cfg.turnstileSiteKey,
-            theme: 'light',
+            theme: 'auto',
             callback: function (token) { currentToken = token; },
             'expired-callback': function () { currentToken = ''; },
             'error-callback': function () { currentToken = ''; }

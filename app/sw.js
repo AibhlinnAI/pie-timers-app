@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v41';
+var CACHE = 'countdown-timers-v42';
 
 var SHELL = [
   './',
