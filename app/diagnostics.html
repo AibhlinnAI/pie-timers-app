@@ -262,9 +262,16 @@
         notes.push(providers.email === false
           ? 'Email sign-in is DISABLED — magic links will fail'
           : 'Email sign-in enabled');
-        notes.push(providers.google ? 'Google enabled' : 'Google not enabled');
+        /* The sign-in panel renders 'Continue with Google' unconditionally
+           (identity-ui.js), so a disabled provider is not a missing feature --
+           it is a visible button that answers 'Unsupported provider' to every
+           visitor who clicks it. */
+        notes.push(providers.google
+          ? 'Google enabled'
+          : 'Google NOT enabled, but the sign-in panel still shows a Continue ' +
+            'with Google button — clicking it errors');
         var bad = providers.email === false;
-        done(bad ? 'fail' : 'pass', notes.join('. ') + '.');
+        done(bad ? 'fail' : (providers.google ? 'pass' : 'warn'), notes.join('. ') + '.');
       }).catch(function (err) {
         done('fail', 'GoTrue did not respond (' + err.message + ').');
       });
@@ -418,12 +425,100 @@
     }
   }
 
+  /* Paddle removed per-destination test events: Simulations run in Sandbox
+     only, so a Production destination can never be handed a synthetic one.
+     The live path can only be exercised by a real purchase. */
   function checkPaddleWebhookNote() {
     var done = row('Paddle webhook');
     if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
     done('warn', 'Cannot be verified from the browser — it is server to server. ' +
-      'Test it from Paddle → Notifications → Send test event, then confirm the ' +
-      'entitlement row appears in Supabase.');
+      'Paddle -> Notifications must have an ACTIVE destination pointing at the ' +
+      'paddle-webhook function URL, subscribed to subscription.created, ' +
+      '.updated and .canceled, with its signing secret in Supabase as ' +
+      'PADDLE_WEBHOOK_SECRET. Without a destination, checkout still takes ' +
+      'money and nobody is ever entitled — silently. Prove it with a real ' +
+      'purchase, then refund; there is no test event for Production.');
+  }
+
+  /* Two account-level Paddle settings gate whether a checkout opens at all,
+     and neither is visible from here. Both surface as the same 400 with
+     "transaction_checkout_not_enabled" in the response body, behind an
+     overlay that only says "Something went wrong". */
+  function checkPaddleCheckoutNote() {
+    var done = row('Paddle checkout — account settings');
+    if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
+    done('warn', 'Confirm in Paddle: Checkout -> Checkout settings has a ' +
+      'Default payment link, and Website approval lists ' + location.hostname +
+      ' as approved, not Pending. Subdomains are reviewed individually. If ' +
+      'checkout shows "Something went wrong", read the transaction-checkout ' +
+      'response in the Network tab before suspecting anything else — ' +
+      '"transaction_checkout_not_enabled" means one of these two is missing.');
+  }
+
+  /* The identity schema is served by PostgREST only if it is listed under
+     Project settings -> Data API -> Exposed schemas. That is a dashboard
+     step with no SQL equivalent, and skipping it fails silently at both
+     ends: paddle-webhook's grant_capability call throws on every event
+     (so Paddle retries forever and nobody is entitled), and the screen
+     saver reads a permission error instead of an empty set, with no
+     fallback behind it. PostgREST says which case we are in outright --
+     PGRST106 for an unexposed schema, a permissions error for an exposed
+     one that is properly locked down. */
+  function checkIdentityExposed(relation, note) {
+    var done = row('Identity schema: ' + relation);
+    var url = cfg.supabaseUrl + '/rest/v1/' + relation + '?select=*&limit=1';
+    return get(url, {
+      headers: { apikey: cfg.supabaseAnonKey, 'Accept-Profile': 'identity' }
+    }).then(function (res) {
+      return res.text().then(function (body) { return { res:res, body:body }; });
+    }).then(function (r) {
+      if (/PGRST106/.test(r.body) || /Invalid schema/i.test(r.body)) {
+        done('fail', 'The `identity` schema is NOT exposed. Project settings ' +
+          '-> Data API -> Exposed schemas -> add `identity` alongside `public` ' +
+          'and `graphql_public`. ' + (note || ''));
+        return;
+      }
+      if (/PGRST20[05]/.test(r.body) || r.res.status === 404) {
+        done('fail', 'Exposed, but ' + relation + ' does not exist. Run ' +
+          'identity-schema.sql in the SQL editor.');
+        return;
+      }
+      if (r.res.status === 401 || r.res.status === 403 || /42501/.test(r.body)) {
+        done('pass', 'Exposed, and refuses an unauthenticated read (HTTP ' +
+          r.res.status + ').');
+        return;
+      }
+      if (!r.res.ok) { done('fail', 'HTTP ' + r.res.status + ': ' + r.body.slice(0, 160)); return; }
+
+      var parsed;
+      try { parsed = JSON.parse(r.body); } catch (e) { parsed = null; }
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        done('fail', 'SECURITY: returned ' + parsed.length + ' row(s) to an ' +
+          'unauthenticated request. Entitlements are readable by anyone with ' +
+          'the publishable key, which is public.');
+      } else {
+        done('pass', 'Exposed, and returns nothing without a session.');
+      }
+    }).catch(function (err) {
+      done('fail', err.message);
+    });
+  }
+
+  /* Role grants cannot be read from the browser: has_schema_privilege needs
+     a database session, and grant_capability is deliberately revoked from
+     anon and authenticated. So this check cannot pass or fail on its own --
+     it hands over the query that settles it. Worth running once per project,
+     because identity-schema.sql creates the schema without granting it, and
+     the resulting failure looks exactly like the one above. */
+  function checkIdentityGrantsNote() {
+    var done = row('Identity schema — role grants');
+    done('warn', 'Not checkable from a browser. Run this in the SQL editor; ' +
+      'all four must be true: ' +
+      "select has_schema_privilege('service_role','identity','USAGE'), " +
+      "has_function_privilege('service_role'," +
+      "'identity.grant_capability(uuid,text,text,text,timestamptz)','EXECUTE'), " +
+      "has_schema_privilege('authenticated','identity','USAGE'), " +
+      "has_table_privilege('authenticated','identity.my_entitlements','SELECT');");
   }
 
   function checkManual() {
@@ -431,7 +526,9 @@
     done('warn',
       '1. Sign in with a real email and confirm the link arrives, not in spam. ' +
       '2. Change your hours on one device and confirm they appear on another. ' +
-      '3. Buy with a Paddle test card and confirm access unlocks. ' +
+      '3. Buy the monthly plan for real and confirm three rows appear in ' +
+      'identity.product_entitlements, then refund it — Production has no ' +
+      'test events and no test cards. ' +
       '4. Delete a throwaway account and confirm the rows are gone. ' +
       '5. Close the app and confirm a milestone alert still arrives.');
   }
@@ -450,10 +547,12 @@
     checkTurnstile();
     checkPaddle();
     checkPaddleWebhookNote();
+    checkPaddleCheckoutNote();
 
     var chain = Promise.resolve()
       .then(function () { return checkLegalPage('terms.html', 'Terms of Service page'); })
       .then(function () { return checkLegalPage('privacy.html', 'Privacy Policy page'); })
+      .then(function () { return checkLegalPage('terms.html#refunds', 'Refund policy link (Paddle domain review)'); })
       .then(checkServiceWorker)
       .then(checkSupabaseRest)
       .then(function (up) {
@@ -481,7 +580,10 @@
           .then(function () { return checkFunction('manage-subscription', 'Without it, the Manage button in Settings has nowhere to send people.'); })
           .then(function () { return checkFunction('notify-milestones', 'Without it, no alerts when the app is closed.'); })
           .then(function () { return checkFunction('calendar-sync', 'Needed for calendar feeds.'); })
-          .then(function () { return checkFunction('google-connect', 'Needed for one-click Google Calendar.'); });
+          .then(function () { return checkFunction('google-connect', 'Needed for one-click Google Calendar.'); })
+          .then(function () { return checkIdentityExposed('product_entitlements', 'Run identity-schema.sql first if it has never been run.'); })
+          .then(function () { return checkIdentityExposed('my_entitlements', 'The Windows screen saver is gated on this view alone.'); })
+          .then(checkIdentityGrantsNote);
       })
       .then(checkManual)
       .then(tally);
