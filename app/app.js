@@ -1995,7 +1995,15 @@
         : 'Never';
     }
 
-    if (!signedIn && CT.config.turnstileEnabled) CT.turnstile.mount();
+    /* Only when this form is actually on screen. renderAccount() runs on
+       every auth change, and an unconditional mount here would drag the
+       single Turnstile widget back out of the header sign-in panel each
+       time -- leaving that panel with no check and a token that never
+       arrives. Whichever form the person can see is the one that gets it. */
+    if (!signedIn && CT.config.turnstileEnabled) {
+      var tsHost = $('turnstileHost');
+      if (tsHost && tsHost.offsetParent !== null) CT.turnstile.mount(tsHost);
+    }
 
     renderPlan();
     renderCalendarPanel();
