@@ -20,7 +20,46 @@
   window.Aibhlinn.identity.init({
     supabaseUrl: cfg.supabaseUrl,
     supabaseAnonKey: cfg.supabaseAnonKey,
-    redirectUrl: cfg.redirectUrl || null
+    redirectUrl: cfg.redirectUrl || null,
+
+    /* ── One protected sign-in path ──────────────────────────────
+       identity's own signInWithEmail posts straight to Supabase's
+       /auth/v1/otp, which has nowhere to put a bot check or a
+       throttle. Pie Timers has both, in the `signin` edge function:
+       Turnstile, then per-email and per-IP limits in Postgres, then
+       Supabase's own limits behind that. Until this delegate existed
+       the header panel bypassed all three while the Account tab's
+       form used them -- two sign-in routes, one of them an open relay
+       for emailing strangers at the expense of our sending quota and
+       the domain's reputation.
+
+       prepareSignIn draws the check when the panel opens, so the
+       person is not left waiting on a widget after they have already
+       pressed the button. CT.turnstile lives in billing.js, which
+       loads after this file, so both hooks resolve it lazily at call
+       time rather than capturing it here. */
+    prepareSignIn: function (challengeHost) {
+      if (!cfg.turnstileEnabled || !CT.turnstile) return Promise.resolve(false);
+      return CT.turnstile.mount(challengeHost);
+    },
+
+    signIn: function (email, ctx) {
+      if (!cfg.turnstileEnabled) return CT.auth.signInWithEmail(email, '');
+      if (!CT.turnstile) return Promise.reject(new Error('Sign-in is still loading. Please try again in a moment.'));
+
+      return CT.turnstile.mount(ctx && ctx.challengeHost).then(function () {
+        var token = CT.turnstile.token();
+        if (!token) {
+          // Not an error state: the widget is still working, or it wants
+          // an interaction. Say so plainly rather than failing silently.
+          throw new Error('Just finishing the bot check — please press the button again.');
+        }
+        return CT.auth.signInWithEmail(email, token).then(function (result) {
+          CT.turnstile.reset();   // tokens are single-use
+          return result;
+        });
+      });
+    }
   });
 
   window.Aibhlinn.entitlements.init({
