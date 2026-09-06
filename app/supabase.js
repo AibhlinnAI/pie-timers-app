@@ -481,14 +481,6 @@
         body: JSON.stringify({ p_code: code })
       });
     },
-
-    /* Self-certified hardship grant. No arguments — the database
-       function reads auth.uid() itself, so this can only ever grant
-       the caller's own account. Safe to call more than once. */
-    grantHardshipAccess: function () {
-      return authedFetch('/rpc/grant_hardship_access', { method: 'POST', body: '{}' });
-    },
-
     /* Hand Google's refresh token to the server. It is never kept here. */
     connectGoogle: function (refreshToken, email) {
       return validToken().then(function (token) {

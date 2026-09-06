@@ -176,8 +176,8 @@
     var done = row('Support address');
     var email = cfg.supportEmail || '';
     if (!email) {
-      done('fail', 'Not set. The terms, the privacy policy and the hardship ' +
-        'link in the app all have nowhere to point.');
+      done('fail', 'Not set. The terms and the privacy policy both have ' +
+        'nowhere to point.');
     } else if (/\.example$|@example\./i.test(email)) {
       done('fail', 'Still the placeholder (' + email + '). It is printed in ' +
         'your terms and privacy policy and shown to customers.');

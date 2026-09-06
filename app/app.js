@@ -2113,49 +2113,6 @@
       });
     });
 
-    /* One click grants access — no confirmation step. A dialog here
-       ("Are you sure you need this?") would be exactly the
-       interrogation this tier exists to avoid. */
-    $('hardshipBtn').addEventListener('click', function () {
-      var button = $('hardshipBtn');
-      var message = $('hardshipMessage');
-      message.classList.remove('is-error');
-
-      // Checked locally, before any network call: authedFetch() rejects
-      // with a plain "Not signed in." for a missing session, which would
-      // otherwise land in the generic network-failure branch below and
-      // tell someone to "try again" when retrying does nothing until
-      // they sign in. A local check avoids that entirely.
-      if (!CT.auth.isSignedIn()) {
-        message.textContent = 'Please sign in first — the panel above.';
-        message.classList.add('is-error');
-        return;
-      }
-
-      button.disabled = true;
-      message.textContent = 'One moment…';
-
-      CT.db.grantHardshipAccess().then(function (result) {
-        if (result && result.ok) {
-          message.textContent = "Done — it's yours. No catch, no time limit.";
-          return CT.billing.refresh().then(function () {
-            if (window.Aibhlinn && window.Aibhlinn.entitlements) {
-              window.Aibhlinn.entitlements.refresh();
-            }
-          });
-        }
-        message.textContent = result && result.error === 'not_signed_in'
-          ? 'Please sign in first — the panel above.'
-          : 'Something went wrong. Please try again.';
-        message.classList.add('is-error');
-      }).catch(function () {
-        message.textContent = 'Could not reach the server just now. Please try again.';
-        message.classList.add('is-error');
-      }).then(function () {
-        button.disabled = false;
-      });
-    });
-
     $('buyAnnual').addEventListener('click', function () { startCheckout('annual'); });
     $('buyMonthly').addEventListener('click', function () { startCheckout('monthly'); });
 
