@@ -119,9 +119,6 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
 - [ ] `schema-calendar.sql`
 - [ ] `schema-google-calendar.sql`
 - [ ] `identity-schema.sql`
-- [ ] `schema-hardship.sql` — needs `schema-billing.sql` (writes to
-      `public.subscriptions`) and `identity-schema.sql`
-      (`identity.grant_capability`) to exist first.
 - [ ] `cron.sql` — last: it schedules a job against edge functions that do
       not exist until 5.3.
 
