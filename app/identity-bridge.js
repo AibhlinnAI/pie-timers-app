@@ -17,6 +17,20 @@
 
   if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return; // no account features configured
 
+  /* Poll rather than use a callback: CT.turnstile owns the widget's
+     callbacks already, and token() is the single place that knows
+     whether one has arrived. */
+  function waitForToken(timeoutMs) {
+    var deadline = Date.now() + timeoutMs;
+    return new Promise(function (resolve) {
+      (function poll() {
+        var token = CT.turnstile.token();
+        if (token || Date.now() > deadline) return resolve(token || '');
+        setTimeout(poll, 200);
+      }());
+    });
+  }
+
   window.Aibhlinn.identity.init({
     supabaseUrl: cfg.supabaseUrl,
     supabaseAnonKey: cfg.supabaseAnonKey,
@@ -47,7 +61,13 @@
       if (!cfg.turnstileEnabled || !CT.turnstile) return CT.auth.signInWithEmail(email, '');
 
       return CT.turnstile.mount(ctx && ctx.challengeHost).then(function () {
-        var token = CT.turnstile.token();
+        /* The widget is drawn when the panel opens, but a token only
+           arrives once Cloudflare finishes -- and someone typing an
+           email address fast can beat it. Wait a few seconds rather
+           than standing aside the moment it is not ready, so the
+           checked path is the normal one and not a race. */
+        return waitForToken(6000);
+      }).then(function (token) {
         if (token) {
           return CT.auth.signInWithEmail(email, token).then(function (result) {
             CT.turnstile.reset();   // tokens are single-use
@@ -55,20 +75,16 @@
           });
         }
 
-        /* No token. Deliberately fall through to identity's own path
-           rather than refusing: a bot check that will not render must
-           not become a sign-in nobody can complete. That leaves this
-           request unchecked, which is the state the app was already in
-           before the delegate existed -- so this is not a new hole, but
-           it is not the destination either. The throttles in the signin
-           function only apply to requests that reach it, so losing them
-           here is the cost of staying usable while the widget is fixed.
-
-           Loud on purpose: silence is how the unchecked path survived
-           unnoticed in the first place. */
-        console.warn('Turnstile did not produce a token; signing in without ' +
+        /* Still nothing. Fall through to identity's own path rather
+           than refusing: a bot check that will not complete must not
+           become a sign-in nobody can complete. That request is
+           unchecked -- the state the app was in before this delegate
+           existed -- so it is not a new hole, but it is not where this
+           ends either. Loud on purpose: silence is how the unchecked
+           path survived unnoticed in the first place. */
+        console.warn('Turnstile produced no token in time; signing in without ' +
                      'the bot check. See identity-bridge.js.');
-        return null;   // null tells identity to use its own /auth/v1/otp path
+        return null;   // null tells identity to use its own path
       });
     }
   });
