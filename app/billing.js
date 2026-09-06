@@ -62,7 +62,15 @@
 
       var host = hostEl || document.getElementById('turnstileHost');
       if (!host) return Promise.resolve(false);
-      if (widgetId !== null && host === currentHost) return Promise.resolve(true);
+      /* Same host AND the widget is still in it. The id outliving its
+       DOM is not hypothetical: the identity panel rebuilds its contents
+       on auth changes, which throws the rendered widget away while this
+       module still believes it is mounted -- and every later call then
+       short-circuits to a widget that is not there, leaving a sign-in
+       that can never produce a token. */
+      if (widgetId !== null && host === currentHost && host.childElementCount > 0) {
+        return Promise.resolve(true);
+      }
 
       if (widgetId !== null && window.turnstile) {
         try { window.turnstile.remove(widgetId); } catch (e) { /* already gone */ }
