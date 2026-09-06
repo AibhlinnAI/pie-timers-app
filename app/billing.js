@@ -41,6 +41,7 @@
   /* ─────────────────────────── Turnstile ─────────────────────────── */
 
   var widgetId = null;
+  var currentHost = null;
   var currentToken = '';
 
   var turnstile = {
@@ -48,20 +49,32 @@
 
     /* Render the widget. Defaults to #turnstileHost (the Account tab's
        own sign-in form); the identity panel passes its own element, so
-       both sign-in routes get the same check. Safe to call repeatedly --
-       one widget is all a page needs, since only one sign-in form is
-       ever open at a time. */
+       both sign-in routes get the same check.
+
+       There is one widget, and it follows whichever form is actually in
+       front of the person. That matters: app.js mounts into the Account
+       tab on load, so without moving it the header panel would show no
+       check at all and its token would stay empty forever -- a sign-in
+       that can never succeed. Cloudflare allows only one render per
+       element, so switching host means removing the old widget first. */
     mount: function (hostEl) {
       if (!cfg.turnstileEnabled) return Promise.resolve(false);
-      if (widgetId !== null) return Promise.resolve(true);
 
       var host = hostEl || document.getElementById('turnstileHost');
       if (!host) return Promise.resolve(false);
+      if (widgetId !== null && host === currentHost) return Promise.resolve(true);
+
+      if (widgetId !== null && window.turnstile) {
+        try { window.turnstile.remove(widgetId); } catch (e) { /* already gone */ }
+        widgetId = null;
+        currentToken = '';
+      }
 
       return loadScript('https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit')
         .then(function () {
           if (!window.turnstile) return false;
           host.hidden = false;
+          currentHost = host;
           widgetId = window.turnstile.render(host, {
             sitekey: cfg.turnstileSiteKey,
             theme: 'light',
