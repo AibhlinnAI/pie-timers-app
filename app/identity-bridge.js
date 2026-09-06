@@ -44,20 +44,31 @@
     },
 
     signIn: function (email, ctx) {
-      if (!cfg.turnstileEnabled) return CT.auth.signInWithEmail(email, '');
-      if (!CT.turnstile) return Promise.reject(new Error('Sign-in is still loading. Please try again in a moment.'));
+      if (!cfg.turnstileEnabled || !CT.turnstile) return CT.auth.signInWithEmail(email, '');
 
       return CT.turnstile.mount(ctx && ctx.challengeHost).then(function () {
         var token = CT.turnstile.token();
-        if (!token) {
-          // Not an error state: the widget is still working, or it wants
-          // an interaction. Say so plainly rather than failing silently.
-          throw new Error('Just finishing the bot check — please press the button again.');
+        if (token) {
+          return CT.auth.signInWithEmail(email, token).then(function (result) {
+            CT.turnstile.reset();   // tokens are single-use
+            return result;
+          });
         }
-        return CT.auth.signInWithEmail(email, token).then(function (result) {
-          CT.turnstile.reset();   // tokens are single-use
-          return result;
-        });
+
+        /* No token. Deliberately fall through to identity's own path
+           rather than refusing: a bot check that will not render must
+           not become a sign-in nobody can complete. That leaves this
+           request unchecked, which is the state the app was already in
+           before the delegate existed -- so this is not a new hole, but
+           it is not the destination either. The throttles in the signin
+           function only apply to requests that reach it, so losing them
+           here is the cost of staying usable while the widget is fixed.
+
+           Loud on purpose: silence is how the unchecked path survived
+           unnoticed in the first place. */
+        console.warn('Turnstile did not produce a token; signing in without ' +
+                     'the bot check. See identity-bridge.js.');
+        return null;   // null tells identity to use its own /auth/v1/otp path
       });
     }
   });
