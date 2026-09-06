@@ -2015,7 +2015,12 @@
     var legal = document.querySelectorAll('[data-legal-link]');
     for (var j = 0; j < legal.length; j++) {
       var which = legal[j].getAttribute('data-legal-link');
-      var url = which === 'terms' ? CT.config.termsUrl : CT.config.privacyUrl;
+      /* Refunds live inside the terms document, so that link follows
+         termsUrl and keeps its fragment. Paddle's domain review wants a
+         refund policy reachable from the site, not buried in a section
+         nothing links to. */
+      var url = which === 'privacy' ? CT.config.privacyUrl : CT.config.termsUrl;
+      if (url && which === 'refunds') url += '#refunds';
       if (url) legal[j].href = url;
     }
   }());
