@@ -24,6 +24,31 @@ create extension if not exists pg_cron;
 -- ═══════════════════════════ FREE TRIAL ═══════════════════════════
 -- Granted by a trigger on account creation rather than by anything
 -- the client can call, so it cannot be requested twice or forged.
+--
+-- Two lengths. Anyone who registers during the launch window gets a
+-- month; everyone after gets a fortnight. A month is long enough to
+-- live with the app through a full billing cycle of your own life,
+-- which is the point of a launch cohort; a fortnight is long enough
+-- to decide, and the price it leads to is A$2.90.
+--
+-- The window is a single constant below. Until it is set, every
+-- account gets the shorter trial -- deliberately the safe direction to
+-- fail, since the alternative is quietly giving away months.
+
+create or replace function public.trial_length()
+returns interval
+language sql
+stable
+as $$
+  -- Set this to the end of the launch month when you go live, e.g.
+  --   timestamptz '2026-10-15 00:00:00+11'
+  -- and leave it null again afterwards. Nothing else needs changing.
+  select case
+    when (null::timestamptz) is not null and now() < (null::timestamptz)
+      then interval '30 days'
+    else interval '14 days'
+  end;
+$$;
 
 create or replace function public.grant_trial()
 returns trigger
@@ -35,7 +60,7 @@ begin
   insert into public.subscriptions
     (user_id, status, plan, current_period_end, updated_at)
   values
-    (new.id, 'trialing', 'trial', now() + interval '60 days', now())
+    (new.id, 'trialing', 'trial', now() + public.trial_length(), now())
   on conflict (user_id) do nothing;   -- never overwrite a real subscription
   return new;
 end;
@@ -49,7 +74,7 @@ create trigger on_auth_user_created_grant_trial
 
 -- Backfill anyone who signed up before this was added.
 insert into public.subscriptions (user_id, status, plan, current_period_end, updated_at)
-select u.id, 'trialing', 'trial', now() + interval '60 days', now()
+select u.id, 'trialing', 'trial', now() + public.trial_length(), now()
   from auth.users u
  where not exists (select 1 from public.subscriptions s where s.user_id = u.id)
 on conflict (user_id) do nothing;
