@@ -85,6 +85,9 @@
           currentHost = host;
           widgetId = window.turnstile.render(host, {
             sitekey: cfg.turnstileSiteKey,
+            /* Named so the server can check the token was minted for this
+               form and not lifted from another widget on the same key. */
+            action: 'signin',
             theme: 'auto',
             callback: function (token) { currentToken = token; },
             'expired-callback': function () { currentToken = ''; },

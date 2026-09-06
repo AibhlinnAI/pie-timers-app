@@ -47,6 +47,20 @@ async function hash(value: string) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* The action and hostname a token must have been minted for. A
+   siteverify success only says "Cloudflare issued this token for this
+   sitekey" -- it does not say for which page or which form. Without
+   these two checks a token harvested from any other widget on the same
+   sitekey is accepted here, which is most of the point of having one. */
+const TURNSTILE_ACTION = "signin";
+const TURNSTILE_HOSTNAME = (() => {
+  try {
+    return ALLOWED_ORIGIN === "*" ? "" : new URL(ALLOWED_ORIGIN).hostname;
+  } catch {
+    return "";
+  }
+})();
+
 async function verifyTurnstile(token: string, ip: string) {
   if (!TURNSTILE_SECRET) return true; // not configured yet — fail open, see README
   if (!token) return false;
@@ -62,7 +76,22 @@ async function verifyTurnstile(token: string, ip: string) {
   );
   if (!response.ok) return false;
   const result = await response.json();
-  return result.success === true;
+  if (result.success !== true) return false;
+
+  // Both checks are skipped rather than failed when the token carries
+  // no such field: older widgets omit action entirely, and a hostname
+  // cannot be compared against an ALLOWED_ORIGIN of "*". Failing there
+  // would lock out sign-in on a misconfiguration, which is worse than
+  // the check not running -- but say so in the logs either way.
+  if (result.action && result.action !== TURNSTILE_ACTION) {
+    console.warn(`Turnstile action mismatch: ${result.action}`);
+    return false;
+  }
+  if (TURNSTILE_HOSTNAME && result.hostname && result.hostname !== TURNSTILE_HOSTNAME) {
+    console.warn(`Turnstile hostname mismatch: ${result.hostname}`);
+    return false;
+  }
+  return true;
 }
 
 async function rest(path: string, init: RequestInit = {}) {
