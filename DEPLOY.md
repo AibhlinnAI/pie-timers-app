@@ -108,48 +108,145 @@ Create the project in **ap-southeast-2 (Sydney)**. The privacy policy states
 that region as fact — if you pick another one, change `privacy.html` section 5
 the same day.
 
-Run the SQL from `supabase/`, in this order:
+### 5.1 Run the SQL, in this order
 
-1. `schema.sql`
-2. `schema-billing.sql`
-3. `schema-access-codes.sql`
-4. `schema-ratelimit.sql`
-5. `schema-calendar.sql`
-6. `schema-google-calendar.sql`
-7. `identity-schema.sql` — then, in the dashboard (no SQL for this part):
-   **Project Settings → Data API → Exposed schemas → add `identity`**
-   alongside `public`. Nothing that reads the identity schema works
-   until this is ticked.
-8. `schema-hardship.sql` — depends on both `schema-billing.sql` (writes
-   to `public.subscriptions`) and `identity-schema.sql`
-   (`identity.grant_capability`) already existing; run it after both.
-9. `cron.sql` — last, because it schedules a job against edge functions
-   that don't exist until the next step.
+Each file is idempotent, so re-running one is safe. Tick them off as they go.
 
-Deploy the six edge functions, then set **Authentication → URL Configuration**:
+- [ ] `schema.sql`
+- [ ] `schema-billing.sql`
+- [ ] `schema-access-codes.sql`
+- [ ] `schema-ratelimit.sql`
+- [ ] `schema-calendar.sql`
+- [ ] `schema-google-calendar.sql`
+- [ ] `identity-schema.sql`
+- [ ] `schema-hardship.sql` — needs `schema-billing.sql` (writes to
+      `public.subscriptions`) and `identity-schema.sql`
+      (`identity.grant_capability`) to exist first.
+- [ ] `cron.sql` — last: it schedules a job against edge functions that do
+      not exist until 5.3.
 
-- Site URL: `https://pietimers.aibhlinn.ai`
-- Redirect URLs: `https://pietimers.aibhlinn.ai/**`
+### 5.2 Expose the identity schema
 
-Sign-in links silently fail to return if this does not match. It is the most
+**Dashboard step, no SQL. Nothing that reads the identity schema works
+until this is done, and the failure is silent in both directions: the
+paddle-webhook mirror throws on every event and Paddle retries forever,
+while the screen saver reads a permission error instead of an empty set.**
+
+- [ ] **Project settings → Data API → Exposed schemas** → add `identity`
+      alongside `public` and `graphql_public`. Save.
+
+Verify rather than assume — this query answers all of it at once:
+
+```sql
+select
+  (select count(*) from information_schema.schemata
+     where schema_name = 'identity')                        as schema_exists,
+  (select count(*) from information_schema.tables
+     where table_schema = 'identity')                       as relation_count,
+  has_schema_privilege('service_role','identity','USAGE')   as svc_schema,
+  has_function_privilege('service_role',
+    'identity.grant_capability(uuid,text,text,text,timestamptz)',
+    'EXECUTE')                                              as svc_exec,
+  has_schema_privilege('authenticated','identity','USAGE')  as auth_schema,
+  has_table_privilege('authenticated',
+    'identity.my_entitlements','SELECT')                    as auth_view;
+```
+
+- [ ] `schema_exists` 1, `relation_count` 3 (two tables and a view), and the
+      four privilege columns all `true`.
+
+Note that `current_setting('pgrst.db_schemas', true)` returns NULL in the SQL
+editor whether or not the schema is exposed — the setting applies to the
+`authenticator` role, not your session. Do not read anything into it. To check
+exposure from outside, request the schema over the REST API: `PGRST106 Invalid
+schema` means not exposed, and a permissions error means exposed and correctly
+locked down.
+
+### 5.3 Edge functions and URL configuration
+
+- [ ] Deploy the six edge functions.
+- [ ] **Authentication → URL Configuration → Site URL**:
+      `https://pietimers.aibhlinn.ai` — no trailing slash.
+- [ ] **Redirect URLs**: `https://pietimers.aibhlinn.ai/**` — both asterisks.
+
+Sign-in links silently fail to return if these do not match. It is the most
 common cause of "the email arrived but clicking it does nothing".
 
-Put the project URL and the **anon** key into `app/config.js`, push, and rerun
-diagnostics. Every table and function should now report PASS.
+### 5.4 Wire the app up
+
+- [ ] Put the project URL and the **publishable** key into `app/config.js`.
+- [ ] Push, then rerun diagnostics. Every table and function should PASS.
 
 ## 6. Email (Resend)
 
-Add `aibhlinn.ai` to Resend and set the SPF, DKIM and DMARC records it gives
-you. Then point Supabase → Authentication → SMTP at Resend.
+**Do this before you try to sign in even once.** Supabase's built-in sender
+allows roughly two messages an hour and only delivers to addresses on your own
+team, so a real customer can never receive a sign-in link. The symptom is a
+`429` and `email rate limit exceeded` — Supabase's own wording, not this app's.
 
-Send yourself a real sign-in link before going further. A brand-new domain with
-no authentication records lands in spam, and from the customer's side that is
-indistinguishable from the app being broken.
+### 6.1 Verify the domain
+
+- [ ] Add `aibhlinn.ai` at [resend.com/domains](https://resend.com/domains) and
+      pick the nearest region (ap-northeast-1 for Australia).
+- [ ] Add every record Resend lists to Cloudflare DNS — an MX and a TXT on the
+      `send` subdomain, and the `resend._domainkey` TXT.
+- [ ] Set every one to **DNS only** (grey cloud). Proxying a mail record breaks
+      it.
+- [ ] Optionally add a DMARC TXT at `_dmarc`: `v=DMARC1; p=none;`
+- [ ] Click **Verify DNS Records**.
+
+Cloudflare appends the zone name automatically, so enter `send`, not
+`send.aibhlinn.ai` — the latter creates `send.aibhlinn.ai.aibhlinn.ai` and
+verification fails for reasons that look mysterious.
+
+Only ever publish **one** DMARC record. Two makes the policy undiscoverable
+under RFC 7489, which is worse than having none.
+
+Sending is gated on DKIM and SPF; DMARC is advisory. If Resend's status
+flickers between verified and pending, that is their resolver cache, not your
+DNS. Check the truth from outside with `nslookup -type=TXT _dmarc.aibhlinn.ai
+1.1.1.1` and stop clicking Verify — repeated checks can re-cache a stale
+answer.
+
+### 6.2 Point Supabase at it
+
+- [ ] Resend → **API Keys → Create API Key**, sending permission only,
+      restricted to `aibhlinn.ai`. It is shown once.
+- [ ] Supabase → **Authentication → Emails → SMTP Settings** → enable custom
+      SMTP:
+
+```
+Sender email    no-reply@aibhlinn.ai
+Sender name     AibhlinnAI
+Host            smtp.resend.com
+Port            465
+Username        resend
+Password        <the re_ API key>
+```
+
+Username is literally `resend` — not your email, not the key. The key is the
+password.
+
+Keep the sender name ASCII. Non-ASCII display names need MIME encoding and
+some clients render mojibake in the From line; the `í` belongs everywhere
+customer-facing, not in a mail header.
+
+### 6.3 Prove it
+
+- [ ] Request a sign-in link and confirm it arrives.
+- [ ] Check spam. A brand-new sending domain has no reputation and the first
+      few messages often land there.
+
+If you sign in on an address at `aibhlinn.ai`, remember incoming mail runs
+through Cloudflare Email Routing: a rule (or catch-all) must exist for that
+exact address, and its destination must be verified, or the link is dropped
+with no error anywhere.
 
 ## 7. Push notifications
 
-Generate a VAPID key pair. The **public** half goes in `config.js`; the private
-half goes in Supabase secrets and nowhere else.
+- [ ] Generate a VAPID key pair.
+- [ ] Public half → `config.js`.
+- [ ] Private half → Supabase secrets, and nowhere else.
 
 Diagnostics verifies the public key decodes to a real 65-byte P-256 point,
 which catches the common mistake of pasting the private one.
@@ -197,30 +294,67 @@ so the secret cannot be put in Supabase first.
 - [ ] Supabase → **Edge Functions → Secrets** → set `PADDLE_WEBHOOK_SECRET` to
       that exact value.
 
-### 8.3 Prove it end to end
+### 8.3 Enable checkout itself
 
-- [ ] Send a test event from the destination's own page.
-- [ ] Confirm a row appears in `public.subscriptions`, **and** the mirrored
-      `entitlements` row appears.
+Two account-level settings gate whether Paddle will open a checkout at all.
+Neither is part of the catalogue, and both fail with the same opaque
+"Something went wrong" panel in the overlay.
 
-Diagnostics cannot check any of 8.2 or 8.3 for you — it is server to server, so
+- [ ] **Checkout → Checkout settings → Default payment link** →
+      `https://pietimers.aibhlinn.ai/`, then Save.
+- [ ] **Checkout → Website approval** → add `pietimers.aibhlinn.ai` and wait
+      for it to move from **Pending** to approved. Subdomains are reviewed
+      individually; approving `aibhlinn.ai` does not approve this one.
+
+Approval requires the site to link to, or contain, terms of service, privacy
+notice and refund policy. All three are linked from the footer of every page —
+refunds via `terms.html#refunds`. Keep it that way.
+
+When either is missing, `POST checkout-service.paddle.com/transaction-checkout`
+returns 400 with `"details": "transaction_checkout_not_enabled"`. Read that
+body in the Network tab before assuming anything else is wrong; the overlay's
+own message says nothing useful. The body is discarded when the overlay
+closes, so read it while the error is still on screen.
+
+### 8.4 Prove it end to end
+
+Paddle removed per-destination test sends. **Simulations** (Developer tools →
+Simulations) run in Sandbox only, so a Production destination can never be
+given a synthetic event. The only way to exercise the live path is a real
+purchase, refunded afterwards.
+
+- [ ] Buy the monthly plan through your own live checkout.
+- [ ] Confirm a row in `public.subscriptions` flips to `active`/`monthly`.
+- [ ] Confirm a row in `public.billing_events`.
+- [ ] Confirm **three** rows in `identity.product_entitlements`: `can_sync`,
+      `can_use_calendar`, `can_use_screensaver`.
+- [ ] Refund and cancel in Paddle.
+
+Diagnostics cannot check any of 8.2 or 8.4 for you — it is server to server, so
 it is the one you must watch happen.
+
+Note that a fresh account is already entitled: `grant_trial` (in
+`schema-access-codes.sql`) gives every new user a 60-day trial, and the upgrade
+panel only reappears in the final 14 days. To reach checkout before then, call
+`CT.billing.openCheckout('monthly')` from the console rather than editing data.
 
 Reading a failure:
 
+- **400 `transaction_checkout_not_enabled`** — see 8.3. Not your code.
 - **401** — the secret in Supabase does not match the destination's. Recopy it.
 - **500** — the signature passed and a write failed. Read the Supabase function
   logs, not the Paddle delivery log.
 - **200 but no row** — the event carried no `custom_data.user_id`. That means
   the checkout was opened outside `billing.js`, which always attaches it.
 
-### 8.4 Before switching `environment` to `'production'`
+### 8.5 Before switching `environment` to `'production'`
 
 - [ ] Confirm the client token starts with `live_`. A `test_` token with
       `environment: 'production'`, or the reverse, produces a checkout that
       opens and then fails at payment. Diagnostics checks this pairing.
-- [ ] Confirm 8.2 is actually done. Going live without it is the one failure
-      that costs real customers real money.
+- [ ] Confirm 8.2 and 8.3 are actually done. Going live without 8.2 is the one
+      failure that costs real customers real money: checkout succeeds, the
+      payment is taken, and nobody is ever entitled.
 
 ---
 
