@@ -96,6 +96,12 @@
     });
     form.appendChild(submit);
 
+    /* Where a product's bot check renders, if it supplies one. Empty and
+       invisible otherwise -- identity itself knows nothing about
+       Turnstile or any other vendor. */
+    var challengeHost = el('div', { class: 'aib-signin-challenge' });
+    form.appendChild(challengeHost);
+
     var status = el('p', { class: 'aib-signin-status', role: 'status', 'aria-live': 'polite' });
     form.appendChild(status);
     panel.appendChild(form);
@@ -116,6 +122,9 @@
       // Focus moves only because the person just activated this
       // control themselves — never on page load, never automatically.
       emailInput.focus();
+      // Give a product-supplied bot check time to render before the
+      // person is ready to submit, rather than making them wait after.
+      identity.prepareSignIn(challengeHost);
       document.addEventListener('keydown', onKeydown);
       document.addEventListener('click', onOutsideClick, true);
     }
@@ -166,7 +175,7 @@
       submit.disabled = true;
       status.dataset.tone = '';
       status.textContent = 'Sending…';
-      identity.signInWithEmail(email).then(function () {
+      identity.signInWithEmail(email, { challengeHost: challengeHost }).then(function () {
         status.textContent = 'Check ' + email + ' for your sign-in link.';
       }).catch(function (err) {
         status.dataset.tone = 'error';

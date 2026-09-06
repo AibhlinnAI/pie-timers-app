@@ -46,12 +46,16 @@
   var turnstile = {
     enabled: function () { return Boolean(cfg.turnstileEnabled); },
 
-    /* Render the widget into #turnstileHost. Safe to call repeatedly. */
-    mount: function () {
+    /* Render the widget. Defaults to #turnstileHost (the Account tab's
+       own sign-in form); the identity panel passes its own element, so
+       both sign-in routes get the same check. Safe to call repeatedly --
+       one widget is all a page needs, since only one sign-in form is
+       ever open at a time. */
+    mount: function (hostEl) {
       if (!cfg.turnstileEnabled) return Promise.resolve(false);
       if (widgetId !== null) return Promise.resolve(true);
 
-      var host = document.getElementById('turnstileHost');
+      var host = hostEl || document.getElementById('turnstileHost');
       if (!host) return Promise.resolve(false);
 
       return loadScript('https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit')

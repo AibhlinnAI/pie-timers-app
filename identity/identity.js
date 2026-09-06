@@ -202,11 +202,31 @@
       scheduleRefresh();
       return consumeRedirect();
     },
-
     /* Email magic link — no password is ever collected or stored,
        which matters for an audience this app is built for: one thing
-       to remember (an email address) instead of two. */
-    signInWithEmail: function (email, extra) {
+       to remember (an email address) instead of two.
+
+       A product may supply `signIn` to init() to route this through
+       its own endpoint instead of straight to Supabase. Pie Timers
+       does, because /auth/v1/otp has nowhere to put a bot check or a
+       throttle: called directly, a sign-in form is an open relay for
+       emailing strangers, and it burns the sending quota and the
+       domain's reputation with it. identity stays ignorant of which
+       vendor does the checking; it only knows there is a delegate and
+       an element the delegate may draw into. */
+    prepareSignIn: function (challengeHost) {
+      if (!cfg || typeof cfg.prepareSignIn !== 'function') return Promise.resolve(false);
+      try {
+        return Promise.resolve(cfg.prepareSignIn(challengeHost));
+      } catch (e) {
+        return Promise.resolve(false);   // a bot check that fails to draw must not block sign-in
+      }
+    },
+
+    signInWithEmail: function (email, ctx) {
+      if (cfg && typeof cfg.signIn === 'function') {
+        return Promise.resolve(cfg.signIn(email, ctx || {}));
+      }
       var body = {
         email: email,
         create_user: true,
@@ -215,7 +235,7 @@
       return request(authUrl('/otp'), {
         method: 'POST',
         headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign(body, extra || {}))
+        body: JSON.stringify(body)
       });
     },
 
