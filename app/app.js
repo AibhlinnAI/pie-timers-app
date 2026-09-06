@@ -1914,11 +1914,14 @@
     if (el) el.textContent = planLabel(ent);
 
     var trialing = isTrial(ent) && ent.entitled;
-    var left = daysLeft(ent);
 
-    /* During a trial, stay out of the way until it is nearly over — the
-       point of two months is that people get to live with it first. */
-    var nudging = trialing && left !== null && left <= 14;
+    var left = daysLeft(ent);
+    /* During a trial, stay out of the way until it is nearly over --
+       people should get to live with the app before being asked. Seven
+       days is the second half of the standard fortnight, and the last
+       week of the thirty-day launch trial, so neither cohort is nagged
+       from the first day. */
+    var nudging = trialing && left !== null && left <= 7;
 
     var panel = $('upgradePanel');
     if (panel) {
