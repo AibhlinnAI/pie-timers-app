@@ -1385,3 +1385,18 @@ body.is-focus{
 .code-entry .discount-row,
 .code-entry .access-code-row{ margin-top:10px; }
 .code-entry .hint{ margin-top:6px; }
+
+/* The product name is the one piece of brand on this panel, so it wears
+   the brand colour. --orange-text is the accessible pairing for text at
+   this size; --orange itself is for fills and large glyphs. */
+.upgrade h3{ color:var(--orange-text); }
+
+/* Anchor targets sit under the sticky header otherwise, so the thing you
+   jumped to is the thing you cannot see. */
+#account{ scroll-margin-top:5rem; }
+
+/* Smooth only where it is wanted, and never for people who have asked
+   the system for less motion. */
+@media (prefers-reduced-motion: no-preference){
+  html{ scroll-behavior:smooth; }
+}
