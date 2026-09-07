@@ -168,21 +168,54 @@
       closePanel(true);
     });
 
+    /* The label carries the state. Once a link is on its way, "Email me a
+       sign-in link" is a lie -- the useful thing to say is where to look
+       and who it is from, since a message from a brand-new domain often
+       lands in spam and an unfamiliar sender name is what makes people
+       give up. The button stays out of action until a resend is genuinely
+       useful, so a second press cannot quietly burn the throttle. */
+    var SUBMIT_LABEL = submit.textContent;
+    var RESEND_AFTER_MS = 30000;
+    var resendTimer = null;
+
+    function armResend() {
+      clearTimeout(resendTimer);
+      resendTimer = setTimeout(function () {
+        submit.textContent = 'Send another link';
+        submit.disabled = false;
+      }, RESEND_AFTER_MS);
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var email = emailInput.value.trim();
       if (!email) return;
+      clearTimeout(resendTimer);
       submit.disabled = true;
+      submit.textContent = 'Sending…';
       status.dataset.tone = '';
-      status.textContent = 'Sending…';
+      status.textContent = '';
       identity.signInWithEmail(email, { challengeHost: challengeHost }).then(function () {
-        status.textContent = 'Check ' + email + ' for your sign-in link.';
+        submit.textContent = 'Check your inbox';
+        status.textContent = 'We sent a sign-in link to ' + email +
+          '. It comes from AibhlinnAI — check your spam folder if it is not there.';
+        armResend();
       }).catch(function (err) {
+        submit.textContent = SUBMIT_LABEL;
+        submit.disabled = false;
         status.dataset.tone = 'error';
         status.textContent = err.message;
-      }).then(function () {
-        submit.disabled = false;
       });
+    });
+
+    /* Editing the address makes the previous "check your inbox" stale --
+       it refers to somewhere the person is no longer signing in to. */
+    emailInput.addEventListener('input', function () {
+      clearTimeout(resendTimer);
+      submit.textContent = SUBMIT_LABEL;
+      submit.disabled = false;
+      status.dataset.tone = '';
+      status.textContent = '';
     });
 
     googleBtn.addEventListener('click', function () {
