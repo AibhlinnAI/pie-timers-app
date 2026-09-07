@@ -370,12 +370,9 @@
     }
   };
 
-  /* ─────────────────────────── Boot ─────────────────────────── */
+  /* No boot step. There is nothing to load and no timer to schedule --
+     identity did both before this file was parsed. */
 
-  if (cfg.isConfigured) {
-    session = loadSession();
-    scheduleRefresh();
-  }
 
   CT.auth = auth;
   CT.db = db;
