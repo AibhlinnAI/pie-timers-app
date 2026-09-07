@@ -79,6 +79,72 @@ async function rest(path: string, init: RequestInit = {}) {
   return response;
 }
 
+/* ─────────────────── Honouring the unused trial ───────────────────
+   A person who buys on day 10 of a 14-day trial should not lose the
+   four days they had left. The rule: the first charge lands 30 days
+   after the account was created, whenever they happen to buy.
+
+   Paddle has no way to say this at checkout -- a trial length lives on
+   the price and is the same for everyone -- so it is corrected here,
+   once, when the subscription first appears. next_billed_at moves to
+   account start + 30 days, with proration_billing_mode "do_not_bill"
+   so moving the date does not itself raise an invoice.
+
+   Deliberately never moves the date EARLIER. If Paddle already intends
+   to bill later than day 30 -- a price-level trial, a manual
+   adjustment -- that is left alone. This can give time away; it must
+   never take it.
+
+   Requires PADDLE_API_KEY. Without it the subscription still works and
+   the person is simply billed on Paddle's own schedule, so a missing
+   key is logged rather than thrown: a payment that already succeeded
+   must not be undone by a courtesy that failed. */
+const PADDLE_API_KEY = Deno.env.get("PADDLE_API_KEY") ?? "";
+const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") === "sandbox"
+  ? "https://sandbox-api.paddle.com"
+  : "https://api.paddle.com";
+const FREE_DAYS_FROM_SIGNUP = 30;
+
+async function accountCreatedAt(userId: string): Promise<string | null> {
+  /* public.subscriptions is created by the grant_trial trigger the
+     moment the account exists, and its created_at is never rewritten,
+     so it dates the account without needing the auth schema exposed. */
+  const response = await rest(`/subscriptions?user_id=eq.${userId}&select=created_at`);
+  if (!response.ok) return null;
+  const rows = await response.json();
+  return rows?.[0]?.created_at ?? null;
+}
+
+async function deferFirstCharge(userId: string, subscriptionId: string, currentNextBilledAt: string | null) {
+  if (!PADDLE_API_KEY) {
+    console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set it.");
+    return;
+  }
+
+  const createdAt = await accountCreatedAt(userId);
+  if (!createdAt) return;
+
+  const target = new Date(new Date(createdAt).getTime() + FREE_DAYS_FROM_SIGNUP * 86400000);
+  if (target.getTime() <= Date.now()) return;                       // day 30 already passed
+  if (currentNextBilledAt && new Date(currentNextBilledAt) >= target) return;  // already later
+
+  const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${PADDLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      next_billed_at: target.toISOString(),
+      proration_billing_mode: "do_not_bill",
+    }),
+  });
+
+  if (!response.ok) {
+    console.error(`Could not defer first charge for ${subscriptionId}: ${response.status} ${await response.text()}`);
+  }
+}
+
 /* Read-only duplicate check. Does NOT record anything -- recording
    happens only via recordEvent() below, once this event's work has
    actually finished, which is what makes a retry after a partial
@@ -296,6 +362,16 @@ Deno.serve(async (request) => {
     // saver and any future suite app. Also throws on failure now -- see
     // its own comment for why that's safe (and necessary) here.
     await mirrorToIdentitySchema(userId, status, row.current_period_end);
+
+    /* Only on creation, and only after the writes above have stuck:
+       this is a courtesy, and a courtesy must not be what decides
+       whether someone is entitled. Any failure inside is logged, not
+       thrown, so a retry is never triggered by it -- Paddle would
+       replay the whole event and the guard against moving the date
+       earlier is what makes that harmless anyway. */
+    if (eventType === "subscription.created" && data?.id) {
+      await deferFirstCharge(userId, String(data.id), data?.next_billed_at ?? null);
+    }
 
     // Recorded only now that every write above has actually succeeded.
     // See the file header and recordEvent()'s own comment: this used to
