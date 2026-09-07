@@ -115,14 +115,36 @@ as $$
   select s.user_id from public.subscriptions s
   where public.has_active_plan(s.user_id);
 $$;
-
-
 -- ─────────────────────────── Granting free access ───────────────────────────
--- For anyone who genuinely cannot pay. Run this by hand:
+-- Complimentary access: the owner's own account, a friend, someone who
+-- genuinely cannot pay. Two statements, and BOTH are needed.
 --
---   insert into public.subscriptions (user_id, status, plan, complimentary)
---   select id, 'active', 'complimentary', true from auth.users
+-- public.subscriptions is what the web app reads. identity.product_
+-- entitlements is what the Windows screen saver reads, and it has no
+-- fallback onto public.subscriptions (ARCHITECTURE.md section 2) -- so
+-- running only the first statement grants Premium in the browser and
+-- leaves the screen saver locked, with nothing to explain why. This
+-- recipe used to be the first statement alone, which is exactly the
+-- half-grant it produced.
+--
+-- expires_at is null on purpose: complimentary access does not lapse.
+-- A subscription's grant is time-bounded to its billing period, which
+-- is what lets a cancellation expire on its own; a gift has no period
+-- to expire with.
+--
+--   insert into public.subscriptions
+--     (user_id, status, plan, complimentary, current_period_end, updated_at)
+--   select id, 'active', 'complimentary', true, null, now() from auth.users
 --   where email = 'someone@example.com'
 --   on conflict (user_id) do update
 --     set complimentary = true, status = 'active', plan = 'complimentary',
---         updated_at = now();
+--         current_period_end = null, updated_at = now();
+--
+--   select identity.grant_capability(u.id, 'pie-timers', c.cap, 'complimentary', null)
+--     from auth.users u
+--    cross join (values ('can_sync'), ('can_use_calendar'),
+--                       ('can_use_screensaver')) as c(cap)
+--    where u.email = 'someone@example.com';
+--
+-- To take it back, delete the identity rows and set complimentary =
+-- false. Nothing expires on its own here.
