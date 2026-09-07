@@ -1032,6 +1032,13 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 }
 .upgrade h3{ font-size:1rem; color:var(--purple); }
 .upgrade > p{ margin:6px 0 16px; font-size:.85rem; color:var(--ink-muted); max-width:62ch; }
+/* The lead-in sits directly above the list, so it keeps its top margin
+   and drops the bottom one -- otherwise the sentence and the bullets it
+   introduces read as two unrelated blocks. */
+.upgrade > p:has(+ .upgrade-list){ margin-bottom:6px; }
+.upgrade-list{ margin:0 0 16px; padding-left:1.15rem; max-width:62ch;
+  font-size:.85rem; color:var(--ink-muted); line-height:1.5; }
+.upgrade-list li{ margin:4px 0; }
 
 .plan-options{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(180px, 100%),1fr)); gap:12px; }
 
