@@ -152,7 +152,22 @@
     return img;
   }
 
-  function renderPlanStatus(container) {
+  /* Every slot the chip has been drawn into. identity-ui calls
+     renderStatus once, when it renders the signed-in header -- but the
+     entitlement is not known then. CT.billing.get() answers from a
+     default of "not entitled" until refresh() returns, so the first
+     draw of a complimentary or paid account was the Get Premium
+     button, and nothing ever came back to correct it.
+
+     Slots are kept rather than re-mounted so sign-out is untouched,
+     and detached ones are dropped as they are found: identity-ui
+     rebuilds its wrapper on every auth change, which orphans the old
+     span without telling anyone. */
+  var statusSlots = [];
+
+  function drawPlanStatus(container) {
+    container.innerHTML = '';
+
     if (!CT.billing || !CT.billing.enabled()) return;
 
     var ent = CT.billing.get();
@@ -182,7 +197,26 @@
     container.appendChild(node);
   }
 
+  function renderPlanStatus(container) {
+    statusSlots.push(container);
+    drawPlanStatus(container);
+  }
+
+  /* Subscribed on DOMContentLoaded, not here: billing.js is loaded
+     AFTER this file, so CT.billing does not exist yet at parse time and
+     a subscription taken now would silently never happen. The same
+     ordering caught out the session bridge. */
+  function watchEntitlement() {
+    if (!CT.billing || typeof CT.billing.onChange !== 'function') return;
+    CT.billing.onChange(function () {
+      statusSlots = statusSlots.filter(function (slot) { return slot.isConnected; });
+      statusSlots.forEach(drawPlanStatus);
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
+    watchEntitlement();
+
     var header = document.getElementById('topbarSignin');
     if (header) {
       window.Aibhlinn.identityUI.mount({
