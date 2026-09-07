@@ -98,13 +98,29 @@ function unescapeText(value) {
    offset actually is for that instant in that zone. That gets DST
    right for any zone the IANA database knows. */
 
+/* Formatters are cached per zone. Building one costs roughly a fifth
+   of a millisecond, which is nothing once and four and a half seconds
+   across a calendar with twenty thousand events -- comfortably past the
+   edge function's CPU budget, and the reason a sync could die without
+   reaching its own error handler. */
+var zoneFormatters = {};
+
+function formatterFor(timeZone) {
+  var cached = zoneFormatters[timeZone];
+  if (!cached) {
+    cached = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone,
+      hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    zoneFormatters[timeZone] = cached;
+  }
+  return cached;
+}
+
 function zoneOffsetMs(utcMs, timeZone) {
-  var parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timeZone,
-    hour12: false,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  }).formatToParts(new Date(utcMs));
+  var parts = formatterFor(timeZone).formatToParts(new Date(utcMs));
 
   var get = function (type) {
     var found = parts.find(function (p) { return p.type === type; });
@@ -243,7 +259,7 @@ function nthWeekdayOfMonth(y, mo, weekday, ordinal) {
 /* Expand a rule into wall-clock dates. Iterating from DTSTART is what
    makes COUNT correct — it counts every occurrence, not just those
    inside our window. The cap stops a malformed rule spinning forever. */
-function expandRule(start, rule, windowEndMs) {
+function expandRule(start, rule, windowStartMs, windowEndMs) {
   var out = [];
   var CAP = 20000;
 
@@ -259,6 +275,28 @@ function expandRule(start, rule, windowEndMs) {
        only — it must not silently become 1 March. */
     var daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
     if (d < 1 || d > daysInMonth) return true;
+
+    /* Cheap rejection before the expensive conversion. A weekly series
+       running since 2015 offers about six hundred candidate dates and
+       four of them can land in a three week window; converting the other
+       five hundred and ninety six through the timezone database is the
+       single largest cost in a sync. A whole day of slack covers any
+       offset, so nothing real is discarded here. */
+    var roughMs = Date.UTC(y, mo - 1, d);
+    if (roughMs > windowEndMs + 86400000) return false;
+
+    if (roughMs < windowStartMs - 86400000) {
+      /* It happened, it simply cannot appear in our window -- so skip the
+         timezone conversion but still COUNT it. Not counting these would
+         let a series with COUNT=20 that finished in 2015 keep producing
+         occurrences today, which is a phantom meeting rather than a slow
+         one. */
+      if (roughMs >= start.ms - 86400000) {
+        emitted++;
+        if (rule.count !== null && emitted >= rule.count) return false;
+      }
+      return true;
+    }
 
     var ms = wallTimeToUtc(y, mo, d, start.h, start.mi, start.s, start.zone);
     if (ms < start.ms) return true;                       // before the series began
@@ -384,17 +422,60 @@ export function parseCalendar(text, windowStartMs, windowEndMs, maxEvents) {
     }
   }
 
+  /* Keep only the VEVENT blocks that can possibly land in the window,
+     and discard the rest as they are read rather than holding the whole
+     calendar in memory at once.
+
+     A personal Google calendar's basic.ics is the entire history: years
+     of finished one-off events, none of which can appear in a three
+     week window. Parsing them all built an object graph large enough to
+     exhaust the edge function's memory, which failed without even
+     reaching the error handler -- the feed row was left with a null
+     last_error and a null last_synced, saying nothing at all.
+
+     A block is kept if it recurs (RRULE), overrides an occurrence
+     (RECURRENCE-ID), or starts near enough to the window. Everything
+     else is dropped before it costs anything but the lines it occupied. */
+  var KEEP_SLACK_MS = 400 * 24 * 60 * 60 * 1000;   // generous: DTSTART of a long series predates its occurrences
   var blocks = [];
   var current = null;
+  var currentKeep = false;
+  var currentStartMs = null;
+
   for (i = 0; i < lines.length; i++) {
     var prop = parseLine(lines[i]);
     if (!prop) continue;
-    if (prop.name === 'BEGIN' && prop.value.toUpperCase() === 'VEVENT') current = [];
-    else if (prop.name === 'END' && prop.value.toUpperCase() === 'VEVENT') {
-      if (current) blocks.push(current);
+
+    if (prop.name === 'BEGIN' && prop.value.toUpperCase() === 'VEVENT') {
+      current = [];
+      currentKeep = false;
+      currentStartMs = null;
+    } else if (prop.name === 'END' && prop.value.toUpperCase() === 'VEVENT') {
+      if (current) {
+        var near = currentStartMs !== null &&
+          currentStartMs <= windowEndMs &&
+          currentStartMs >= windowStartMs - KEEP_SLACK_MS;
+        if (currentKeep || near) blocks.push(current);
+      }
       current = null;
-    } else if (current) current.push(prop);
+    } else if (current) {
+      if (prop.name === 'RRULE' || prop.name === 'RDATE' || prop.name === 'RECURRENCE-ID') currentKeep = true;
+      if (prop.name === 'DTSTART' && currentStartMs === null) {
+        /* Deliberately crude: pull YYYYMMDD straight out and treat it as
+           UTC. This decides only whether a block is worth keeping, and
+           the slack around the window is measured in months, so being a
+           day out either way changes nothing. A real parseDate here costs
+           a fifth of a millisecond and runs once per event in the file --
+           on a calendar with years of history that alone was several
+           seconds of CPU spent on events about to be discarded. */
+        var ymd = /(\d{4})(\d{2})(\d{2})/.exec(prop.value);
+        if (ymd) currentStartMs = Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]);
+      }
+      current.push(prop);
+    }
   }
+
+  lines = null;   // the largest array in the function; let it go before expanding recurrences
 
   var results = [];
   var overridden = {};   // "uid|instant" for occurrences replaced by an override
@@ -460,7 +541,7 @@ export function parseCalendar(text, windowStartMs, windowEndMs, maxEvents) {
 
     var instants = [];
     if (rule) {
-      var occurrences = expandRule(start, rule, windowEndMs);
+      var occurrences = expandRule(start, rule, windowStartMs, windowEndMs);
       for (var oi = 0; oi < occurrences.length; oi++) {
         instants.push(wallTimeToUtc(
           occurrences[oi].y, occurrences[oi].mo, occurrences[oi].d,
