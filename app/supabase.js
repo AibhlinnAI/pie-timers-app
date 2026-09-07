@@ -10,21 +10,9 @@
   var CT = window.CT = window.CT || {};
   var cfg = CT.config;
 
-  var SESSION_KEY = 'countdown-timers/session/v1';
-  var REFRESH_MARGIN_MS = 60 * 1000; // refresh a minute before expiry
-
-  var session = null;      // { access_token, refresh_token, expires_at, user }
-  var listeners = [];
-  var refreshTimer = null;
-  var refreshInFlight = null;
-  var lastEmittedKey = null;
-  /* True once the session came from Aibhlinn.identity via the bridge.
-     Supabase rotates the refresh token on every use, so two modules
-     refreshing the same one race: the loser presents a spent token,
-     gets a 401, and the sync status flaps between syncing and error.
-     When adopted, identity owns refresh and pushes each new token here
-     through onChange -- so this module must not refresh on its own. */
-  var adopted = false;
+  /* No session state, no refresh timer, no listener list, no localStorage
+     key. Aibhlinn.identity holds all of it -- see the note above the
+     facade below for why this module stopped keeping its own copy. */
 
   /* ─────────────────────────── Utilities ─────────────────────────── */
 
@@ -34,28 +22,6 @@
   function redirectTarget() {
     if (cfg.redirectUrl) return cfg.redirectUrl;
     return location.origin + location.pathname;
-  }
-
-  /* Identity of the current session, for change detection. Listeners
-     react to WHO is signed in, not to the session object being
-     rewritten -- and at least one of them (sync.js) calls loadUser(),
-     which writes the user back onto the session and stores it again.
-     Emitting on every store therefore re-entered that listener and
-     looped: user fetch, entitlement, calendar, profile, push, repeat,
-     tens of times a second. Emit only when the answer to "who is
-     signed in" has actually changed. */
-  function sessionKey() {
-    if (!session || !session.access_token) return '';
-    return session.access_token + '|' + ((session.user && session.user.id) || '');
-  }
-
-  function emit() {
-    var key = sessionKey();
-    if (key === lastEmittedKey) return;
-    lastEmittedKey = key;
-    listeners.forEach(function (fn) {
-      try { fn(session); } catch (e) { /* a listener must not break the chain */ }
-    });
   }
 
   /* Surface a useful message rather than "[object Object]". */
@@ -87,119 +53,33 @@
     });
   }
 
-  /* ─────────────────────────── Session storage ─────────────────────────── */
+  /* ─────────────────────────── Session ───────────────────────────
+     There is no session here any more. Aibhlinn.identity owns it: one
+     store, one refresh timer, one place the magic-link hash is read.
 
-  function loadSession() {
-    try {
-      var raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
+     This module used to keep its own, under its own localStorage key,
+     with its own refresh timer and its own hash parsing -- and because
+     identity-bridge.js loads first, identity always won the race for
+     the hash and this copy stayed empty. A signed-in person therefore
+     looked signed out to everything gated on CT.auth: sync, calendar,
+     background alerts, and checkout, which rejected every purchase with
+     "Please sign in first".
+
+     Bridging the two sessions fixed that and immediately produced two
+     more faults -- both modules refreshing the same rotating refresh
+     token, and a listener that stored the session it was listening to.
+     Neither was a coincidence: two owners of one thing is the fault,
+     and copying between them is not a cure. So CT.auth is now a facade.
+
+     What stays here is what is genuinely Pie Timers': the bot-checked
+     sign-in route, and the calendar-scope Google round trip. */
+  function id() {
+    return (window.Aibhlinn && window.Aibhlinn.identity) || null;
   }
 
-  function storeSession(next) {
-    session = next;
-    try {
-      if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-      else localStorage.removeItem(SESSION_KEY);
-    } catch (e) { /* private browsing — session stays in memory only */ }
-    scheduleRefresh();
-    emit();
-  }
-
-  function adoptTokenResponse(data) {
-    if (!data || !data.access_token) throw new Error('Sign-in response was incomplete.');
-    storeSession({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + ((data.expires_in || 3600) * 1000),
-      user: data.user || (session && session.user) || null
-    });
-    return session;
-  }
-
-  /* ─────────────────────────── Token refresh ─────────────────────────── */
-
-  function scheduleRefresh() {
-    clearTimeout(refreshTimer);
-    if (adopted) return;   // identity refreshes; see `adopted` above
-    if (!session || !session.refresh_token) return;
-    var delay = session.expires_at - Date.now() - REFRESH_MARGIN_MS;
-    // setTimeout saturates past ~24.8 days; clamp well below that anyway.
-    refreshTimer = setTimeout(refresh, Math.min(Math.max(delay, 0), 30 * 60 * 1000));
-  }
-
-  function refresh() {
-    if (adopted) return Promise.resolve(session);   // not ours to rotate
-    if (!session || !session.refresh_token) return Promise.resolve(null);
-    if (refreshInFlight) return refreshInFlight;
-
-    refreshInFlight = request(authUrl('/token?grant_type=refresh_token'), {
-      method: 'POST',
-      headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: session.refresh_token })
-    }).then(function (data) {
-      refreshInFlight = null;
-      return adoptTokenResponse(data);
-    }).catch(function (err) {
-      refreshInFlight = null;
-      // A rejected refresh token means the session is genuinely dead.
-      if (err.status === 400 || err.status === 401) storeSession(null);
-      throw err;
-    });
-
-    return refreshInFlight;
-  }
-
-  /* Return a valid access token, refreshing first if it is about to expire. */
   function validToken() {
-    if (!session) return Promise.resolve(null);
-    if (session.expires_at - Date.now() > REFRESH_MARGIN_MS) {
-      return Promise.resolve(session.access_token);
-    }
-    return refresh().then(function (s) { return s ? s.access_token : null; });
-  }
-
-  /* ─────────────────────────── Redirect handling ─────────────────────────── */
-
-  /* Supabase returns tokens in the URL fragment after a magic link or
-     OAuth round trip. Consume them, then scrub the address bar so the
-     tokens are not left sitting in history. */
-  function consumeRedirect() {
-    var hash = location.hash || '';
-    if (hash.indexOf('access_token=') === -1 && hash.indexOf('error=') === -1) return null;
-
-    var params = new URLSearchParams(hash.replace(/^#/, ''));
-    var clean = location.pathname + location.search;
-
-    if (params.get('error')) {
-      var message = params.get('error_description') || params.get('error');
-      history.replaceState(null, '', clean);
-      return { error: message.replace(/\+/g, ' ') };
-    }
-
-    try {
-      adoptTokenResponse({
-        access_token: params.get('access_token'),
-        refresh_token: params.get('refresh_token'),
-        expires_in: parseInt(params.get('expires_in'), 10) || 3600
-      });
-    } catch (e) {
-      history.replaceState(null, '', clean);
-      return { error: e.message };
-    }
-
-    /* Google's own refresh token rides along when calendar scope was
-       requested. It is returned to the caller and never stored here —
-       it goes straight to the server and is then forgotten. */
-    var providerRefreshToken = params.get('provider_refresh_token');
-
-    history.replaceState(null, '', clean);
-    return {
-      signedIn: true,
-      providerRefreshToken: providerRefreshToken || null
-    };
+    var i = id();
+    return i ? i.validToken() : Promise.resolve(null);
   }
 
   /* ─────────────────────────── Public auth API ─────────────────────────── */
@@ -210,7 +90,9 @@
        Routed through the `signin` edge function whenever Turnstile is
        configured, because that is the only place a bot check and a
        throttle can sit. Without it the form would email any address
-       given to it, as often as asked. */
+       given to it, as often as asked. This is the one auth call that
+       does NOT go to identity: identity posts straight to Supabase,
+       which is exactly what this exists to avoid. */
     signInWithEmail: function (email, turnstileToken) {
       if (cfg.turnstileEnabled) {
         return request(cfg.supabaseUrl + '/functions/v1/signin', {
@@ -235,18 +117,18 @@
       });
     },
 
-    /* Google OAuth — hands off to Supabase, which returns to redirectTarget(). */
     signInWithGoogle: function () {
-      var url = authUrl('/authorize') +
-        '?provider=google' +
-        '&redirect_to=' + encodeURIComponent(redirectTarget());
-      location.assign(url);
+      var i = id();
+      if (i) i.signInWithGoogle();
     },
 
     /* Re-authorise with Google, additionally asking for read-only calendar
        access. access_type=offline is what yields a refresh token, and
        prompt=consent forces Google to re-issue one even if the user has
-       approved before — without it a reconnect silently returns nothing. */
+       approved before — without it a reconnect silently returns nothing.
+       Stays here rather than in identity: identity deliberately asks for
+       nothing beyond identifying the person, and a product wanting more
+       does that itself, afterwards. */
     connectGoogleCalendar: function () {
       var scopes = 'email profile https://www.googleapis.com/auth/calendar.readonly';
       var url = authUrl('/authorize') +
@@ -270,87 +152,42 @@
     },
 
     signOut: function () {
-      var token = session && session.access_token;
-      storeSession(null);
-      if (!token) return Promise.resolve();
-      return request(authUrl('/logout'), {
-        method: 'POST',
-        headers: {
-          apikey: cfg.supabaseAnonKey,
-          Authorization: 'Bearer ' + token
-        }
-      }).catch(function () { /* local sign-out already happened */ });
+      var i = id();
+      return i ? i.signOut() : Promise.resolve();
     },
 
-    /* Fetch the user record for a freshly adopted token. */
     loadUser: function () {
-      return validToken().then(function (token) {
-        if (!token) return null;
-        return request(authUrl('/user'), {
-          headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + token }
-        });
-      }).then(function (user) {
-        if (user && session) {
-          session.user = user;
-          storeSession(session);
-        }
-        return user;
-      });
+      var i = id();
+      return i ? i.loadUser() : Promise.resolve(null);
     },
 
     /* Permanently delete the signed-in user and everything they own.
-       The heavy lifting is server-side; this only proves who is asking. */
+       The heavy lifting is server-side; this only names the function to
+       call, since identity has no idea which product is asking. */
     deleteAccount: function () {
-      return validToken().then(function (token) {
-        if (!token) throw new Error('Not signed in.');
-        return request(cfg.supabaseUrl + '/functions/v1/delete-account', {
-          method: 'POST',
-          headers: {
-            apikey: cfg.supabaseAnonKey,
-            Authorization: 'Bearer ' + token,
-            'Content-Type': 'application/json'
-          },
-          body: '{}'
-        });
-      }).then(function (result) {
-        storeSession(null); // the account is gone; drop the session with it
-        return result;
-      });
+      var i = id();
+      if (!i) return Promise.reject(new Error('Not signed in.'));
+      return i.deleteAccount(cfg.supabaseUrl + '/functions/v1/delete-account');
     },
 
-    /* Adopt a session minted elsewhere -- specifically by the shared
-       identity module, which parses the magic-link hash before this
-       file is even loaded (see identity-bridge.js for why). Takes a
-       stored session object, not a token endpoint response, so there
-       is no refresh round trip. Idempotent on the access token, so the
-       bridge can call it on load and on every change without churn. */
-    adoptSession: function (next) {
-      adopted = true;
-      if (!next || !next.access_token) {
-        if (session) storeSession(null);
-        return null;
-      }
-      if (session && session.access_token === next.access_token) return session;
-      storeSession({
-        access_token: next.access_token,
-        refresh_token: next.refresh_token,
-        expires_at: next.expires_at || (Date.now() + 3600000),
-        user: next.user || null
-      });
-      return session;
+    /* identity.init() consumes the magic-link hash before this file is
+       loaded, and the bridge keeps what it returned. Reading it here is
+       what lets sync.js surface a redirect error without knowing any of
+       that happened. Consumed once, like the hash it came from. */
+    consumeRedirect: function () {
+      var pending = CT.pendingIdentityRedirect || null;
+      CT.pendingIdentityRedirect = null;
+      return pending;
     },
 
-    getSession: function () { return session; },
-    getUser: function () { return session && session.user; },
-    isSignedIn: function () { return Boolean(session && session.access_token); },
+    getSession: function () { var i = id(); return i ? i.getSession() : null; },
+    getUser: function () { var i = id(); return i ? i.getUser() : null; },
+    isSignedIn: function () { var i = id(); return Boolean(i && i.isSignedIn()); },
     validToken: validToken,
-    consumeRedirect: consumeRedirect,
 
     onChange: function (fn) {
-      listeners.push(fn);
-      return function () {
-        listeners = listeners.filter(function (f) { return f !== fn; });
-      };
+      var i = id();
+      return i ? i.onChange(fn) : function () {};
     }
   };
 
