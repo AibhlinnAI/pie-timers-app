@@ -405,7 +405,14 @@
   <!-- ───────────────────────── SETTINGS ───────────────────────── -->
   <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0">
     <section class="panel">
-      <header class="panel-head"><h2>Settings</h2></header>
+      <header class="panel-head">
+        <h2>Settings</h2>
+        <!-- Account lives at the bottom of a long tab, behind appearance,
+             notifications and calendar settings. Anyone coming here to
+             sign in, check their plan or cancel had to scroll past all of
+             it first, with nothing saying it was down there. -->
+        <a class="btn btn-ghost" href="#account">Account</a>
+      </header>
 
       <div class="settings-list">
         <label class="setting">
@@ -516,7 +523,7 @@
          configuration/sign-in state — this label is what makes the
          cluster read as "Account" regardless of which one is showing,
          rather than only once someone is already signed in. -->
-    <p class="section-label">Account</p>
+    <p class="section-label" id="account" tabindex="-1">Account</p>
 
     <!-- Shown when config.js has no Supabase project set -->
     <section class="panel" id="accountUnconfigured" hidden>
