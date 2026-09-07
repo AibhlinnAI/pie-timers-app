@@ -66,8 +66,8 @@ window.CT.config = {
     monthlyPriceId: 'pri_01m1efkevnwpn0rj7g2kzjne0j',
 
     /* The same two plans, with a 14-day trial set on the price. */
-    annualTrialPriceId: '',
-    monthlyTrialPriceId: '',
+    annualTrialPriceId: 'pri_01m1xrvghx8896bxbf9rgtmx0m',
+    monthlyTrialPriceId: 'pri_01m1xrry3351rzzgjvr2aqk2vd',
 
     /* What the upgrade panel displays. These are labels only — Paddle's
        checkout shows the real, tax-inclusive, localised price. Keep them
