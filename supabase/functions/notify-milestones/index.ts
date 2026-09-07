@@ -45,7 +45,13 @@ async function rest(path: string, init: RequestInit = {}) {
   if (!response.ok) {
     throw new Error(`${init.method ?? "GET"} ${path} → ${response.status} ${await response.text()}`);
   }
-  return response.status === 204 ? null : await response.json();
+  /* An empty body is a success, not a value. PostgREST answers a
+     Prefer: return=minimal write with 200 and an empty body, not 204,
+     so parsing unconditionally threw "Unexpected end of JSON input"
+     after the write had already succeeded. Fixed in calendar-sync on
+     7 Sep 2026; these two carried the same line. */
+  const body = await response.text();
+  return body ? JSON.parse(body) : null;
 }
 
 /* ─────────────────────────── Timezone-aware clock ─────────────────────────── */

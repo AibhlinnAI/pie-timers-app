@@ -102,7 +102,15 @@ async function rest(path: string, init: RequestInit = {}) {
   if (!response.ok) {
     throw new Error(`${init.method ?? "GET"} ${path} → ${response.status} ${await response.text()}`);
   }
-  return response.status === 204 ? null : await response.json();
+  /* An empty body is a success, not a value. PostgREST answers a
+     Prefer: return=minimal write with 200 and nothing in it -- not the
+     204 this used to check for -- so calling .json() threw "Unexpected
+     end of JSON input" AFTER the events had already been written. The
+     parse fixed the sync; this is what was failing behind it: the run
+     recorded an error, left event_count at zero, and the calendar
+     looked broken while its events sat in the table. */
+  const body = await response.text();
+  return body ? JSON.parse(body) : null;
 }
 
 async function userFromToken(token: string) {
