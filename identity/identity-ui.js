@@ -148,15 +148,20 @@
        app. Sign out existed only at the foot of the Settings tab, in a
        panel you had to know was there -- so the control that got you in
        vanished once you were in, and the way back out was somewhere
-       else entirely. Sign-in and sign-out belong in the same place. */
+       else entirely. Sign-in and sign-out belong in the same place.
+
+       What sits between them is the product's business, not identity's:
+       a plan badge, a trial, an upgrade prompt. A product supplies
+       renderStatus(container) and draws whatever it likes; identity
+       neither knows nor asks what entitlement means here. */
     function renderSignedIn() {
       wrap.innerHTML = '';
 
-      var open = el('a', {
-        class: 'aib-signin-btn', href: opts.openHref,
-        'aria-label': opts.openLabel
-      }, [document.createTextNode(opts.openLabel)]);
-      wrap.appendChild(open);
+      if (typeof opts.renderStatus === 'function') {
+        var slot = el('span', { class: 'aib-signin-status-slot' });
+        try { opts.renderStatus(slot); } catch (e) { /* a product's badge must not break sign-out */ }
+        if (slot.childNodes.length) wrap.appendChild(slot);
+      }
 
       var user = identity.getUser();
       var out = el('button', {
