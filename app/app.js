@@ -1930,12 +1930,11 @@
                      (CT.billing.isEntitled() && !nudging);
     }
 
-    var heading = $('upgradeHeading');
-    if (heading) {
-      heading.textContent = nudging
-        ? 'Keep sync and background alerts'
-        : 'Unlock sync and background alerts';
-    }
+    /* One heading, always. It used to swap between "Unlock" and "Keep"
+       depending on how much trial was left -- a distinction that made
+       the panel about the trial rather than about what is being sold.
+       The product has a name; the list underneath already says what it
+       does, and the trial notice already says how long is left. */
 
     var trialNotice = $('trialNotice');
     if (trialNotice) {
