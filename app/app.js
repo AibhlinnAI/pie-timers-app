@@ -2114,6 +2114,39 @@
       not_signed_in: 'Please sign in first.'
     };
 
+    /* Progressive disclosure for the two kinds of code. Nothing shows
+       until someone says they have one, because most people do not, and
+       the type is asked before the field so the answer is never ambiguous
+       -- a discount is applied by Paddle at checkout, a private code is
+       redeemed here and grants access outright. Two boxes both labelled
+       "code" is what this replaces. */
+    function syncCodeEntry() {
+      var has = $('hasCode').checked;
+      var type = $('codeType').value;
+
+      $('codeTypeRow').hidden = !has;
+      $('discountRow').hidden = !has || type !== 'discount';
+      $('accessRow').hidden = !has || type !== 'private';
+
+      /* Clearing on the way out matters: a discount left in a hidden
+         field is still read at checkout, so someone who changed their
+         mind would be charged a price they can no longer see. */
+      if ($('discountRow').hidden) $('discountCode').value = '';
+      if ($('accessRow').hidden) {
+        $('accessCode').value = '';
+        $('accessCodeMessage').textContent = '';
+      }
+      if (!has) $('codeType').value = '';
+    }
+
+    $('hasCode').addEventListener('change', syncCodeEntry);
+    $('codeType').addEventListener('change', function () {
+      syncCodeEntry();
+      var field = $('codeType').value === 'discount' ? 'discountCode' : 'accessCode';
+      if (!$(field === 'discountCode' ? 'discountRow' : 'accessRow').hidden) $(field).focus();
+    });
+    syncCodeEntry();
+
     $('accessCodeForm').addEventListener('submit', function (event) {
       event.preventDefault();
 

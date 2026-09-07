@@ -668,27 +668,48 @@
           </button>
         </div>
 
-        <div class="discount-row">
-          <label class="field field--grow">
-            <span>Discount code (optional)</span>
-            <input type="text" id="discountCode" autocomplete="off" spellcheck="false"
-                   placeholder="Enter a code">
-          </label>
-        </div>
-
         <p class="hint">Prices include any sales tax or GST.</p>
 
+        <!-- Both code fields used to sit here permanently, ten lines apart,
+             each asking for "a code" without saying which kind. Someone
+             holding one had to guess, and guessing wrong failed with an
+             error that could not explain itself. Now nothing is shown
+             until someone says they have one, and then they say which. -->
+        <div class="code-entry">
+          <label class="code-toggle">
+            <input type="checkbox" id="hasCode">
+            <span>Have a code?</span>
+          </label>
 
-        <div class="access-code-row">
-          <form class="signin-form" id="accessCodeForm" novalidate>
+          <label class="field field--grow" id="codeTypeRow" hidden>
+            <span>Select code type</span>
+            <select id="codeType">
+              <option value="">Choose one…</option>
+              <option value="discount">Discount</option>
+              <option value="private">Private</option>
+            </select>
+          </label>
+
+          <div class="discount-row" id="discountRow" hidden>
             <label class="field field--grow">
-              <span>Have an access code?</span>
-              <input type="text" id="accessCode" autocomplete="off" spellcheck="false"
-                     placeholder="MATE-XXXX-XXXX">
+              <span>Discount code</span>
+              <input type="text" id="discountCode" autocomplete="off" spellcheck="false"
+                     placeholder="Enter a code">
             </label>
-            <button class="btn btn-ghost" type="submit" id="redeemCode">Redeem</button>
-          </form>
-          <p class="status-line" id="accessCodeMessage" role="status" aria-live="polite"></p>
+            <p class="hint">Applied at checkout, when you choose a plan above.</p>
+          </div>
+
+          <div class="access-code-row" id="accessRow" hidden>
+            <form class="signin-form" id="accessCodeForm" novalidate>
+              <label class="field field--grow">
+                <span>Private code</span>
+                <input type="text" id="accessCode" autocomplete="off" spellcheck="false"
+                       placeholder="MATE-XXXX-XXXX">
+              </label>
+              <button class="btn btn-ghost" type="submit" id="redeemCode">Redeem</button>
+            </form>
+            <p class="status-line" id="accessCodeMessage" role="status" aria-live="polite"></p>
+          </div>
         </div>
       </section>
 
