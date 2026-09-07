@@ -117,13 +117,77 @@
     refresh: function () { return window.Aibhlinn.entitlements.refresh(); }
   };
 
+  /* ── Plan status in the header ───────────────────────────────────
+     Three states, because a signed-in person is in exactly one of them
+     and each wants something different said:
+
+       trial, more than NUDGE_DAYS left  →  a quiet badge. They are
+         living with the app; do not sell to them yet. This is the same
+         restraint app.js applies to the upgrade panel, which stays
+         hidden for the same window and for the same reason.
+
+       trial ending, or ended            →  a button. Now is when asking
+         is useful, and it is the only state here that is an action.
+
+       entitled                          →  a bordered badge. Status,
+         not an offer. Nothing to click.
+
+     Read from CT.billing, so the header cannot disagree with the panel
+     further down the page. */
+  var NUDGE_DAYS = 4;
+
+  function daysLeft(ent) {
+    if (!ent.currentPeriodEnd) return null;
+    var ms = new Date(ent.currentPeriodEnd).getTime() - Date.now();
+    return ms <= 0 ? 0 : Math.ceil(ms / 86400000);
+  }
+
+  function mark() {
+    var img = document.createElement('img');
+    img.src = 'aibhlinn-mark-40.png';
+    img.alt = '';                 // decorative; the label beside it carries the meaning
+    img.className = 'ai-mark';
+    img.width = 20;
+    img.height = 20;
+    return img;
+  }
+
+  function renderPlanStatus(container) {
+    if (!CT.billing || !CT.billing.enabled()) return;
+
+    var ent = CT.billing.get();
+    var trialing = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    var left = daysLeft(ent);
+    var node;
+
+    if (ent.entitled && !trialing) {
+      node = document.createElement('span');
+      node.className = 'plan-chip plan-chip--premium';
+      node.appendChild(mark());
+      node.appendChild(document.createTextNode('AibhlínnAI Premium'));
+    } else if (trialing && left !== null && left > NUDGE_DAYS) {
+      node = document.createElement('span');
+      node.className = 'plan-chip plan-chip--trial';
+      node.appendChild(mark());
+      node.appendChild(document.createTextNode('Free Trial'));
+    } else {
+      node = document.createElement('a');
+      node.className = 'plan-chip plan-chip--offer';
+      node.href = '#account';
+      node.appendChild(document.createTextNode('Get '));
+      node.appendChild(mark());
+      node.appendChild(document.createTextNode('Premium'));
+    }
+
+    container.appendChild(node);
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var header = document.getElementById('topbarSignin');
     if (header) {
       window.Aibhlinn.identityUI.mount({
         target: header,
-        openLabel: 'Open Pie Timers',
-        openHref: 'index.html',
+        renderStatus: renderPlanStatus,
         productName: 'Pie Timers',
         showSuiteContext: true
       });
@@ -133,8 +197,7 @@
     if (secondary) {
       window.Aibhlinn.identityUI.mount({
         target: secondary,
-        openLabel: 'Open Pie Timers',
-        openHref: 'index.html',
+        renderStatus: renderPlanStatus,
         productName: 'Pie Timers',
         showSuiteContext: false // already said once, in the header
       });

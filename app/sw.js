@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v56';
+var CACHE = 'countdown-timers-v57';
 
 var SHELL = [
   './',
@@ -29,6 +29,9 @@ var SHELL = [
   'sync.js',
   'app.js',
   'icon.svg',
+  /* The header plan chip carries it, so it is part of the shell rather
+     than an image that arrives late and shifts the toolbar. */
+  'aibhlinn-mark-40.png',
   'manifest.webmanifest'
 ];
 

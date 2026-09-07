@@ -1409,3 +1409,42 @@ body.is-focus{
 .setting-go{ font-size:1.1rem; color:var(--ink-muted); flex:none; }
 .setting--link:hover .setting-go{ color:var(--orange-text); }
 .setting--link:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; border-radius:4px; }
+
+/* ── Plan chip (header) ─────────────────────────────────────────────
+   Three states, three weights. The trial badge is quiet on purpose:
+   during a trial the app has nothing to ask for yet. Only the offer is
+   a link, because only the offer is an action. */
+.plan-chip{
+  display:inline-flex; align-items:center; gap:7px;
+  min-height:44px; padding:0 14px;
+  border-radius:999px;
+  font-size:.85rem; font-weight:600;
+  text-decoration:none; white-space:nowrap;
+}
+.plan-chip .ai-mark{ width:20px; height:20px; display:block; }
+
+/* Trial: Pie Timers' own orange, no border. A note, not a control. */
+.plan-chip--trial{
+  color:var(--orange-text);
+  background:var(--amber-tint);
+}
+
+/* Entitled: AibhlínnAI purple, bordered. Status, nothing to press. */
+.plan-chip--premium{
+  color:var(--purple);
+  background:var(--purple-tint);
+  border:1px solid var(--purple-mid);
+}
+
+/* The ask. The only one that is a link, so it is the only one that
+   looks pressable. */
+.plan-chip--offer{
+  color:var(--purple-lift);
+  background:var(--purple-tint);
+  border:1px solid var(--purple);
+}
+.plan-chip--offer:hover{
+  background:var(--purple-mid);
+  color:var(--ink);
+}
+.aib-signin-status-slot{ display:inline-flex; align-items:center; }

@@ -1917,11 +1917,12 @@
 
     var left = daysLeft(ent);
     /* During a trial, stay out of the way until it is nearly over --
-       people should get to live with the app before being asked. Seven
-       days is the second half of the standard fortnight, and the last
-       week of the thirty-day launch trial, so neither cohort is nagged
-       from the first day. */
-    var nudging = trialing && left !== null && left <= 7;
+       people should get to live with the app before being asked. Four
+       days matches the header chip, which switches from a quiet Free
+       Trial badge to a Get Premium button at the same moment. Two
+       different answers to "is it time to ask yet" on one screen would
+       be worse than either. */
+    var nudging = trialing && left !== null && left <= 4;
 
     var panel = $('upgradePanel');
     if (panel) {
