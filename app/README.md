@@ -589,7 +589,7 @@ Still genuinely open:
   there updates the upgrade panel, the footer, the terms and the privacy policy;
   they all read from it. Make sure the mailbox actually exists and is monitored
   before launch — it is printed in both legal documents, so it is where refund
-  requests, privacy requests and hardship requests will arrive.
+  requests and privacy requests will arrive.
 - **Terms and a privacy policy.** Drafts are written: `terms.html` and
   `privacy.html`, linked from the footer of every page. Both carry an HTML
   comment listing what to fill in, and **neither has been reviewed by a lawyer**.

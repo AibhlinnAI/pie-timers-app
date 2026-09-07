@@ -5,8 +5,8 @@
    never "what plan is this account on". A product asks
    hasCapability('pie-timers', 'can_sync'), gets true or false, and
    never learns or cares whether that came from a subscription, a
-   hardship grant, or a friends-and-family pass. That distinction is
-   deliberate: it is what lets a hardship grant, a suite bundle, and a
+   complimentary grant, or a friends-and-family pass. That distinction is
+   deliberate: it is what lets a complimentary grant, a suite bundle, and a
    single-app subscription all satisfy the same check with no branching
    in product code.
 
@@ -111,7 +111,7 @@
     },
 
     /* Force a re-fetch — call right after a checkout completes or a
-       hardship grant is submitted, rather than waiting on the cache. */
+       complimentary grant is made, rather than waiting on the cache. */
     refresh: function () {
       return fetchEntitlements(true);
     }
