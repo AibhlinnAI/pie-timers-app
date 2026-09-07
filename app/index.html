@@ -323,7 +323,8 @@
           Connect Google Calendar
         </button>
         <p class="hint">One click. We ask only for permission to <strong>read</strong>
-        your calendar — nothing can be changed or deleted.</p>
+        your calendar — nothing can be changed or deleted. Google will ask which
+        account: it does not have to be the one you signed in with.</p>
         <div class="or"><span>or paste an iCal address</span></div>
       </div>
 
@@ -339,6 +340,16 @@
         </label>
         <button class="btn btn-primary" type="submit" id="calendarAdd">Connect</button>
       </form>
+
+      <!-- The route for locked-down work accounts. Plenty of employers
+           block third-party OAuth outright, and for those people this is
+           not a fallback, it is the only way in -- worth saying before
+           they conclude the feature does not work for them. -->
+      <p class="hint" id="icalHint" hidden>If your workplace blocks connecting apps to
+      your calendar, a private iCal address usually still works. In Google Calendar
+      it is under <strong>Settings → your calendar → Secret address in iCal format</strong>;
+      in Outlook, <strong>Settings → Calendar → Shared calendars → Publish a calendar</strong>.
+      Treat that address like a password — anyone holding it can read your calendar.</p>
 
       <p class="status-line" id="calendarMessage" role="status" aria-live="polite"></p>
 

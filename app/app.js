@@ -992,6 +992,13 @@
     });
     $('googleConnect').hidden = Boolean(reason) || hasLiveGoogle;
 
+    /* Shown alongside the manual form, and only while there is still a
+       calendar to add. Employers that block third-party OAuth are common
+       enough that this is the only route in for some people, and they
+       would otherwise conclude the feature does not work for them. */
+    var icalHint = $('icalHint');
+    if (icalHint) icalHint.hidden = Boolean(reason) || hasLiveGoogle;
+
     if (!reason) renderCalendarFeeds();
   }
 
