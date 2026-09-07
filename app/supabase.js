@@ -135,7 +135,12 @@
        so the person is offered the wrong calendar with no visible
        reason and nothing to click. */
     connectGoogleCalendar: function () {
-      var scopes = 'email profile https://www.googleapis.com/auth/calendar.readonly';
+      /* events.readonly, not calendar.readonly. The app calls exactly
+         one endpoint -- calendars/{id}/events -- and never lists
+         calendars or reads calendar metadata, so the wider scope asks
+         for access it would not use. Google's verification form asks
+         why a more limited scope is not sufficient; here one is. */
+      var scopes = 'email profile https://www.googleapis.com/auth/calendar.events.readonly';
       var url = authUrl('/authorize') +
         '?provider=google' +
         '&scopes=' + encodeURIComponent(scopes) +
