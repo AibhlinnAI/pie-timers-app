@@ -144,13 +144,41 @@
       if (!wrap.contains(e.target)) closePanel(false);
     }
 
+    /* Signed in, the header used to offer one thing: a link into the
+       app. Sign out existed only at the foot of the Settings tab, in a
+       panel you had to know was there -- so the control that got you in
+       vanished once you were in, and the way back out was somewhere
+       else entirely. Sign-in and sign-out belong in the same place. */
     function renderSignedIn() {
       wrap.innerHTML = '';
+
       var open = el('a', {
         class: 'aib-signin-btn', href: opts.openHref,
         'aria-label': opts.openLabel
       }, [document.createTextNode(opts.openLabel)]);
       wrap.appendChild(open);
+
+      var user = identity.getUser();
+      var out = el('button', {
+        type: 'button',
+        class: 'aib-signout-btn',
+        title: user && user.email ? 'Sign out of ' + user.email : 'Sign out'
+      }, [document.createTextNode('Sign out')]);
+
+      out.addEventListener('click', function () {
+        out.disabled = true;
+        out.textContent = 'Signing out…';
+        /* Whatever happens, stop looking signed in. signOut() clears the
+           local session before it calls the server, so a failed request
+           means the token was already gone -- not that the person is
+           still signed in. */
+        identity.signOut().catch(function () {}).then(function () {
+          out.disabled = false;
+          out.textContent = 'Sign out';
+        });
+      });
+
+      wrap.appendChild(out);
     }
 
     function renderSignedOut() {
