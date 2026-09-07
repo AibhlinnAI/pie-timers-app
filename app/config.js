@@ -52,7 +52,7 @@ window.CT.config = {
      Turn this on the day verification clears. The iCal path below it
      works for everyone in the meantime, and needs no Google approval
      at all. */
-  googleCalendarEnabled: false,
+  googleCalendarEnabled: true,
 
   /* Cloudflare Turnstile site key (the public half). When set, the
      sign-in form is bot-checked and magic links are throttled. Leaving
