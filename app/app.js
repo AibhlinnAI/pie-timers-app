@@ -2036,6 +2036,11 @@
     }
   }());
 
+  /* Captured once, so the button can be put back exactly as the markup
+     had it rather than a hard-coded copy that drifts from index.html. */
+  var MAGIC_SUBMIT_LABEL = null;
+  var magicResendTimer = null;
+
   function authMessage(text, isError) {
     var el = $('authMessage');
     el.textContent = text || '';
@@ -2047,27 +2052,46 @@
       event.preventDefault();
       var email = $('magicEmail').value.trim();
       if (!email) return;
-
       var button = $('magicSubmit');
+      if (MAGIC_SUBMIT_LABEL === null) MAGIC_SUBMIT_LABEL = button.textContent;
       var token = CT.turnstile.token();
 
       if (CT.config.turnstileEnabled && !token) {
-        CT.turnstile.mount();
+        CT.turnstile.mount($('turnstileHost'));
         authMessage('Just a moment — completing the security check.', true);
         return;
       }
 
       button.disabled = true;
-      authMessage('Sending…');
+      button.textContent = 'Sending…';
+      authMessage('');
 
       CT.auth.signInWithEmail(email, token).then(function () {
-        authMessage('Check ' + email + ' for your sign-in link.');
+        /* Same as the header panel: the label says where to look and who
+           it is from, and stays put until a resend is actually useful. */
+        button.textContent = 'Check your inbox';
+        authMessage('We sent a sign-in link to ' + email + '. It comes from ' +
+          'AibhlinnAI — check your spam folder if it is not there.');
+        clearTimeout(magicResendTimer);
+        magicResendTimer = setTimeout(function () {
+          button.textContent = 'Send another link';
+          button.disabled = false;
+        }, 30000);
       }).catch(function (err) {
+        button.textContent = MAGIC_SUBMIT_LABEL;
+        button.disabled = false;
         authMessage(err.message, true);
       }).then(function () {
-        button.disabled = false;
         CT.turnstile.reset();   // tokens are single-use
       });
+    });
+
+    /* A changed address makes the previous "check your inbox" stale. */
+    $('magicEmail').addEventListener('input', function () {
+      clearTimeout(magicResendTimer);
+      $('magicSubmit').textContent = MAGIC_SUBMIT_LABEL;
+      $('magicSubmit').disabled = false;
+      authMessage('');
     });
 
     /* ── Checkout ─────────────────────────────────────────────────── */
