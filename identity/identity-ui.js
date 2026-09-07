@@ -206,6 +206,20 @@
         status.dataset.tone = 'error';
         status.textContent = err.message;
       });
+
+      /* Last resort. If the promise above never settles at all -- a hung
+         network, a third-party script that neither loads nor errors --
+         the button would sit on "Sending…" with nothing to press. Give
+         it back rather than leaving someone stuck with a reload as their
+         only option. */
+      setTimeout(function () {
+        if (submit.textContent === 'Sending…') {
+          submit.textContent = SUBMIT_LABEL;
+          submit.disabled = false;
+          status.dataset.tone = 'error';
+          status.textContent = 'That took too long. Please try again.';
+        }
+      }, 20000);
     });
 
     /* Editing the address makes the previous "check your inbox" stale --

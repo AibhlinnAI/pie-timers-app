@@ -60,7 +60,16 @@
     signIn: function (email, ctx) {
       if (!cfg.turnstileEnabled || !CT.turnstile) return CT.auth.signInWithEmail(email, '');
 
-      return CT.turnstile.mount(ctx && ctx.challengeHost).then(function () {
+      /* Bounded. mount() waits on a third-party script, and a network
+         that hangs rather than fails would leave the button on
+         "Sending…" forever with nothing to press -- worse than an
+         unchecked sign-in and impossible to diagnose from the outside. */
+      var mounted = Promise.race([
+        CT.turnstile.mount(ctx && ctx.challengeHost),
+        new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 8000); })
+      ]);
+
+      return mounted.then(function () {
         /* The widget is drawn when the panel opens, but a token only
            arrives once Cloudflare finishes -- and someone typing an
            email address fast can beat it. Wait a few seconds rather
