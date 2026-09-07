@@ -1373,3 +1373,15 @@ body.is-focus{
   .tabs,.livenote,.toast,.btn{ display:none !important; }
   body{ background:#fff; }
 }
+
+/* ── Code entry ─────────────────────────────────────────────────────
+   A checkbox, then a type, then the field for that type. Each step
+   appears only once the one before it is answered. */
+.code-entry{ margin-top:16px; }
+.code-toggle{ display:flex; align-items:center; gap:8px; cursor:pointer;
+  font-size:.85rem; color:var(--ink-muted); }
+.code-toggle input{ width:16px; height:16px; accent-color:var(--purple); cursor:pointer; }
+.code-entry > .field{ margin-top:10px; max-width:22rem; }
+.code-entry .discount-row,
+.code-entry .access-code-row{ margin-top:10px; }
+.code-entry .hint{ margin-top:6px; }
