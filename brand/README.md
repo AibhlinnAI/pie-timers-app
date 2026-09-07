@@ -6,7 +6,6 @@ hand into somebody else's dashboard, where the size is fixed by them.
 | File | Where it goes | Constraint |
 |---|---|---|
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
-| `pie-timers-oauth-120-deep.png` | the same, darker background | 120×120 PNG |
 
 ## pie-timers-oauth-120.png
 
@@ -19,11 +18,10 @@ white panel, where a transparent PNG leaves the mark floating with no
 brand around it -- and the pie itself is pale enough to lose its edges.
 A purple tile reads as a deliberate app icon at 120px.
 
-Two backgrounds:
-
-- `pie-timers-oauth-120.png` -- `#4B2A5A`, the `--purple` brand token
-- `pie-timers-oauth-120-deep.png` -- `#1C1024`, the app background and
-  the existing `theme-color` in index.html
+Background is `#1C1024` -- the app background, and the `theme-color`
+already declared in index.html. Chosen over the lighter `--purple`
+(`#4B2A5A`) so the consent screen matches the colour a browser paints
+around the installed app: one purple in both places rather than two.
 
 **Uploading it starts a Google brand verification review.** That is not
 a formality: it can take days, occasionally weeks, and until it passes
@@ -38,7 +36,7 @@ $img = [System.Drawing.Image]::FromFile("app\icon-512.png")
 $bmp = New-Object System.Drawing.Bitmap 120, 120
 $g = [System.Drawing.Graphics]::FromImage($bmp)
 $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-$g.Clear([System.Drawing.Color]::Transparent)
-$g.DrawImage($img, 0, 0, 120, 120)
+$g.Clear([System.Drawing.ColorTranslator]::FromHtml("#1C1024"))
+$g.DrawImage($img, 6, 6, 108, 108)   # 6px inset; Google may round corners
 $bmp.Save("brand\pie-timers-oauth-120.png", [System.Drawing.Imaging.ImageFormat]::Png)
 ```
