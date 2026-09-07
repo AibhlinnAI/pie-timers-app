@@ -990,7 +990,11 @@
     var hasLiveGoogle = calendarFeeds.some(function (feed) {
       return feed.kind === 'google' && feed.has_google;
     });
-    $('googleConnect').hidden = Boolean(reason) || hasLiveGoogle;
+    /* Hidden until Google verifies the calendar scope. A button that
+       answers 403 to everyone reads as broken; absent reads as a
+       feature that has not arrived. See config.googleCalendarEnabled. */
+    $('googleConnect').hidden = Boolean(reason) || hasLiveGoogle ||
+      !CT.config.googleCalendarEnabled;
 
     /* Shown alongside the manual form, and only while there is still a
        calendar to add. Employers that block third-party OAuth are common
