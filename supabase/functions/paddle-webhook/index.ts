@@ -171,8 +171,8 @@ async function grantCapability(
    status this function decides is NOT currently entitled, which is
    what makes the omission double as the revocation: no fresh grant
    call means the previous expiry (already in the database) is left to
-   lapse on its own, exactly the mechanism schema-hardship.sql already
-   uses for its own grants.
+   lapse on its own -- the same mechanism a complimentary grant relies
+   on, except that one is written with no expiry at all.
 
    Throws on failure, so a transient fault here (a timeout, Supabase
    hiccuping, or -- see grantCapability's own note -- the identity

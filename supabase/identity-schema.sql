@@ -36,7 +36,7 @@ create table if not exists identity.product_entitlements (
   account_id   uuid        not null references auth.users (id) on delete cascade,
   product_id   text        not null,
   capability   text        not null,
-  source       text        not null,   -- 'subscription' | 'hardship' | 'complimentary' | 'trial'
+  source       text        not null,   -- 'subscription' | 'complimentary' | 'trial' | whatever a product adds
   expires_at   timestamptz,            -- null = does not expire on its own
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -55,7 +55,7 @@ create policy "own entitlements: read"
 
 -- No insert/update/delete policy for authenticated users on purpose.
 -- Every grant comes from a service-role edge function (a webhook, a
--- hardship request, a redeemed pass) so an account can never write
+-- complimentary grant, a redeemed pass) so an account can never write
 -- its own entitlement.
 
 -- ─────────────────────────── subscriptions ───────────────────────────

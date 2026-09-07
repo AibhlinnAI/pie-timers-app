@@ -52,9 +52,9 @@ async function userFromToken(token: string) {
 }
 
 /* This account's Paddle identifiers, or null if it has never
-   actually checked out (hardship / complimentary access, or a free
-   account that's never upgraded -- both real, both have nothing for
-   Paddle to show a portal for). */
+   actually checked out (complimentary access, or a free account that
+   has never upgraded -- both real, both with nothing for Paddle to
+   show a portal for). */
 async function paddleIdsFor(userId: string) {
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/subscriptions?user_id=eq.${userId}&select=paddle_customer_id,paddle_subscription_id`,
@@ -117,7 +117,7 @@ Deno.serve(async (request) => {
     const ids = await paddleIdsFor(user.id);
     if (!ids) {
       return json(
-        { error: "No billing account found. This is expected for free, hardship or complimentary access." },
+        { error: "No billing account found. This is expected for when an AibhlínnAI account has free access." },
         404,
       );
     }
