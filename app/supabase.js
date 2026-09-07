@@ -121,21 +121,26 @@
       var i = id();
       if (i) i.signInWithGoogle();
     },
-
     /* Re-authorise with Google, additionally asking for read-only calendar
        access. access_type=offline is what yields a refresh token, and
        prompt=consent forces Google to re-issue one even if the user has
        approved before — without it a reconnect silently returns nothing.
-       Stays here rather than in identity: identity deliberately asks for
-       nothing beyond identifying the person, and a product wanting more
-       does that itself, afterwards. */
+
+       select_account matters as much as consent. The calendar someone
+       wants is frequently not the account they signed up with: a work
+       calendar reached from a personal subscription, or the reverse
+       where an employer's policy forbids paying on the work account.
+       Without it Google silently uses whichever account the browser is
+       already signed into, and there is no way back to the chooser --
+       so the person is offered the wrong calendar with no visible
+       reason and nothing to click. */
     connectGoogleCalendar: function () {
       var scopes = 'email profile https://www.googleapis.com/auth/calendar.readonly';
       var url = authUrl('/authorize') +
         '?provider=google' +
         '&scopes=' + encodeURIComponent(scopes) +
         '&access_type=offline' +
-        '&prompt=consent' +
+        '&prompt=' + encodeURIComponent('select_account consent') +
         '&redirect_to=' + encodeURIComponent(redirectTarget() + '#calendar-connected');
       try { sessionStorage.setItem('countdown-timers/connecting-google', '1'); } catch (e) { /* fine */ }
       location.assign(url);
