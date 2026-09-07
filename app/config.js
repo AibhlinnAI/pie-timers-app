@@ -38,6 +38,22 @@ window.CT.config = {
      Supabase → Authentication → URL Configuration → Redirect URLs. */
   redirectUrl: '',
 
+  /* One-click Google Calendar. Off until Google has verified the app.
+
+     Calendar scopes are sensitive: Google allows them in Testing mode
+     for listed testers only, and blocks them in production until the
+     app passes review. Published-but-unverified therefore gives every
+     customer who presses the button a 403 and no explanation -- worse
+     than not offering it, because it looks broken rather than absent.
+
+     Sign-in is unaffected either way: that flow asks only for email,
+     profile and openid, and never for the calendar.
+
+     Turn this on the day verification clears. The iCal path below it
+     works for everyone in the meantime, and needs no Google approval
+     at all. */
+  googleCalendarEnabled: false,
+
   /* Cloudflare Turnstile site key (the public half). When set, the
      sign-in form is bot-checked and magic links are throttled. Leaving
      it blank sends sign-ins straight to Supabase, unthrottled — fine
