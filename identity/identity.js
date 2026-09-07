@@ -55,6 +55,7 @@
   var cfg = null;
   var session = null;
   var listeners = [];
+  var lastEmittedKey = null;
   var refreshTimer = null;
   var refreshInFlight = null;
 
@@ -65,7 +66,27 @@
     return location.origin + location.pathname;
   }
 
+  /* Identity of the current session, for change detection. Listeners
+     care about WHO is signed in, not about the session object being
+     rewritten -- and at least one of them (Pie Timers' sync.js) calls
+     loadUser() from inside its own handler, which writes the user back
+     onto the session and stores it again. Emitting on every store
+     therefore re-enters that listener and loops: user fetch,
+     entitlement, calendar, profile, push, repeat, tens of times a
+     second.
+
+     This guard lived in supabase.js until CT.auth became a facade and
+     stopped keeping a session of its own. It has to live wherever the
+     session actually does, which is here. */
+  function sessionKey() {
+    if (!session || !session.access_token) return '';
+    return session.access_token + '|' + ((session.user && session.user.id) || '');
+  }
+
   function emit() {
+    var key = sessionKey();
+    if (key === lastEmittedKey) return;
+    lastEmittedKey = key;
     listeners.forEach(function (fn) {
       try { fn(session); } catch (e) { /* one listener must not break the rest */ }
     });
