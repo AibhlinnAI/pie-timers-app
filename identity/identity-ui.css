@@ -126,3 +126,23 @@
    something is rendered into it, so a product that supplies none
    leaves the panel exactly as it was. */
 .aib-signin-challenge:not(:empty){ margin:.5rem 0 0; display:flex; justify-content:center; }
+
+/* Sign out sits beside the app link once signed in. Deliberately
+   quieter than it: leaving is not the action being encouraged, but it
+   must be findable without hunting through settings. Same 44px target,
+   so it is no harder to hit on a phone. */
+.aib-signout-btn{
+  margin-left:8px;
+  min-height:44px; padding:0 14px;
+  border-radius:999px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--ink-muted, #A794B5);
+  font:inherit; font-size:.85rem;
+  cursor:pointer;
+}
+.aib-signout-btn:hover:not(:disabled){
+  border-color:var(--line, #3A2A47);
+  color:var(--ink, #F3ECF7);
+}
+.aib-signout-btn:disabled{ opacity:.6; cursor:default; }
