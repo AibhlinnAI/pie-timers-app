@@ -199,12 +199,31 @@
     return paddleReady;
   }
 
+  /* Which of the two prices for this cadence. Someone still inside
+     their account trial takes the price that carries a trial, so
+     checkout takes nothing today and they can cancel free right up to
+     day 30 -- paddle-webhook moves that first charge to exactly day 30
+     afterwards. Someone whose trial has already lapsed takes the plain
+     price and pays now; handing them the trial price would give away a
+     second free fortnight nobody offered.
+
+     Falls back to the plain price whenever the trial pair is unset, so
+     a half-configured catalogue charges honestly rather than failing. */
+  function priceFor(cadence) {
+    var p = cfg.paddle;
+    var plain = cadence === 'monthly' ? p.monthlyPriceId : p.annualPriceId;
+    var trial = cadence === 'monthly' ? p.monthlyTrialPriceId : p.annualTrialPriceId;
+
+    var ent = entitlement;
+    var inTrial = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+
+    return (inTrial && trial) ? trial : plain;
+  }
+
   function openCheckout(cadence, discountCode) {
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
-    var priceId = cadence === 'monthly'
-      ? cfg.paddle.monthlyPriceId
-      : cfg.paddle.annualPriceId;
+    var priceId = priceFor(cadence);
 
     if (!priceId) return Promise.reject(new Error('That plan is not available yet.'));
 

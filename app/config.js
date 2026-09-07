@@ -50,9 +50,24 @@ window.CT.config = {
     /* 'sandbox' while testing, 'production' when live. */
     environment: 'production',
     clientToken: 'live_f40ba5ce81b1aff0afd6ab1ff86',
-    /* Price IDs from Paddle → Catalogue → Products. */
+    /* Price IDs from Paddle → Catalogue → Products.
+
+       Four, not two. Paddle puts the trial length on the price, so it
+       is the same for everyone who buys it -- and the two audiences
+       need different answers. Someone subscribing during their account
+       trial owes nothing yet, and their first charge is moved to day 30
+       by paddle-webhook. Someone subscribing after it expired owes
+       money today; giving them the trial price would hand them a second
+       free fortnight nobody promised.
+
+       billing.js chooses. If the trial pair is left blank, everyone
+       gets the plain price and is charged on the spot. */
     annualPriceId: 'pri_01m1effmxgfb45pmtyfz1dnh77',
     monthlyPriceId: 'pri_01m1efkevnwpn0rj7g2kzjne0j',
+
+    /* The same two plans, with a 14-day trial set on the price. */
+    annualTrialPriceId: '',
+    monthlyTrialPriceId: '',
 
     /* What the upgrade panel displays. These are labels only — Paddle's
        checkout shows the real, tax-inclusive, localised price. Keep them

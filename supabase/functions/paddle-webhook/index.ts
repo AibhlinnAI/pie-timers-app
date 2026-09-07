@@ -90,10 +90,9 @@ async function rest(path: string, init: RequestInit = {}) {
    account start + 30 days, with proration_billing_mode "do_not_bill"
    so moving the date does not itself raise an invoice.
 
-   Deliberately never moves the date EARLIER. If Paddle already intends
-   to bill later than day 30 -- a price-level trial, a manual
-   adjustment -- that is left alone. This can give time away; it must
-   never take it.
+   Only ever pins it to day 30, and only while day 30 is still ahead.
+   Someone who buys after their trial lapsed is on the price without a
+   trial, has paid today, and is left entirely alone.
 
    Requires PADDLE_API_KEY. Without it the subscription still works and
    the person is simply billed on Paddle's own schedule, so a missing
@@ -125,8 +124,18 @@ async function deferFirstCharge(userId: string, subscriptionId: string, currentN
   if (!createdAt) return;
 
   const target = new Date(new Date(createdAt).getTime() + FREE_DAYS_FROM_SIGNUP * 86400000);
-  if (target.getTime() <= Date.now()) return;                       // day 30 already passed
-  if (currentNextBilledAt && new Date(currentNextBilledAt) >= target) return;  // already later
+  /* Past day 30 means they bought after their trial lapsed: they are
+     on the plain price, they have paid today, and their anniversary is
+     Paddle's business, not ours. */
+  if (target.getTime() <= Date.now()) return;
+
+  /* Otherwise pin it to day 30 exactly, in whichever direction. The
+     trial price gives everyone the same fixed run from the day they
+     buy, so an early buyer overshoots day 30 and a late one falls
+     short; only the account start date knows where day 30 actually is.
+     Pulling a date earlier can only ever bring it back to day 30, and
+     never to today, because of the check above. */
+  if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return;
 
   const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
     method: "PATCH",
