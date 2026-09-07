@@ -407,14 +407,22 @@
     <section class="panel">
       <header class="panel-head">
         <h2>Settings</h2>
-        <!-- Account lives at the bottom of a long tab, behind appearance,
-             notifications and calendar settings. Anyone coming here to
-             sign in, check their plan or cancel had to scroll past all of
-             it first, with nothing saying it was down there. -->
-        <a class="btn btn-ghost" href="#account">Account</a>
       </header>
 
       <div class="settings-list">
+        <!-- First, because it is the reason most people open this tab, and
+             because Account otherwise sits at the very bottom behind
+             appearance, notifications and calendar settings -- which is
+             also where cancelling lives. A row rather than a button: this
+             list is the pattern already on the page. -->
+        <a class="setting setting--link" href="#account">
+          <div>
+            <strong>Account</strong>
+            <span>Sign in, your plan, cancel.</span>
+          </div>
+          <span class="setting-go" aria-hidden="true">→</span>
+        </a>
+
         <label class="setting">
           <div>
             <strong>Appearance</strong>

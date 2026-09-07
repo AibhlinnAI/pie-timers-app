@@ -1400,3 +1400,12 @@ body.is-focus{
 @media (prefers-reduced-motion: no-preference){
   html{ scroll-behavior:smooth; }
 }
+
+/* Account as a settings row rather than a button. Inherits .setting, so
+   it matches Appearance and Notifications exactly; the only additions
+   are the things a link needs and a select does not. */
+.setting--link{ text-decoration:none; color:inherit; }
+.setting--link:hover strong{ color:var(--orange-text); }
+.setting-go{ font-size:1.1rem; color:var(--ink-muted); flex:none; }
+.setting--link:hover .setting-go{ color:var(--orange-text); }
+.setting--link:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; border-radius:4px; }
