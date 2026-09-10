@@ -116,7 +116,7 @@
     codeField.appendChild(el('span', { text: 'Signed in elsewhere? Enter the code from the email' }));
     var codeInput = el('input', {
       type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code',
-      maxlength: '10', placeholder: '000000'
+      maxlength: '10', placeholder: '00000000'
     });
     codeField.appendChild(codeInput);
     codeRow.appendChild(codeField);
