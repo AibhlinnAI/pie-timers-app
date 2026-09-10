@@ -262,12 +262,16 @@ you have to swap it.
 ```html
 <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:420px;margin:0 auto;padding:8px 4px;color:#241A2E">
   <p style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#7A4F9E;font-weight:600;margin:0 0 22px">AibhlínnAI</p>
-  <h1 style="font-size:18px;margin:0 0 6px">Your sign-in code</h1>
-  <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5E5568">Enter this in Pie Timers to finish signing in:</p>
+  <h1 style="font-size:18px;margin:0 0 6px">Your AibhlínnAI sign-in code</h1>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5E5568">Enter this code to finish signing in:</p>
   <p style="font-size:30px;font-weight:700;letter-spacing:6px;margin:0 0 18px">{{ .Token }}</p>
-  <p style="font-size:13px;line-height:1.5;color:#8A8194;margin:0">It expires shortly. If you didn't ask to sign in, ignore this email — the code is useless without it.</p>
+  <p style="font-size:13px;line-height:1.5;color:#8A8194;margin:0">This code expires shortly. If you didn't ask to sign in, ignore this email. Without this code, a sign-in attempt will be useless.</p>
 </div>
 ```
+
+The body names no product, so the *Subject heading* is where a person sees which
+app asked — set it to `Your Pie Timers sign-in code` rather than repeating the
+neutral wording.
 
 - [ ] Do not leave a bare `{{ .ConfirmationURL }}` anywhere in the body, even as
       plain text — a scanner will still follow it and burn the code.
