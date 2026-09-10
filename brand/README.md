@@ -11,7 +11,8 @@ hand into somebody else's dashboard, where the size is fixed by them.
 
 | Name | Hex | What it is |
 |---|---|---|
-| AibhlínnAI brand blue | `#050818` | The suite colour — near-black with a blue cast. Set as the AibhlínnAI Discord banner colour, which is the reference. The ground the logo sits on, and the ink for the "AibhlínnAI" wordmark on a light surface (e.g. the sign-in email, `DEPLOY.md` §6.4). The wordmark is set in mixed case — `AibhlínnAI`, never all-caps. |
+| Brand blue | `#050818` | The suite colour — near-black with a blue cast. Set as the AibhlínnAI Discord banner colour, which is the reference. Use it as a ground (the logo sits on it) and on dark surfaces. On white it collapses to near-black — use the light-backdrop variant below instead. |
+| Brand blue, white backdrop | `#2E3A63` | The on-light variant: the same hue lifted until it reads as blue against white. This is the "AibhlínnAI" wordmark colour on a light surface — the sign-in email (`DEPLOY.md` §6.4), and anywhere else the mark sits on white. Mixed case always — `AibhlínnAI`, never all-caps. |
 | Pie Timers purple | `#1C1024` | This *app's* colour, not the suite's — the app background, the PWA `theme-color`, and the OAuth tile below. `#4B2A5A` is the lighter tint. A second suite app picks its own app colour and keeps the blue wordmark. |
 
 ## pie-timers-oauth-120.png
