@@ -262,8 +262,10 @@
       status.textContent = '';
       identity.signInWithEmail(email, { challengeHost: challengeHost }).then(function () {
         submit.textContent = 'Check your inbox';
-        status.textContent = 'We sent a sign-in code to ' + email +
-          '. It comes from AibhlinnAI — check your spam folder if it is not there.';
+        status.textContent = 'We sent a sign-in code to ' + email + '.';
+        status.appendChild(document.createElement('br'));
+        status.appendChild(document.createTextNode(
+          'This email comes from AibhlinnAI ➡️ check your spam folder if the email has not hit your inbox.'));
         codeRow.hidden = false;
         codeInput.focus();
         armResend();

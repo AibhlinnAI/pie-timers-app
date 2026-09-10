@@ -2059,9 +2059,13 @@
   var MAGIC_SUBMIT_LABEL = null;
   var magicResendTimer = null;
 
-  function authMessage(text, isError) {
+  function authMessage(text, isError, line2) {
     var el = $('authMessage');
     el.textContent = text || '';
+    if (line2) {
+      el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(line2));
+    }
     el.classList.toggle('is-error', !!isError);
   }
 
@@ -2088,8 +2092,8 @@
         /* Same as the header panel: the label says where to look and who
            it is from, and stays put until a resend is actually useful. */
         button.textContent = 'Check your inbox';
-        authMessage('We sent a sign-in code to ' + email +
-          '. It comes from AibhlinnAI — check your spam folder if it is not there.');
+        authMessage('We sent a sign-in code to ' + email + '.', false,
+          'This email comes from AibhlinnAI ➡️ check your spam folder if the email has not hit your inbox.');
         /* The code goes in below — this is how sign-in finishes on a
            device whose inbox is somewhere else. */
         $('codeForm').hidden = false;
