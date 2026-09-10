@@ -265,6 +265,9 @@ you have to swap it.
 
 - [ ] Do not leave a bare `{{ .ConfirmationURL }}` anywhere in the body, even as
       plain text — a scanner will still follow it and burn the code.
+- [ ] Change the **Subject heading** on both templates too — it is a separate
+      field above the body and the stock text says "magic link" / "confirm your
+      signup". Set it to something like `Your Pie Timers sign-in code`.
 - [ ] Shorten the code's lifetime at **Authentication → Providers → Email → Email
       OTP Expiration** — default is 3600s; 600s is plenty and narrows the window
       on a code read to the wrong person.
