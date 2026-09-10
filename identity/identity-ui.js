@@ -1,8 +1,8 @@
 /* ============================================================
    AibhlínnAI shared sign-in UI.
 
-   Renders a header button plus an anchored panel (magic link primary,
-   Google secondary). Every string a product might want to change —
+   Renders a header button plus an anchored panel (emailed sign-in code
+   primary, Google secondary). Every string a product might want to change —
    the "open app" label, the suite context line — is a parameter, not
    a hardcoded word, so this file is copy-pasted into a second app
    verbatim rather than forked.
@@ -92,7 +92,7 @@
     form.appendChild(field);
 
     var submit = el('button', {
-      type: 'submit', class: 'aib-signin-submit', text: 'Email me a sign-in link'
+      type: 'submit', class: 'aib-signin-submit', text: 'Email me a sign-in code'
     });
     form.appendChild(submit);
 
@@ -104,6 +104,28 @@
 
     var status = el('p', { class: 'aib-signin-status', role: 'status', 'aria-live': 'polite' });
     form.appendChild(status);
+
+    /* The same email carries a short code as well as the link. The link
+       only signs in the browser that opens it; the code can be carried
+       to the device running the app when the inbox is somewhere else
+       — a personal address on a work machine, most often. Hidden until
+       a send has actually happened, so it never invites a code that
+       was never issued. */
+    var codeRow = el('div', { class: 'aib-signin-code', hidden: 'hidden' });
+    var codeField = el('label', { class: 'aib-signin-field' });
+    codeField.appendChild(el('span', { text: 'Signed in elsewhere? Enter the code from the email' }));
+    var codeInput = el('input', {
+      type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code',
+      maxlength: '10', placeholder: '000000'
+    });
+    codeField.appendChild(codeInput);
+    codeRow.appendChild(codeField);
+    var codeSubmit = el('button', {
+      type: 'button', class: 'aib-signin-submit', text: 'Sign in with code'
+    });
+    codeRow.appendChild(codeSubmit);
+    form.appendChild(codeRow);
+
     panel.appendChild(form);
 
     panel.appendChild(el('div', { class: 'aib-signin-divider', text: 'or' }));
@@ -192,6 +214,16 @@
       wrap.appendChild(panel);
       panel.hidden = true;
       btn.setAttribute('aria-expanded', 'false');
+      /* Back to a clean form: a code row left over from a previous
+         sign-in refers to an email that has since been consumed. */
+      codeRow.hidden = true;
+      codeInput.value = '';
+      codeSubmit.disabled = false;
+      codeSubmit.textContent = CODE_LABEL;
+      submit.textContent = SUBMIT_LABEL;
+      submit.disabled = false;
+      status.textContent = '';
+      status.dataset.tone = '';
     }
 
     btn.addEventListener('click', function () {
@@ -201,8 +233,8 @@
       closePanel(true);
     });
 
-    /* The label carries the state. Once a link is on its way, "Email me a
-       sign-in link" is a lie -- the useful thing to say is where to look
+    /* The label carries the state. Once a code is on its way, "Email me a
+       sign-in code" is a lie -- the useful thing to say is where to look
        and who it is from, since a message from a brand-new domain often
        lands in spam and an unfamiliar sender name is what makes people
        give up. The button stays out of action until a resend is genuinely
@@ -214,7 +246,7 @@
     function armResend() {
       clearTimeout(resendTimer);
       resendTimer = setTimeout(function () {
-        submit.textContent = 'Send another link';
+        submit.textContent = 'Send another code';
         submit.disabled = false;
       }, RESEND_AFTER_MS);
     }
@@ -230,8 +262,10 @@
       status.textContent = '';
       identity.signInWithEmail(email, { challengeHost: challengeHost }).then(function () {
         submit.textContent = 'Check your inbox';
-        status.textContent = 'We sent a sign-in link to ' + email +
+        status.textContent = 'We sent a sign-in code to ' + email +
           '. It comes from AibhlinnAI — check your spam folder if it is not there.';
+        codeRow.hidden = false;
+        codeInput.focus();
         armResend();
       }).catch(function (err) {
         submit.textContent = SUBMIT_LABEL;
@@ -255,14 +289,43 @@
       }, 20000);
     });
 
+    /* Verifying the code completes sign-in on THIS device with no
+       redirect: identity.onChange fires, render() swaps the panel for
+       the signed-in header, and there is nothing left to do here. A
+       wrong or stale code just comes back as an error to show. */
+    var CODE_LABEL = codeSubmit.textContent;
+    function submitCode() {
+      var code = codeInput.value.replace(/\s+/g, '');
+      if (!code) return;
+      codeSubmit.disabled = true;
+      codeSubmit.textContent = 'Signing in…';
+      status.dataset.tone = '';
+      status.textContent = '';
+      identity.verifyEmailOtp(emailInput.value.trim(), code).catch(function (err) {
+        codeSubmit.disabled = false;
+        codeSubmit.textContent = CODE_LABEL;
+        status.dataset.tone = 'error';
+        status.textContent = err.message;
+      });
+    }
+    codeSubmit.addEventListener('click', submitCode);
+    codeInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitCode(); }
+    });
+
     /* Editing the address makes the previous "check your inbox" stale --
-       it refers to somewhere the person is no longer signing in to. */
+       it refers to somewhere the person is no longer signing in to, and
+       the code that was sent there no longer applies either. */
     emailInput.addEventListener('input', function () {
       clearTimeout(resendTimer);
       submit.textContent = SUBMIT_LABEL;
       submit.disabled = false;
       status.dataset.tone = '';
       status.textContent = '';
+      codeRow.hidden = true;
+      codeInput.value = '';
+      codeSubmit.disabled = false;
+      codeSubmit.textContent = CODE_LABEL;
     });
 
     googleBtn.addEventListener('click', function () {

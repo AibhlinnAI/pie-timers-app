@@ -85,7 +85,8 @@
   /* ─────────────────────────── Public auth API ─────────────────────────── */
 
   var auth = {
-    /* Email magic link — no password is ever collected or stored.
+    /* Emails a one-time sign-in code — no password is ever collected
+       or stored. The email carries no link; verifyEmailOtp() finishes.
 
        Routed through the `signin` edge function whenever Turnstile is
        configured, because that is the only place a bot check and a
@@ -115,6 +116,18 @@
           options: { email_redirect_to: redirectTarget() }
         })
       });
+    },
+
+    /* Finish sign-in with the emailed code. It completes on this
+       device — the machine running the app — with no redirect, which
+       is the whole point: the inbox can be on a phone the work machine
+       cannot open. Straight to identity: this is a verification call,
+       not a send, so it needs neither the bot check nor the throttle
+       the `signin` function exists to apply. */
+    verifyEmailOtp: function (email, code) {
+      var i = id();
+      return i ? i.verifyEmailOtp(email, code)
+               : Promise.reject(new Error('Sign-in is unavailable.'));
     },
 
     signInWithGoogle: function () {

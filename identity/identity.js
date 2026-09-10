@@ -21,6 +21,7 @@
 
      Aibhlinn.identity.onChange(function (session) { ... });
      Aibhlinn.identity.signInWithEmail('me@example.com');
+     Aibhlinn.identity.verifyEmailOtp('me@example.com', '123456');
      Aibhlinn.identity.isSignedIn();
      Aibhlinn.identity.signOut();
 
@@ -180,9 +181,11 @@
     return refresh().then(function (s) { return s ? s.access_token : null; });
   }
 
-  /* Supabase returns tokens in the URL fragment after a magic link or
-     OAuth round trip. Consumed once at init, then scrubbed from the
-     address bar so they are not left sitting in browser history. */
+  /* Supabase returns tokens in the URL fragment after an OAuth round
+     trip (Google). The emailed-code path never comes back this way --
+     it verifies in place and gets its tokens in a response body. Any
+     fragment found here is consumed once at init, then scrubbed from
+     the address bar so it is not left sitting in browser history. */
   function consumeRedirect() {
     var hash = location.hash || '';
     if (hash.indexOf('access_token=') === -1 && hash.indexOf('error=') === -1) return null;
@@ -239,9 +242,11 @@
       scheduleRefresh();
       return consumeRedirect();
     },
-    /* Email magic link — no password is ever collected or stored,
-       which matters for an audience this app is built for: one thing
-       to remember (an email address) instead of two.
+    /* Emails a one-time sign-in code — no password is ever collected
+       or stored, which matters for an audience this app is built for:
+       one thing to remember (an email address) instead of two. The
+       code is finished with verifyEmailOtp() below; the email carries
+       no link, so nothing here depends on which device opens it.
 
        A product may supply `signIn` to init() to route this through
        its own endpoint instead of straight to Supabase. Pie Timers
@@ -271,6 +276,36 @@
         });
       }
       return sendMagicLink(email);
+    },
+
+    /* Finish sign-in with the numeric code from the email. The email
+       carries only this code, no link: a link signs in whichever
+       browser opens it and no other, and corporate mail scanners that
+       fetch every URL can spend it before the person even reads the
+       message. A code is read off the device that holds the inbox and
+       typed into the device running the app — a personal address that
+       is only reachable on a phone while the app is open on a
+       locked-down work machine.
+
+       Verification returns the same token payload an OAuth redirect
+       carries, in the response body rather than a URL fragment, so the
+       session is adopted identically.
+
+       type 'email' is GoTrue's unified passwordless type — it settles
+       both a brand-new account and a returning one, matching the
+       create_user:true request that sent the code. */
+    verifyEmailOtp: function (email, code) {
+      return request(authUrl('/verify'), {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          email: (email || '').trim(),
+          token: (code || '').replace(/\s+/g, '')
+        })
+      }).then(function (data) {
+        return adoptTokenResponse(data);
+      });
     },
 
     /* Optional, secondary. Hands off to Supabase, which returns to

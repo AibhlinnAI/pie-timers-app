@@ -108,6 +108,19 @@
 }
 .aib-signin-status[data-tone="error"]{ color:var(--urgent-text, #FF9E9E); }
 
+/* The type-in-a-code fallback, revealed once the email is on its way.
+   Sits under a hairline so it reads as a second route, not part of
+   the send form above it. */
+.aib-signin-code{
+  margin-top:14px; padding-top:14px;
+  border-top:1px solid var(--line, #3A2A47);
+}
+.aib-signin-code[hidden]{ display:none; }
+.aib-signin-code .aib-signin-field{ margin-bottom:10px; }
+.aib-signin-code input{
+  letter-spacing:.16em; font-variant-numeric:tabular-nums;
+}
+
 .aib-signin-close{
   position:absolute; top:10px; right:10px;
   width:32px; height:32px;
