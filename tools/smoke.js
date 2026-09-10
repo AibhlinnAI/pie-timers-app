@@ -144,7 +144,7 @@ for (const [file, exports] of SCRIPTS) {
    leaves a property that is simply undefined, and undefined is exactly
    what "signed out" looks like from a call site. */
 const AUTH_METHODS = [
-  'signInWithEmail', 'signInWithGoogle', 'connectGoogleCalendar',
+  'signInWithEmail', 'verifyEmailOtp', 'signInWithGoogle', 'connectGoogleCalendar',
   'wasConnectingGoogle', 'signOut', 'loadUser', 'deleteAccount',
   'consumeRedirect', 'getSession', 'getUser', 'isSignedIn',
   'validToken', 'onChange',

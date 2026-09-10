@@ -26,6 +26,7 @@ allowed to exist as an actual value is a product's own bridge file — see
 // identity.js
 Aibhlinn.identity.init({ supabaseUrl, supabaseAnonKey, redirectUrl? })
 Aibhlinn.identity.signInWithEmail(email)
+Aibhlinn.identity.verifyEmailOtp(email, code)   // finish sign-in with the emailed code (the email carries no link)
 Aibhlinn.identity.signInWithGoogle()
 Aibhlinn.identity.signOut()
 Aibhlinn.identity.deleteAccount(functionUrl)

@@ -2004,6 +2004,13 @@
       $('lastUpdated').textContent = state.updatedAt
         ? new Date(state.updatedAt).toLocaleString(LOCALE)
         : 'Never';
+    } else {
+      /* Nothing sent yet, or just signed out: the code route only makes
+         sense straight after an email goes out, so it starts hidden and
+         the send handler reveals it. renderAccount does not run on send,
+         so this cannot pull it back after that. */
+      $('codeForm').hidden = true;
+      $('codeInput').value = '';
     }
 
     /* Only when this form is actually on screen. renderAccount() runs on
@@ -2081,11 +2088,14 @@
         /* Same as the header panel: the label says where to look and who
            it is from, and stays put until a resend is actually useful. */
         button.textContent = 'Check your inbox';
-        authMessage('We sent a sign-in link to ' + email + '. It comes from ' +
-          'AibhlinnAI — check your spam folder if it is not there.');
+        authMessage('We sent a sign-in code to ' + email +
+          '. It comes from AibhlinnAI — check your spam folder if it is not there.');
+        /* The code goes in below — this is how sign-in finishes on a
+           device whose inbox is somewhere else. */
+        $('codeForm').hidden = false;
         clearTimeout(magicResendTimer);
         magicResendTimer = setTimeout(function () {
-          button.textContent = 'Send another link';
+          button.textContent = 'Send another code';
           button.disabled = false;
         }, 30000);
       }).catch(function (err) {
@@ -2097,11 +2107,35 @@
       });
     });
 
-    /* A changed address makes the previous "check your inbox" stale. */
+    /* Verifying the code signs this device in with no redirect:
+       CT.auth.onChange fires, renderAccount() swaps to the signed-in
+       panel, and there is nothing more to do on success. */
+    var CODE_SUBMIT_LABEL = null;
+    $('codeForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var email = $('magicEmail').value.trim();
+      var code = $('codeInput').value.replace(/\s+/g, '');
+      if (!email || !code) return;
+      var button = $('codeSubmit');
+      if (CODE_SUBMIT_LABEL === null) CODE_SUBMIT_LABEL = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Signing in…';
+      authMessage('');
+      CT.auth.verifyEmailOtp(email, code).catch(function (err) {
+        button.disabled = false;
+        button.textContent = CODE_SUBMIT_LABEL;
+        authMessage(err.message, true);
+      });
+    });
+
+    /* A changed address makes the previous "check your inbox" stale, and
+       the code that was sent there no longer applies. */
     $('magicEmail').addEventListener('input', function () {
       clearTimeout(magicResendTimer);
       $('magicSubmit').textContent = MAGIC_SUBMIT_LABEL;
       $('magicSubmit').disabled = false;
+      $('codeForm').hidden = true;
+      $('codeInput').value = '';
       authMessage('');
     });
 

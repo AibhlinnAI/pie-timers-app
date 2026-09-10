@@ -239,6 +239,45 @@ through Cloudflare Email Routing: a rule (or catch-all) must exist for that
 exact address, and its destination must be verified, or the link is dropped
 with no error anywhere.
 
+### 6.4 Make the sign-in email a code, not a link
+
+A link in the sign-in email only signs in the browser that opens it — no use to
+someone whose inbox is on a phone while the app is open on a locked-down work
+machine. Worse, corporate mail scanners (Safe Links, Mimecast, Proofpoint) fetch
+every URL in an inbound message, which can spend a one-time link before the person
+ever reads the email. So the template sends **only the code**, which is typed into
+whichever device is running the app.
+
+Supabase mints the code (`{{ .Token }}`) for the same `/auth/v1/otp` request that
+would have carried a link. The default templates render the link, not the code —
+you have to swap it.
+
+- [ ] **Authentication → Emails**. In **both** the *Magic Link* template and the
+      *Confirm signup* template (new accounts get the second one), remove the
+      `{{ .ConfirmationURL }}` anchor and put the code in its place:
+
+```html
+<h2>Your sign-in code</h2>
+<p>Enter this code to finish signing in:</p>
+<p style="font-size:24px;font-weight:bold;letter-spacing:3px">{{ .Token }}</p>
+<p>It expires shortly. If you didn't ask to sign in, ignore this email.</p>
+```
+
+- [ ] Do not leave a bare `{{ .ConfirmationURL }}` anywhere in the body, even as
+      plain text — a scanner will still follow it and burn the code.
+- [ ] Shorten the code's lifetime at **Authentication → Providers → Email → Email
+      OTP Expiration** — default is 3600s; 600s is plenty and narrows the window
+      on a code read to the wrong person.
+- [ ] Test across two devices: on device A request a code, read it off device B's
+      inbox, type it into device A. ✅ device A lands signed in with no redirect.
+      ❌ "Token has expired or is invalid" means the code expired, was already
+      used, or the address on device A does not match the one it was sent to.
+      ❌ a message mentioning `otp_type` / `type` means the `type: 'email'` verify
+      value needs revisiting for this GoTrue version — flag it.
+
+The **Redirect URLs** allowlist (§5.3) still matters — it is used by the Google
+OAuth return — so do not remove it just because the email no longer carries a link.
+
 ## 7. Push notifications
 
 - [ ] Generate a VAPID key pair.

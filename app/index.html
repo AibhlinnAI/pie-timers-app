@@ -577,15 +577,28 @@
           <input type="email" id="magicEmail" placeholder="you@example.com"
                  autocomplete="email" required>
         </label>
-        <button class="btn btn-primary" type="submit" id="magicSubmit">Email me a link</button>
+        <button class="btn btn-primary" type="submit" id="magicSubmit">Email me a code</button>
       </form>
 
       <!-- Cloudflare Turnstile renders here when a site key is configured.
            Invisible to nearly all real users. -->
       <div id="turnstileHost" class="turnstile-host" hidden></div>
 
-      <p class="hint">We'll email you a one-time sign-in link. There is no password to
+      <p class="hint">We'll email you a one-time sign-in code. There is no password to
       create or remember.</p>
+
+      <!-- The emailed code is typed in here to finish signing in on this
+           device. It carries where a link cannot: a code works on the
+           machine running the app even when the inbox is only reachable
+           on a phone. Shown once a code has actually been sent. -->
+      <form class="signin-form" id="codeForm" novalidate hidden>
+        <label class="field field--grow">
+          <span>Enter the code from the email</span>
+          <input type="text" id="codeInput" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="10" placeholder="000000">
+        </label>
+        <button class="btn btn-primary" type="submit" id="codeSubmit">Sign in with code</button>
+      </form>
 
       <div class="or"><span>or</span></div>
 

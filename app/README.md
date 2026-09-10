@@ -191,8 +191,17 @@ The purple dial and green dial keep the pairing from the workbook's pie charts
 
 ## Accounts & sync
 
-Sign-in is **magic link or Google** — there is no password anywhere in the product,
-so there is nothing to hash, reset, or leak.
+Sign-in is **an emailed one-time code, or Google** — there is no password anywhere
+in the product, so there is nothing to hash, reset, or leak.
+
+The sign-in email carries a **short numeric code and no link**. A link only ever
+signs in the browser that opens it, and corporate mail scanners that fetch every
+URL in a message can spend it before the person reads the email. A code is read off
+whichever device holds the inbox — a personal address reachable only on a phone,
+say — and typed into the device running the app, which calls `/auth/v1/verify`
+itself and gets its own session, no redirect involved. The code field appears in
+the sign-in panel once a code has actually been sent from that device. See §6.4 of
+`DEPLOY.md` for the email-template setup that this depends on.
 
 Your schedule and settings live in one row per user. Sync runs on sign-in, on tab
 focus, every 60 seconds, and 1.5 seconds after any edit (debounced). Edits made
