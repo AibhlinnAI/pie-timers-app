@@ -7,6 +7,13 @@ hand into somebody else's dashboard, where the size is fixed by them.
 |---|---|---|
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
 
+## Colours
+
+| Name | Hex | What it is |
+|---|---|---|
+| AibhlínnAI brand blue | `#050818` | The suite colour — near-black with a blue cast. Set as the AibhlínnAI Discord banner colour, which is the reference. The ground the logo sits on, and the ink for the "AibhlínnAI" wordmark on a light surface (e.g. the sign-in email, `DEPLOY.md` §6.4). The wordmark is set in mixed case — `AibhlínnAI`, never all-caps. |
+| Pie Timers purple | `#1C1024` | This *app's* colour, not the suite's — the app background, the PWA `theme-color`, and the OAuth tile below. `#4B2A5A` is the lighter tint. A second suite app picks its own app colour and keeps the blue wordmark. |
+
 ## pie-timers-oauth-120.png
 
 Downscaled from `app/icon-512.png` with high-quality bicubic
