@@ -253,14 +253,20 @@ would have carried a link. The default templates render the link, not the code �
 you have to swap it.
 
 - [ ] **Authentication → Emails**. In **both** the *Magic Link* template and the
-      *Confirm signup* template (new accounts get the second one), remove the
-      `{{ .ConfirmationURL }}` anchor and put the code in its place:
+      *Confirm signup* template (new accounts get the second one), replace the whole
+      body with the block below. It is deliberately image-free — a text wordmark,
+      not the logo lockup: a new sending domain with no reputation delivers better
+      without images, image-off clients still show the brand, and nothing in the
+      email phones home. A second suite app reuses this block unchanged.
 
 ```html
-<h2>Your sign-in code</h2>
-<p>Enter this code to finish signing in:</p>
-<p style="font-size:24px;font-weight:bold;letter-spacing:3px">{{ .Token }}</p>
-<p>It expires shortly. If you didn't ask to sign in, ignore this email.</p>
+<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:420px;margin:0 auto;padding:8px 4px;color:#241A2E">
+  <p style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#7A4F9E;font-weight:600;margin:0 0 22px">AibhlínnAI</p>
+  <h1 style="font-size:18px;margin:0 0 6px">Your sign-in code</h1>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5E5568">Enter this in Pie Timers to finish signing in:</p>
+  <p style="font-size:30px;font-weight:700;letter-spacing:6px;margin:0 0 18px">{{ .Token }}</p>
+  <p style="font-size:13px;line-height:1.5;color:#8A8194;margin:0">It expires shortly. If you didn't ask to sign in, ignore this email — the code is useless without it.</p>
+</div>
 ```
 
 - [ ] Do not leave a bare `{{ .ConfirmationURL }}` anywhere in the body, even as
