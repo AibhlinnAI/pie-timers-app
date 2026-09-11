@@ -76,6 +76,13 @@
       </div>
     </section>
 
+    <div class="dashboard-toolbar" id="dashboardToolbar" hidden>
+      <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false">
+        <span id="fullscreenIcon" aria-hidden="true">⛶</span>
+        <span id="fullscreenLabel">Full screen</span>
+      </button>
+    </div>
+
     <div class="daystrip" id="dayStrip">
       <div class="daystrip-item">
         <span class="k">Today</span>
@@ -280,11 +287,12 @@
           <button class="view-toggle-btn is-active" id="apptViewList" type="button"
                   role="tab" aria-selected="true">List</button>
           <button class="view-toggle-btn" id="apptViewCalendar" type="button"
-                  role="tab" aria-selected="false">
-            Calendar
-            <span class="chip chip--plan" id="apptCalendarPlanChip" hidden>Plan feature</span>
-          </button>
+                  role="tab" aria-selected="false">Calendar</button>
         </div>
+        <!-- Takes the Calendar toggle's place entirely while not entitled --
+             one unambiguous button straight to the place that sells it,
+             not a locked control sitting next to an explanation. -->
+        <a class="btn-premium" id="apptCalendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
       </header>
 
       <form class="appt-form" id="apptForm" novalidate>
@@ -345,7 +353,7 @@
           own. Works with Google, Outlook, iCloud and anything else that publishes
           an iCal address.</p>
         </div>
-        <span class="chip chip--plan" id="calendarPlanChip" hidden>Plan feature</span>
+        <a class="btn-premium" id="calendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
       </header>
 
       <!-- Shown when sync is unavailable for any reason -->

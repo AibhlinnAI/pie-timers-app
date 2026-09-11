@@ -1074,10 +1074,10 @@
 
   function setAppointmentsView(view) {
     var toCalendar = view === 'calendar';
-    if (toCalendar && !CT.billing.isEntitled()) {
-      toast('Calendar view is part of AibhlínnAI Premium. Upgrade under Settings → Account.');
-      return;
-    }
+    // The toggle button itself is hidden (replaced by the Premium Feature
+    // link) whenever this would be blocked, so reaching here not entitled
+    // would mean stale markup, not a real click -- nothing to say about it.
+    if (toCalendar && !CT.billing.isEntitled()) return;
     $('apptListView').hidden = toCalendar;
     $('apptCalendarView').hidden = !toCalendar;
     $('apptViewList').classList.toggle('is-active', !toCalendar);
@@ -1101,12 +1101,14 @@
     renderCalendarDay(isoDate(now));
   });
 
-  /* The lock badge and, if someone is mid-Calendar-view when their plan
-     lapses, falling back to List rather than leaving a paying-only view
-     open to someone who no longer pays for it. */
+  /* The Calendar toggle and the Premium Feature link that replaces it
+     trade places by entitlement, and if someone is mid-Calendar-view
+     when their plan lapses, falling back to List rather than leaving a
+     paying-only view open to someone who no longer pays for it. */
   function renderAppointmentsPlanGate() {
     var entitled = CT.billing.enabled() ? CT.billing.isEntitled() : true;
-    $('apptCalendarPlanChip').hidden = !CT.billing.enabled() || entitled;
+    $('apptViewCalendar').hidden = !entitled;
+    $('apptCalendarPremiumBtn').hidden = entitled;
     if (!entitled && !$('apptCalendarView').hidden) setAppointmentsView('list');
   }
 
@@ -1163,7 +1165,7 @@
     var unavailable = $('calendarUnavailable');
     var form = $('calendarForm');
     var connected = $('calendarConnected');
-    var planChip = $('calendarPlanChip');
+    var premiumBtn = $('calendarPremiumBtn');
     var help = $('calendarHelp');
 
     var reason = null;
@@ -1179,7 +1181,10 @@
                'stay free.';
     }
 
-    planChip.hidden = !CT.billing.enabled();
+    // Only a real paywall earns the button -- not configured or not
+    // signed in are setup states, not something Premium Feature fixes.
+    premiumBtn.hidden = !(CT.config.isConfigured && CT.auth.isSignedIn() &&
+      CT.billing.enabled() && !CT.billing.isEntitled());
     unavailable.hidden = !reason;
     if (reason) setUnavailable(unavailable, reason, setupNote);
 
@@ -2607,6 +2612,39 @@
 
     render: render
   };
+
+  /* ─────────────────────────── Fullscreen toggle ─────────────────────────── */
+  // Feature-detected rather than assumed: iOS Safari has no
+  // requestFullscreen at all, so the button stays hidden there instead
+  // of offering something that would silently do nothing.
+  (function () {
+    var toolbar = $('dashboardToolbar');
+    var btn = $('fullscreenToggle');
+    var icon = $('fullscreenIcon');
+    var label = $('fullscreenLabel');
+    var el = document.documentElement;
+
+    if (!el.requestFullscreen || !document.exitFullscreen) return;
+    toolbar.hidden = false;
+
+    function sync() {
+      var active = !!document.fullscreenElement;
+      btn.setAttribute('aria-pressed', String(active));
+      icon.textContent = active ? '⤢' : '⛶';
+      label.textContent = active ? 'Exit full screen' : 'Full screen';
+    }
+
+    btn.addEventListener('click', function () {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        el.requestFullscreen().catch(function () {});
+      }
+    });
+
+    document.addEventListener('fullscreenchange', sync);
+    sync();
+  }());
 
   /* ─────────────────────────── Boot ─────────────────────────── */
 

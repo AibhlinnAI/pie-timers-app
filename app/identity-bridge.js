@@ -186,9 +186,15 @@
       node.appendChild(mark());
       node.appendChild(document.createTextNode('Free Trial'));
     } else {
+      /* Every premium touch-point in the app points at the same page
+         now, rather than some going to #account and others to
+         pricing.html -- one place to buy, everywhere the offer is
+         made. On pricing.html itself this would be a self-link, so it
+         is skipped there; the whole page already is the offer. */
+      if (/(^|\/)pricing\.html$/.test(location.pathname)) return;
       node = document.createElement('a');
       node.className = 'plan-chip plan-chip--offer';
-      node.href = '#account';
+      node.href = 'pricing.html';
       node.appendChild(document.createTextNode('Get '));
       node.appendChild(mark());
       node.appendChild(document.createTextNode('Premium'));
