@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pricing — Pie Timers</title>
+<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed.">
+<meta name="theme-color" content="#1C1024">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="identity/identity-ui.css">
+
+<!-- ============================================================
+     Public pricing page. Two jobs, and it must do both:
+
+     1. Something a Paddle reviewer (or anyone else) can open with no
+        sign-in and see real prices on. Required for domain approval --
+        Paddle's "Account setup" flow added a mandatory Pricing page
+        field 12/9/26, separate from the Website approval terms/privacy/
+        refund check already passed.
+     2. A shorter path than the one that existed before: sign in and buy
+        used to mean opening the app, going to Settings, scrolling past
+        Appearance/Notifications/Calendar to reach Account, and only
+        then seeing a plan. This page puts sign-in and both plans on one
+        screen with nothing above them.
+
+     Deliberately loads only what those two jobs need -- identity (with
+     Pie Timers' Turnstile-protected sign-in, not identity's own
+     unprotected default), config and billing. Not sync.js, not
+     notify.js, not app.js: none of the dashboard exists here to wire
+     up, and app.js assumes DOM this page does not have.
+
+     Prices are never hardcoded to a number. They render from
+     CT.config.paddle at load and again on every billing.onChange, the
+     same source app.js's own upgrade panel reads -- so this page and
+     the in-app one cannot quote different figures. ============================================================ -->
+</head>
+<body class="legal-page">
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="15" fill="#32493C"/>
+      <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+    </svg>
+    <div class="brand-text">
+      <h1>Pie Timers</h1>
+      <p>Pricing</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-signin" id="topbarSignin"></div>
+  </div>
+</header>
+
+<main class="legal">
+  <p class="legal-meta">
+    <a href="index.html">Open Pie Timers</a> &middot;
+    <a href="terms.html">Terms of Service</a> &middot;
+    <a href="privacy.html">Privacy Policy</a> &middot;
+    <a href="terms.html#refunds">Refund Policy</a>
+  </p>
+
+  <h2>Free forever on one device</h2>
+  <p>Timers, your weekly schedule and the countdown calculator work fully
+  offline, with no account and nothing to sign in to. AibhlínnAI Premium is
+  for the parts that need a server: your schedule following you between
+  devices, a calendar you connect, and alerts that reach you when the app
+  itself is closed.</p>
+
+  <section class="upgrade" id="pricingPanel">
+    <h3>AibhlínnAI Premium</h3>
+
+    <p>AibhlínnAI Premium allows your:</p>
+    <ul class="upgrade-list">
+      <li>weekly schedule to be updated across all your devices</li>
+      <li>calendar to connect to Pie Timers for an automatic countdown until
+          your next appointment, and</li>
+      <li>Pie Timer alerts reach you even when the app is closed</li>
+    </ul>
+
+    <div class="plan-options">
+      <button class="plan-card is-best" id="buyAnnual" type="button">
+        <span class="plan-badge" id="annualSaving">Save A$15.80 a year</span>
+        <span class="plan-name">Annual</span>
+        <span class="plan-price"><b id="annualPrice">A$19</b><small id="annualPeriod">/year</small></span>
+        <span class="plan-note" id="annualNote">Works out at A$1.58 a month</span>
+      </button>
+      <button class="plan-card" id="buyMonthly" type="button">
+        <span class="plan-name">Monthly</span>
+        <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
+        <span class="plan-note">Try it first — cancel any time</span>
+      </button>
+    </div>
+
+    <p class="hint">Prices include any sales tax or GST. New accounts start
+    on a free trial — nothing is charged until you choose a plan above, and
+    subscribing during the trial does not start billing early: the first
+    charge still lands 30 days after you signed up, whichever plan you
+    pick.</p>
+
+    <p class="status-line" id="pricingStatus" role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <p class="site-foot-promise">No ads. No tracking. No selling your data. Ever.</p>
+  <div class="site-foot-links">
+    <a href="terms.html">Terms of Service</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="terms.html#refunds">Refund Policy</a>
+    <a href="mailto:support@aibhlinn.ai">Contact support</a>
+  </div>
+</footer>
+
+<!-- Same order as index.html, and it matters: identity-bridge.js reads
+     window.Aibhlinn.identity/.entitlements/.identityUI, which must exist
+     first, and it resolves CT.turnstile/CT.auth lazily (at click time,
+     not at parse time) so that billing.js and supabase.js can load
+     after it, exactly as they do in the app itself. sync.js, notify.js
+     and app.js are not loaded -- there is no dashboard here to wire. -->
+<script src="identity/identity.js"></script>
+<script src="identity/entitlements.js"></script>
+<script src="identity/identity-ui.js"></script>
+<script src="config.js"></script>
+<script src="identity-bridge.js"></script>
+<script src="supabase.js"></script>
+<script src="billing.js"></script>
+<script>
+(function () {
+  'use strict';
+  var CT = window.CT;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* Mirrors app.js's renderPlan() price fields exactly, on purpose --
+     two copies of the same small block beat importing app.js wholesale,
+     which assumes dashboard DOM this page does not have. */
+  function renderPricing() {
+    var pricing = CT.config.paddle;
+    var fields = {
+      annualPrice: pricing.annualPrice,
+      annualPeriod: pricing.annualPeriod,
+      annualNote: pricing.annualNote,
+      monthlyPrice: pricing.monthlyPrice,
+      monthlyPeriod: pricing.monthlyPeriod
+    };
+    Object.keys(fields).forEach(function (id) {
+      var el = $(id);
+      if (el && fields[id]) el.textContent = fields[id];
+    });
+
+    var saving = $('annualSaving');
+    if (saving) {
+      saving.textContent = pricing.annualSaving || '';
+      saving.hidden = !pricing.annualSaving;
+    }
+
+    var monthlyBtn = $('buyMonthly');
+    if (monthlyBtn) monthlyBtn.hidden = !pricing.monthlyPriceId;
+
+    var billingOn = CT.billing.enabled();
+    $('buyAnnual').disabled = !billingOn;
+    $('buyMonthly').disabled = !billingOn;
+
+    var ent = CT.billing.get();
+    var trialing = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    var status = $('pricingStatus');
+    status.classList.remove('is-error');
+
+    if (!billingOn) {
+      status.textContent = '';
+    } else if (ent.entitled && !trialing) {
+      status.textContent = "You're already on AibhlínnAI Premium — manage or cancel it from the app's Settings.";
+    } else if (CT.auth.isSignedIn()) {
+      status.textContent = '';
+    } else {
+      status.textContent = '';
+    }
+  }
+
+  /* Signed out, clicking a plan does not fail quietly -- it says what
+     to do and moves focus to the control that does it, so the whole
+     interaction stays on this one page. */
+  function promptSignIn() {
+    var status = $('pricingStatus');
+    status.textContent = 'Sign in above first — it only takes an email address, then choose a plan again.';
+    status.classList.add('is-error');
+    var host = $('topbarSignin');
+    var control = host && host.querySelector('button, a');
+    if (control) {
+      control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      control.focus();
+    }
+  }
+
+  function startCheckout(cadence) {
+    if (!CT.auth.isSignedIn()) { promptSignIn(); return; }
+    var status = $('pricingStatus');
+    status.classList.remove('is-error');
+    status.textContent = 'Opening checkout…';
+    CT.billing.openCheckout(cadence, '').then(function () {
+      status.textContent = '';
+    }).catch(function (err) {
+      status.classList.add('is-error');
+      status.textContent = err.message;
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    $('buyAnnual').addEventListener('click', function () { startCheckout('annual'); });
+    $('buyMonthly').addEventListener('click', function () { startCheckout('monthly'); });
+
+    CT.billing.onChange(renderPricing);
+    // Covers a session already restored from storage before this ran.
+    CT.auth.onChange(function () { CT.billing.refresh(); });
+    CT.billing.refresh();
+    renderPricing();
+  });
+})();
+</script>
+</body>
+</html>
