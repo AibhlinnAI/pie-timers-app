@@ -963,6 +963,13 @@
     return events;
   }
 
+  /* Sets which day is selected AND repaints the grid's highlight for it,
+     in that order, in one function. Splitting those two across call
+     sites is what caused the bug this replaced: the grid was told to
+     redraw before calView.selectedDate had changed, so the highlight
+     was always one click behind whichever day was actually showing
+     below it. Every caller wants both effects together, so there is
+     now only one function that can do half the job. */
   function renderCalendarDay(dateStr) {
     var detail = $('calDayDetail');
     var list = $('calDayList');
@@ -986,11 +993,12 @@
     emptyNote.hidden = dayEvents.length > 0;
     dayEvents.forEach(function (item) {
       list.appendChild(buildApptItemRow(item, today, function () {
-        renderCalendarGrid();
         renderCalendarDay(dateStr);
         render();
       }));
     });
+
+    renderCalendarGrid();
   }
 
   function renderCalendarGrid() {
@@ -1047,7 +1055,7 @@
           new Date(year, month, day).toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' }) +
           (count ? ', ' + count + (count === 1 ? ' item' : ' items') : ''));
 
-        cell.addEventListener('click', function () { renderCalendarGrid(); renderCalendarDay(dateStr); });
+        cell.addEventListener('click', function () { renderCalendarDay(dateStr); });
         grid.appendChild(cell);
       }(d));
     }
