@@ -705,6 +705,70 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   padding:2px 7px; border-radius:999px; vertical-align:2px;
 }
 
+/* ───────────────────────── View toggle (List / Calendar) ─────────────────────────
+   A plain segmented control. The purple "Plan feature" chip inside the
+   Calendar button is what carries the premium signal -- the toggle
+   itself stays in the app's ordinary neutral palette, the same as the
+   page-level tabs, so it reads as a display choice rather than a sale. */
+.view-toggle{
+  display:flex; gap:2px; padding:3px; flex:none;
+  background:var(--amber-tint); border:1px solid var(--line); border-radius:999px;
+}
+.view-toggle-btn{
+  appearance:none; border:0; cursor:pointer; background:none;
+  display:flex; align-items:center; gap:6px;
+  padding:6px 14px; border-radius:999px;
+  font-size:.82rem; font-weight:600; color:var(--ink-muted);
+  transition:background .14s ease, color .14s ease;
+}
+.view-toggle-btn:hover{ color:var(--ink); }
+.view-toggle-btn.is-active{ background:var(--card); color:var(--ink); box-shadow:var(--shadow); }
+.view-toggle-btn:focus-visible{ outline:2px solid var(--forest); outline-offset:1px; }
+.view-toggle-btn .chip{ font-size:.66rem; padding:2px 8px; }
+
+/* ───────────────────────── Calendar view (month grid) ───────────────────────── */
+.cal-nav{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin:18px 0 12px;
+}
+.cal-nav-mid{ display:flex; align-items:center; gap:10px; }
+.cal-nav-mid strong{ font-size:.98rem; min-width:11ch; text-align:center; }
+.cal-nav .btn{ padding:6px 12px; }
+
+.cal-weekdays{
+  display:grid; grid-template-columns:repeat(7,1fr);
+  font-size:.72rem; font-weight:700; color:var(--ink-muted);
+  text-align:center; padding-bottom:6px;
+}
+
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+
+.cal-cell{
+  appearance:none; border:1px solid transparent; border-radius:var(--radius-sm);
+  background:var(--amber-tint); cursor:pointer;
+  aspect-ratio:1; min-height:38px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  position:relative;
+}
+.cal-cell:hover{ border-color:var(--line); }
+.cal-cell:focus-visible{ outline:2px solid var(--forest); outline-offset:1px; }
+.cal-cell--pad{ background:none; cursor:default; visibility:hidden; }
+.cal-cell-num{ font-size:.84rem; font-variant-numeric:tabular-nums; color:var(--ink); }
+.cal-cell.is-today .cal-cell-num{ color:var(--orange-deep); font-weight:700; }
+.cal-cell.is-today{ background:var(--amber-tint); }
+.cal-cell.is-selected{ border-color:var(--purple); background:var(--purple-tint); }
+.cal-cell.is-selected .cal-cell-num{ color:var(--purple); font-weight:700; }
+.cal-cell-badge{
+  font-size:.64rem; font-weight:700; line-height:1;
+  color:var(--on-dark); background:var(--purple);
+  padding:2px 5px; border-radius:999px; min-width:1.4em; text-align:center;
+}
+
+.cal-day-detail{
+  margin-top:18px; padding-top:14px; border-top:1px solid var(--line);
+}
+.cal-day-detail h3{ margin:0 0 4px; font-size:.94rem; }
+
 /* ───────────────────────── Calendar sync ───────────────────────── */
 .calendar-form{
   display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:4px;

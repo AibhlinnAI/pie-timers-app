@@ -832,6 +832,55 @@
 
   /* ─────────────────────────── Appointments editor ─────────────────────────── */
 
+  /* One <li>, either view. Extracted so the calendar day-detail list is
+     not a second copy of this markup with its own chance to drift --
+     manual entries keep their Remove button, synced ones stay read-only,
+     and both re-render through whichever caller owns the current view. */
+  function buildApptItemRow(item, today, onRemoved) {
+    var when = new Date(item.at);
+    var li = document.createElement('li');
+    li.className = 'appt-item';
+
+    var text = document.createElement('div');
+    var title = document.createElement('strong');
+    title.textContent = item.title;
+    if (item.source === 'calendar') {
+      var tag = document.createElement('em');
+      tag.className = 'appt-tag';
+      tag.textContent = item.allDay ? 'all day' : 'calendar';
+      title.appendChild(tag);
+    }
+
+    var meta = document.createElement('span');
+    meta.textContent = (isoDate(when) === today
+      ? 'Today'
+      : when.toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" })
+    ) + (item.allDay ? '' : ' at ' + formatClock(when.getHours() * 60 + when.getMinutes()));
+
+    text.appendChild(title);
+    text.appendChild(meta);
+    li.appendChild(text);
+
+    // Synced events belong to the calendar, so they are read-only here.
+    if (item.source === 'manual') {
+      var remove = document.createElement('button');
+      remove.className = 'btn btn-quiet';
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', 'Remove ' + item.title);
+      remove.addEventListener('click', function () {
+        state.appointments = state.appointments.filter(function (a) {
+          return a.id !== item.id;
+        });
+        save();
+        if (onRemoved) onRemoved();
+      });
+      li.appendChild(remove);
+    }
+
+    return li;
+  }
+
   function buildAppointmentList() {
     var list = $('apptList');
     var now = new Date();
@@ -864,51 +913,195 @@
     $('apptEmptyNote').hidden = upcoming.length > 0;
 
     upcoming.forEach(function (item) {
-      var when = new Date(item.at);
-      var li = document.createElement('li');
-      li.className = 'appt-item';
-
-      var text = document.createElement('div');
-      var title = document.createElement('strong');
-      title.textContent = item.title;
-      if (item.source === 'calendar') {
-        var tag = document.createElement('em');
-        tag.className = 'appt-tag';
-        tag.textContent = item.allDay ? 'all day' : 'calendar';
-        title.appendChild(tag);
-      }
-
-      var meta = document.createElement('span');
-      meta.textContent = (isoDate(when) === today
-        ? 'Today'
-        : when.toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" })
-      ) + (item.allDay ? '' : ' at ' + formatClock(when.getHours() * 60 + when.getMinutes()));
-
-      text.appendChild(title);
-      text.appendChild(meta);
-      li.appendChild(text);
-
-      // Synced events belong to the calendar, so they are read-only here.
-      if (item.source === 'manual') {
-        var remove = document.createElement('button');
-        remove.className = 'btn btn-quiet';
-        remove.type = 'button';
-        remove.textContent = 'Remove';
-        remove.setAttribute('aria-label', 'Remove ' + item.title);
-        remove.addEventListener('click', function () {
-          state.appointments = state.appointments.filter(function (a) {
-            return a.id !== item.id;
-          });
-          save();
-          buildAppointmentList();
-          render();
-        });
-        li.appendChild(remove);
-      }
-
-      list.appendChild(li);
+      list.appendChild(buildApptItemRow(item, today, function () {
+        buildAppointmentList();
+        render();
+      }));
     });
   }
+
+  /* ─────────────────────────── Calendar view (Premium) ───────────────────────────
+     A month grid of the same two sources the list already reads --
+     manual appointments plus synced calendar events -- so switching
+     views never shows different data, only a different shape of it.
+
+     Gated on CT.billing.isEntitled(), the same flag calendar sync
+     itself is gated on. Rendering a month once the data already exists
+     costs nothing extra to give away, which is what makes it a clean
+     example of what a plan buys beyond the sync it is named for,
+     rather than a feature invented to have something to sell.
+
+     Synced events are only ever as complete as calendar-sync's own
+     window (a day back, three weeks ahead — see calendar-sync/
+     index.ts), so a month view can show real gaps for days outside it.
+     That is not a new limitation: the list view reads the same capped
+     data today, just without a way to notice the cap. */
+  var calView = { year: 0, month: 0, selectedDate: null };
+
+  function eventsForMonth(year, month) {
+    var monthStart = new Date(year, month, 1).getTime();
+    var monthEnd = new Date(year, month + 1, 1).getTime();
+    var events = [];
+
+    state.appointments.forEach(function (appointment) {
+      var at = appointmentDate(appointment).getTime();
+      if (at >= monthStart && at < monthEnd) {
+        events.push({ at: at, title: appointment.title, source: 'manual', id: appointment.id });
+      }
+    });
+
+    state.calendarEvents.forEach(function (event) {
+      if (event.at >= monthStart && event.at < monthEnd) {
+        events.push({
+          at: event.at, title: event.title, source: 'calendar',
+          id: event.uid, allDay: event.allDay
+        });
+      }
+    });
+
+    events.sort(function (a, b) { return a.at - b.at; });
+    return events;
+  }
+
+  function renderCalendarDay(dateStr) {
+    var detail = $('calDayDetail');
+    var list = $('calDayList');
+    var heading = $('calDayHeading');
+    var emptyNote = $('calDayEmptyNote');
+    var today = isoDate(new Date());
+
+    calView.selectedDate = dateStr;
+    detail.hidden = false;
+
+    var parts = dateStr.split('-');
+    var dayDate = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    heading.textContent = dateStr === today
+      ? 'Today'
+      : dayDate.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
+
+    var dayEvents = eventsForMonth(dayDate.getFullYear(), dayDate.getMonth())
+      .filter(function (event) { return isoDate(new Date(event.at)) === dateStr; });
+
+    list.innerHTML = '';
+    emptyNote.hidden = dayEvents.length > 0;
+    dayEvents.forEach(function (item) {
+      list.appendChild(buildApptItemRow(item, today, function () {
+        renderCalendarGrid();
+        renderCalendarDay(dateStr);
+        render();
+      }));
+    });
+  }
+
+  function renderCalendarGrid() {
+    var grid = $('calGrid');
+    var year = calView.year, month = calView.month;
+    var today = isoDate(new Date());
+
+    $('calMonthLabel').textContent = new Date(year, month, 1)
+      .toLocaleDateString(LOCALE, { month: 'long', year: 'numeric' });
+
+    var events = eventsForMonth(year, month);
+    var countByDay = {};
+    events.forEach(function (event) {
+      var key = isoDate(new Date(event.at));
+      countByDay[key] = (countByDay[key] || 0) + 1;
+    });
+
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    // getDay() is Sunday-first; the grid is Monday-first to match the
+    // working week on the Schedule tab.
+    var leading = (new Date(year, month, 1).getDay() + 6) % 7;
+
+    grid.innerHTML = '';
+
+    for (var i = 0; i < leading; i++) {
+      var filler = document.createElement('span');
+      filler.className = 'cal-cell cal-cell--pad';
+      grid.appendChild(filler);
+    }
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      (function (day) {
+        var dateStr = year + '-' + pad(month + 1) + '-' + pad(day);
+        var cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'cal-cell';
+        if (dateStr === today) cell.classList.add('is-today');
+        if (dateStr === calView.selectedDate) cell.classList.add('is-selected');
+
+        var num = document.createElement('span');
+        num.className = 'cal-cell-num';
+        num.textContent = String(day);
+        cell.appendChild(num);
+
+        var count = countByDay[dateStr];
+        if (count) {
+          var badge = document.createElement('span');
+          badge.className = 'cal-cell-badge';
+          badge.textContent = count > 9 ? '9+' : String(count);
+          cell.appendChild(badge);
+        }
+
+        cell.setAttribute('aria-label',
+          new Date(year, month, day).toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' }) +
+          (count ? ', ' + count + (count === 1 ? ' item' : ' items') : ''));
+
+        cell.addEventListener('click', function () { renderCalendarGrid(); renderCalendarDay(dateStr); });
+        grid.appendChild(cell);
+      }(d));
+    }
+  }
+
+  function goToMonth(year, month) {
+    // Roll a month index outside 0-11 into the adjacent year, rather
+    // than making the caller do modular arithmetic at every call site.
+    var normalised = new Date(year, month, 1);
+    calView.year = normalised.getFullYear();
+    calView.month = normalised.getMonth();
+    calView.selectedDate = null;
+    $('calDayDetail').hidden = true;
+    renderCalendarGrid();
+  }
+
+  function setAppointmentsView(view) {
+    var toCalendar = view === 'calendar';
+    if (toCalendar && !CT.billing.isEntitled()) {
+      toast('Calendar view is part of AibhlínnAI Premium. Upgrade under Settings → Account.');
+      return;
+    }
+    $('apptListView').hidden = toCalendar;
+    $('apptCalendarView').hidden = !toCalendar;
+    $('apptViewList').classList.toggle('is-active', !toCalendar);
+    $('apptViewList').setAttribute('aria-selected', String(!toCalendar));
+    $('apptViewCalendar').classList.toggle('is-active', toCalendar);
+    $('apptViewCalendar').setAttribute('aria-selected', String(toCalendar));
+    if (toCalendar) {
+      var now = new Date();
+      goToMonth(now.getFullYear(), now.getMonth());
+      renderCalendarDay(isoDate(now));
+    }
+  }
+
+  $('apptViewList').addEventListener('click', function () { setAppointmentsView('list'); });
+  $('apptViewCalendar').addEventListener('click', function () { setAppointmentsView('calendar'); });
+  $('calPrevMonth').addEventListener('click', function () { goToMonth(calView.year, calView.month - 1); });
+  $('calNextMonth').addEventListener('click', function () { goToMonth(calView.year, calView.month + 1); });
+  $('calToday').addEventListener('click', function () {
+    var now = new Date();
+    goToMonth(now.getFullYear(), now.getMonth());
+    renderCalendarDay(isoDate(now));
+  });
+
+  /* The lock badge and, if someone is mid-Calendar-view when their plan
+     lapses, falling back to List rather than leaving a paying-only view
+     open to someone who no longer pays for it. */
+  function renderAppointmentsPlanGate() {
+    var entitled = CT.billing.enabled() ? CT.billing.isEntitled() : true;
+    $('apptCalendarPlanChip').hidden = !CT.billing.enabled() || entitled;
+    if (!entitled && !$('apptCalendarView').hidden) setAppointmentsView('list');
+  }
+
 
   $('apptForm').addEventListener('submit', function (event) {
     event.preventDefault();
@@ -2270,6 +2463,7 @@
       renderPlan();
       updateNotificationNotices();
       renderCalendarPanel();
+      renderAppointmentsPlanGate();
       // Entitlement just arrived — pull whatever calendar data exists.
       if (CT.billing.isEntitled() && CT.auth.isSignedIn()) loadCalendar();
     });
@@ -2412,6 +2606,7 @@
   buildScheduleEditor();
   primeAppointmentForm();
   buildAppointmentList();
+  renderAppointmentsPlanGate();
   renderAccount();
   renderCalendarPanel();
   renderWelcome();
