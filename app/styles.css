@@ -494,6 +494,18 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .view:focus{ outline:none; }
 .view:focus-visible{ outline:2px solid var(--orange); outline-offset:4px; border-radius:var(--radius); }
 
+/* ───────────────────────── Dashboard toolbar ───────────────────────── */
+.dashboard-toolbar{ display:flex; justify-content:flex-end; margin-bottom:10px; }
+.icon-btn{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; min-height:36px;
+  border-radius:999px; border:1px solid var(--line); background:var(--card);
+  color:var(--ink); font-size:.85rem; font-weight:600; cursor:pointer;
+}
+.icon-btn:hover{ border-color:var(--orange); color:var(--orange); background:var(--amber-tint); }
+.icon-btn:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
+.icon-btn span:first-child{ font-size:1.05rem; line-height:1; }
+
 /* ───────────────────────── Day strip ───────────────────────── */
 .daystrip{
   display:grid; grid-template-columns:repeat(auto-fit,minmax(min(160px, 100%),1fr)); gap:1px;
@@ -778,7 +790,23 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .calendar-form .field input{ width:100%; min-width:0; }
 .calendar-form .btn{ flex:none; }
 
-.chip--plan{ background:var(--purple-tint); color:var(--purple); }
+/* Same purple-fill, neon-green-edge treatment as the Sign In button
+   (.topbar-signin .aib-signin-btn) -- one consistent "this is the paid
+   part of the app" colour, whether the button is signing in or buying.
+   Fixed colours rather than theme variables, for the same reason as
+   that button: it needs to read the same in both themes. */
+.btn-premium{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:6px 14px; min-height:36px;
+  border-radius:999px;
+  background:#4B2A5A;
+  border:2px solid #6FD08C;
+  color:#6FD08C;
+  font-weight:700; font-size:.9rem; text-decoration:none;
+  white-space:nowrap;
+}
+.btn-premium:hover{ background:#5C3570; }
+.btn-premium:focus-visible{ outline:2px solid #6FD08C; outline-offset:2px; }
 
 #googleConnect .hint{ margin-top:10px; }
 #googleConnect .or{ margin:20px 0 4px; }
