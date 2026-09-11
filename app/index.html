@@ -270,6 +270,21 @@
           <p class="sub">Anything with a fixed time — a meeting, a call, a pickup.
           The next one counts down on the Dashboard.</p>
         </div>
+        <!-- List is the default and always free. Calendar is a month grid
+             of the same events -- manual appointments and synced calendar
+             events together -- and is an AibhlinnAI Premium feature: unlike
+             calendar sync itself, it costs nothing extra to render once the
+             data already exists, so it is a clean example of what a plan
+             buys beyond the sync it is named for. -->
+        <div class="view-toggle" id="apptViewToggle" role="tablist" aria-label="Appointments view">
+          <button class="view-toggle-btn is-active" id="apptViewList" type="button"
+                  role="tab" aria-selected="true">List</button>
+          <button class="view-toggle-btn" id="apptViewCalendar" type="button"
+                  role="tab" aria-selected="false">
+            Calendar
+            <span class="chip chip--plan" id="apptCalendarPlanChip" hidden>Plan feature</span>
+          </button>
+        </div>
       </header>
 
       <form class="appt-form" id="apptForm" novalidate>
@@ -290,8 +305,36 @@
 
       <p class="status-line" id="apptError" role="alert"></p>
 
-      <ul class="appt-list" id="apptList"></ul>
-      <p class="saved" id="apptEmptyNote">No appointments yet.</p>
+      <div id="apptListView">
+        <ul class="appt-list" id="apptList"></ul>
+        <p class="saved" id="apptEmptyNote">No appointments yet.</p>
+      </div>
+
+      <!-- Month grid. Entitled accounts only -- app.js refuses to switch
+           into this view otherwise, so its emptiness is never the thing
+           a non-paying person sees. Selecting a day shows that day's
+           items in the same appt-item markup the list view uses, so
+           Remove/read-only behaviour does not need a second copy. -->
+      <div id="apptCalendarView" hidden>
+        <div class="cal-nav">
+          <button class="btn btn-quiet" id="calPrevMonth" type="button" aria-label="Previous month">&larr;</button>
+          <div class="cal-nav-mid">
+            <strong id="calMonthLabel">&nbsp;</strong>
+            <button class="btn btn-quiet" id="calToday" type="button">Today</button>
+          </div>
+          <button class="btn btn-quiet" id="calNextMonth" type="button" aria-label="Next month">&rarr;</button>
+        </div>
+        <div class="cal-weekdays">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
+          <span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-day-detail" id="calDayDetail" hidden>
+          <h3 id="calDayHeading">&nbsp;</h3>
+          <ul class="appt-list" id="calDayList"></ul>
+          <p class="saved" id="calDayEmptyNote" hidden>Nothing that day.</p>
+        </div>
+      </div>
     </section>
 
     <section class="panel">
