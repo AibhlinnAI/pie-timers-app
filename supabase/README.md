@@ -12,7 +12,7 @@ contents in this order:
 | - | ---- | --------------- | --------- |
 | 1 | `schema.sql` | profiles, push subscriptions, notification log | Always |
 | 2 | `schema-billing.sql` | subscriptions, entitlement, billing events | Always |
-| 3 | `schema-access-codes.sql` | **two-month free trial**, friends-and-family codes | Always |
+| 3 | `schema-access-codes.sql` | **14-day free trial**, friends-and-family codes | Always |
 | 4 | `schema-ratelimit.sql` | sign-in throttle store | Always |
 | 5 | `schema-calendar.sql` | calendar feeds and events, **appointments column** | Always |
 | 6 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
@@ -64,7 +64,7 @@ select u.email, s.status, s.plan, s.current_period_end
  order by s.created_at desc limit 5;
 ```
 
-Expect `trialing` / `trial` and a date about 60 days out.
+Expect `trialing` / `trial` and a date 14 days out.
 
 ## Scheduled jobs
 

@@ -300,12 +300,15 @@ but "Sync now" still downloads the schedule, and Settings → Export still works
 
 ### Free trial
 
-**Everyone gets two months free on sign-up.** No card, no code, nothing to enter.
+**Everyone gets 14 days free on sign-up.** No card, no code, nothing to enter.
 It is granted by a database trigger on account creation, so it cannot be requested
 twice or forged from the client.
 
-Two months rather than one is deliberate: these timers only prove themselves after
-a few real working weeks.
+Fourteen days covers two real working weeks, which is what it takes for the
+timers to prove themselves. Subscribe inside that window and the first payment
+is not taken until day 30 from sign-up (`FREE_DAYS_FROM_SIGNUP` in
+`paddle-webhook`), so subscribing early never costs someone free time they
+would otherwise have had.
 
 The app stays quiet during the trial and only starts mentioning payment in the last
 14 days. When it ends, automatic sync stops but nothing is deleted, no card is
@@ -363,14 +366,14 @@ Full instructions and verification queries are in `supabase/README.md`.
 ```
 supabase/schema.sql             core tables + row-level security
 supabase/schema-billing.sql     subscriptions + entitlement
-supabase/schema-access-codes.sql two-month trial + friends-and-family codes
+supabase/schema-access-codes.sql 14-day trial + friends-and-family codes
 supabase/schema-ratelimit.sql   sign-in throttle store
 supabase/schema-calendar.sql    calendar feeds + expanded events
 supabase/schema-google-calendar.sql  Google one-click columns
 ```
 
 Two of these matter even if you skip the optional features:
-`schema-access-codes.sql` carries the **two-month free trial trigger**, and
+`schema-access-codes.sql` carries the **14-day free trial trigger**, and
 `schema-calendar.sql` adds the **`appointments` column** without which manual
 appointments do not sync between devices.
 

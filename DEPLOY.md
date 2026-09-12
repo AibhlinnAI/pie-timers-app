@@ -378,7 +378,7 @@ given a synthetic event. The only way to exercise the live path is a real
 purchase, refunded afterwards.
 
 **Which price you get decides what this test proves.** `billing.js` hands
-anyone still inside their 60-day account trial the *trial* price, so that
+anyone still inside their 14-day account trial the *trial* price, so that
 purchase authorises the card and takes **nothing** today — there is no charge
 to refund, and the status stays `trialing`. Only a lapsed account takes the
 plain price and pays on the spot. Run both, in this order, on a throwaway
@@ -417,8 +417,8 @@ Diagnostics cannot check any of 8.2 or 8.4 for you — it is server to server, s
 it is the one you must watch happen.
 
 Note that a fresh account is already entitled: `grant_trial` (in
-`schema-access-codes.sql`) gives every new user a 60-day trial, and the upgrade
-panel only reappears in the final 14 days. To reach checkout before then, call
+`schema-access-codes.sql`) gives every new user a 14-day trial (`public.trial_length()`), and the upgrade
+panel only reappears in the final 4 days. To reach checkout before then, call
 `CT.billing.openCheckout('monthly')` from the console rather than editing data.
 
 Reading a failure:
