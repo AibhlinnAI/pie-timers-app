@@ -117,7 +117,12 @@ Deno.serve(async (request) => {
     const ids = await paddleIdsFor(user.id);
     if (!ids) {
       return json(
-        { error: "No billing account found. This is expected for when an AibhlínnAI account has free access." },
+        // Reachable only as a fallback now that the button is hidden
+        // unless there is a paid plan (app.js, renderAccount). Worded as
+        // reassurance rather than a fault, because it is not one: free
+        // access is the normal state for a trialling or complimentary
+        // account, and nothing has gone wrong.
+        { error: "This account has free access, so there is no billing to manage and nothing has been charged." },
         404,
       );
     }
