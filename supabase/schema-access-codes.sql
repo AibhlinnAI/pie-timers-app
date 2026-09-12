@@ -40,11 +40,14 @@ returns interval
 language sql
 stable
 as $$
-  -- Set this to the end of the launch month when you go live, e.g.
-  --   timestamptz '2026-10-15 00:00:00+11'
-  -- and leave it null again afterwards. Nothing else needs changing.
+  -- Launch month: Pie Timers goes public on 19 Sep 2026, at the ADHD
+  -- conference in Adelaide. Everyone signing up in the 30 days from then
+  -- gets 30 days rather than the standard 14. Adelaide time (+10:30,
+  -- ACDT -- daylight saving starts 4 Oct, so the cutoff is inside it).
+  -- Set this back to null after the window closes; nothing else changes.
   select case
-    when (null::timestamptz) is not null and now() < (null::timestamptz)
+    when (timestamptz '2026-10-19 00:00:00+10:30') is not null
+         and now() < (timestamptz '2026-10-19 00:00:00+10:30')
       then interval '30 days'
     else interval '14 days'
   end;
