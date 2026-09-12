@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v79';
+var CACHE = 'countdown-timers-v80';
 
 var SHELL = [
   './',
@@ -17,6 +17,12 @@ var SHELL = [
   'terms.html',
   'privacy.html',
   'styles.css',
+  /* The self-hosted face. Precached because styles.css asks for it and
+     nothing else will fetch it offline — without these two the app still
+     works with the network off, but silently in the fallback font, which
+     is a difference people notice and cannot explain. */
+  'fonts/instrument-sans-latin.woff2',
+  'fonts/instrument-sans-latin-ext.woff2',
   'config.js',
   'identity-bridge.js',
   'identity/identity.js',
