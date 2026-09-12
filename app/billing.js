@@ -291,6 +291,20 @@
       // With no billing configured, nothing is gated.
       return cfg.billingEnabled ? entitlement.entitled : true;
     },
+    /* Whether there is a Paddle subscription behind this account, which
+       is a narrower question than isEntitled(). A trial, a complimentary
+       grant and a friends-and-family code all entitle someone without
+       creating anything Paddle can show them a portal for -- and since
+       every new account starts on a trial, entitled-but-unbilled is the
+       normal state for a customer's first fortnight, not an edge case.
+       Only 'monthly' and 'annual' are written by paddle-webhook; 'trial'
+       and 'complimentary' are granted in SQL. Deliberately not gated on
+       status: a canceled subscriber still has invoices to read and a
+       card to update, so they keep the portal. */
+    hasPaidPlan: function () {
+      return (entitlement.plan === 'monthly' || entitlement.plan === 'annual') &&
+             !entitlement.complimentary;
+    },
     refresh: refresh,
     openCheckout: openCheckout,
     openManagePortal: openManagePortal,

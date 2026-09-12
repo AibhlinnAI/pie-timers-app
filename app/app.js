@@ -2190,8 +2190,14 @@
     var monthlyBtn = $('buyMonthly');
     if (monthlyBtn) monthlyBtn.hidden = !CT.config.paddle.monthlyPriceId;
 
+    /* Shown only when there is actually a Paddle subscription to manage.
+       Gating this on isEntitled() offered the button to every trialling
+       account -- which is every account, for its first fortnight -- and
+       clicking it returned a 404 rendered as an error, so the first
+       thing a new customer did on this page was read what looked like a
+       broken account. */
     var manage = $('managePlan');
-    if (manage) manage.hidden = !CT.billing.enabled() || !CT.billing.isEntitled();
+    if (manage) manage.hidden = !CT.billing.enabled() || !CT.billing.hasPaidPlan();
 
   }
 
