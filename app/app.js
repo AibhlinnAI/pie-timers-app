@@ -2260,9 +2260,13 @@
     }
   }());
 
-  /* Captured once, so the button can be put back exactly as the markup
-     had it rather than a hard-coded copy that drifts from index.html. */
-  var MAGIC_SUBMIT_LABEL = null;
+  /* Captured once up front, so the button can be put back exactly as
+     the markup had it rather than a hard-coded copy that drifts from
+     index.html. Read at boot, not lazily on first submit: the email
+     input's own listener below resets the button to this value on
+     every keystroke, and a null read there (before any submit had
+     happened) blanked the button the moment someone started typing. */
+  var MAGIC_SUBMIT_LABEL = $('magicSubmit').textContent;
   var magicResendTimer = null;
 
   function authMessage(text, isError, line2) {
@@ -2281,7 +2285,6 @@
       var email = $('magicEmail').value.trim();
       if (!email) return;
       var button = $('magicSubmit');
-      if (MAGIC_SUBMIT_LABEL === null) MAGIC_SUBMIT_LABEL = button.textContent;
       var token = CT.turnstile.token();
 
       if (CT.config.turnstileEnabled && !token) {
