@@ -103,7 +103,6 @@
     form.appendChild(challengeHost);
 
     var status = el('p', { class: 'aib-signin-status', role: 'status', 'aria-live': 'polite' });
-    form.appendChild(status);
 
     /* The same email carries a short code as well as the link. The link
        only signs in the browser that opens it; the code can be carried
@@ -125,6 +124,12 @@
     });
     codeRow.appendChild(codeSubmit);
     form.appendChild(codeRow);
+
+    /* Below the code field, not the send button -- it reports on the
+       code (arrived? wrong? expired?) at least as often as on the send
+       itself, so it reads better sitting next to what it is reporting
+       on. */
+    form.appendChild(status);
 
     panel.appendChild(form);
 

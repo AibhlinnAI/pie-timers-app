@@ -651,6 +651,11 @@
         <button class="btn btn-primary" type="submit" id="codeSubmit">Sign in with code</button>
       </form>
 
+      <!-- Reports on the code at least as often as on the send -- arrived,
+           wrong, expired -- so it sits with what it is reporting on
+           rather than after the Google alternative below. -->
+      <p class="status-line" id="authMessage" role="status" aria-live="polite"></p>
+
       <div class="or"><span>or</span></div>
 
       <button class="btn btn-google" id="googleSignIn" type="button">
@@ -662,8 +667,6 @@
         </svg>
         Continue with Google
       </button>
-
-      <p class="status-line" id="authMessage" role="status" aria-live="polite"></p>
     </section>
 
     <!-- Signed in -->
