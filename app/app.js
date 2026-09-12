@@ -2286,19 +2286,26 @@
   }
 
   if (CT.config.isConfigured) {
-    $('magicForm').addEventListener('submit', function (event) {
-      event.preventDefault();
-      var email = $('magicEmail').value.trim();
-      if (!email) return;
-      var button = $('magicSubmit');
-      var token = CT.turnstile.token();
+    /* Polls rather than a callback -- CT.turnstile owns the widget's own
+       callback already, and token() is the one place that knows whether
+       one has arrived. Same pattern as identity-bridge.js's own
+       waitForToken, for the same reason: the widget rarely finishes
+       inside the time it takes to type an email address and press the
+       button, and bailing outright the first time round used to strand
+       the form on "Just a moment" for good -- the check would quietly
+       pass a moment later with nothing left on screen to press. */
+    function waitForTurnstileToken(timeoutMs) {
+      var deadline = Date.now() + timeoutMs;
+      return new Promise(function (resolve) {
+        (function poll() {
+          var t = CT.turnstile.token();
+          if (t || Date.now() > deadline) return resolve(t || '');
+          setTimeout(poll, 200);
+        }());
+      });
+    }
 
-      if (CT.config.turnstileEnabled && !token) {
-        CT.turnstile.mount($('turnstileHost'));
-        authMessage('Just a moment — completing the security check.', true);
-        return;
-      }
-
+    function sendCode(email, button, token) {
       button.disabled = true;
       button.textContent = 'Sending…';
       authMessage('');
@@ -2324,6 +2331,28 @@
       }).then(function () {
         CT.turnstile.reset();   // tokens are single-use
       });
+    }
+
+    $('magicForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var email = $('magicEmail').value.trim();
+      if (!email) return;
+      var button = $('magicSubmit');
+      var token = CT.turnstile.token();
+
+      if (CT.config.turnstileEnabled && !token) {
+        CT.turnstile.mount($('turnstileHost'));
+        authMessage('Just a moment — completing the security check.', true);
+        button.disabled = true;
+        waitForTurnstileToken(8000).then(function (waited) {
+          if (waited) { sendCode(email, button, waited); return; }
+          button.disabled = false;
+          authMessage('Could not complete the security check. Please try again.', true);
+        });
+        return;
+      }
+
+      sendCode(email, button, token);
     });
 
     /* Verifying the code signs this device in with no redirect:
