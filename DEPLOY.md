@@ -335,7 +335,12 @@ so the secret cannot be put in Supabase first.
       **Production** environment.
 - [ ] Type **Webhook**, URL = your `paddle-webhook` function URL:
       `https://<project-ref>.supabase.co/functions/v1/paddle-webhook`
-- [ ] Notification version **v2**.
+- [ ] Leave **API version** at **1**. This is the notification payload
+      version, and 1 is the current one for Paddle Billing — there is no 2 to
+      choose. (An earlier version of this file said "notification version v2",
+      conflating Paddle *Billing* — sometimes called the v2 platform, as
+      opposed to Paddle Classic — with this per-destination field. Changing it
+      would not help and could break the payload `paddle-webhook` parses.)
 - [ ] Tick exactly `subscription.created`, `subscription.updated`,
       `subscription.canceled`. Nothing else — the handler ignores every other
       event type, so extra ticks only add noise to the delivery log.
@@ -372,11 +377,40 @@ Simulations) run in Sandbox only, so a Production destination can never be
 given a synthetic event. The only way to exercise the live path is a real
 purchase, refunded afterwards.
 
+**Which price you get decides what this test proves.** `billing.js` hands
+anyone still inside their 60-day account trial the *trial* price, so that
+purchase authorises the card and takes **nothing** today — there is no charge
+to refund, and the status stays `trialing`. Only a lapsed account takes the
+plain price and pays on the spot. Run both, in this order, on a throwaway
+account rather than your own.
+
+Test A — still in trial, takes no money, exercises the most code:
+
 - [ ] Buy the monthly plan through your own live checkout.
-- [ ] Confirm a row in `public.subscriptions` flips to `active`/`monthly`.
+- [ ] Confirm the `public.subscriptions` row's **`plan` changes from `trial` to
+      `monthly`**. The status stays `trialing` — it does *not* become `active`
+      on this path, and looking for `active` here reads a working webhook as a
+      broken one.
 - [ ] Confirm a row in `public.billing_events`.
 - [ ] Confirm **three** rows in `identity.product_entitlements`: `can_sync`,
-      `can_use_calendar`, `can_use_screensaver`.
+      `can_use_calendar`, `can_use_screensaver`. Note that `grant_trial` may
+      already have written here, so check `source` and the timestamps rather
+      than just counting rows.
+- [ ] Confirm `next_billed_at` in Paddle sits at exactly day 30 from account
+      creation. This is the only check that exercises `deferFirstCharge`, and
+      therefore the only proof `PADDLE_API_KEY` is set — without it the
+      function logs a warning and silently leaves Paddle's own date.
+
+Test B — the money path. Expire the same account's trial first:
+
+```sql
+update public.subscriptions
+   set current_period_end = now() - interval '1 day'
+ where user_id = '<test account uuid>';
+```
+
+- [ ] Buy the monthly plan again. This time it is a real charge.
+- [ ] Confirm the row flips to `active`/`monthly`.
 - [ ] Refund and cancel in Paddle.
 
 Diagnostics cannot check any of 8.2 or 8.4 for you — it is server to server, so
