@@ -5,7 +5,7 @@
    Conflict rule: last write wins, compared on updatedAt. This is
    the right trade-off here because the data is a single small
    document edited by one person on a handful of devices, and a
-   merge UI would cost more than it is worth. Ties break in
+   merge UI would cost more than the merge is worth. Ties break in
    favour of the remote copy so devices converge rather than
    ping-pong.
    ============================================================ */
@@ -84,7 +84,7 @@
         return true;
       }
 
-      // Local is genuinely newer — send it up.
+      // Local is genuinely newer — send the row up.
       return push(true).then(function () { return true; });
     }).catch(function (err) {
       setStatus('error', err.message);
@@ -151,7 +151,7 @@
     }
 
     // Handle the return leg of a magic link or Google sign-in. The result
-    // is stashed because app.js needs the provider token from it, and the
+    // is stashed because app.js needs the provider token from there, and the
     // URL fragment can only be read once.
     var redirect = CT.auth.consumeRedirect();
     CT.pendingRedirect = redirect;
@@ -161,7 +161,7 @@
       if (session) {
         startPolling();
         CT.auth.loadUser()
-          // Entitlement must be known before syncing decides what it may do.
+          // Entitlement must be known before syncing decides what is permitted.
           .then(function () { return CT.billing.refresh(); })
           .then(function () { return pull(); })
           .then(function () { CT.notify.refreshSubscription(); })

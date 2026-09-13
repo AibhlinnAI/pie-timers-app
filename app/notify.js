@@ -13,7 +13,7 @@
 
    Path 1 always runs. Path 2 layers on top when configured, and
    the service worker de-duplicates by tag so a milestone shows
-   once even if both paths deliver it.
+   once even if both paths deliver.
    ============================================================ */
 (function () {
   'use strict';
@@ -42,7 +42,7 @@
          noticed for ten minutes after a deploy, and users sit on a stale
          build with no way to know. skipWaiting/clients.claim in sw.js
          cannot help: they only run once the browser has fetched a worker
-         it considers new. 'none' makes the update check always hit the
+         the browser considers new. 'none' makes the update check always hit the
          network. */
       updateViaCache: 'none'
     })
@@ -133,7 +133,7 @@
   }
 
   /* Subscribe this device and hand the endpoint to Supabase.
-     Safe to call repeatedly — it reuses an existing subscription. */
+     Safe to call repeatedly — an existing subscription is reused. */
   function refreshSubscription() {
     if (!pushSupported || !CT.config.pushConfigured) return Promise.resolve(null);
     if (!CT.auth || !CT.auth.isSignedIn()) return Promise.resolve(null);

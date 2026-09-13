@@ -51,9 +51,9 @@
        own sign-in form); the identity panel passes its own element, so
        both sign-in routes get the same check.
 
-       There is one widget, and it follows whichever form is actually in
+       There is one widget, following whichever form is actually in
        front of the person. That matters: app.js mounts into the Account
-       tab on load, so without moving it the header panel would show no
+       tab on load, so without the move the header panel would show no
        check at all and its token would stay empty forever -- a sign-in
        that can never succeed. Cloudflare allows only one render per
        element, so switching host means removing the old widget first. */
@@ -62,10 +62,10 @@
 
       var host = hostEl || document.getElementById('turnstileHost');
       if (!host) return Promise.resolve(false);
-      /* Same host AND the widget is still in it. The id outliving its
+      /* Same host AND the widget is still inside. The id outliving its
        DOM is not hypothetical: the identity panel rebuilds its contents
        on auth changes, which throws the rendered widget away while this
-       module still believes it is mounted -- and every later call then
+       module still believes the widget is mounted -- and every later call then
        short-circuits to a widget that is not there, leaving a sign-in
        that can never produce a token. */
       if (widgetId !== null && host === currentHost && host.childElementCount > 0) {
@@ -160,7 +160,7 @@
      this page's normal web context. Do not add a "cheaper on the web"
      message, a link to this pricing section, or a coupon reference
      anywhere reachable from the Play-wrapped build. If a Play-specific
-     build variant is ever introduced, gate this whole panel out of it
+     build variant is ever introduced, gate this whole panel out of that variant
      rather than editing its copy. */
 
   /* ─────────────────────────── Paddle ─────────────────────────── */
@@ -181,7 +181,7 @@
           token: cfg.paddle.clientToken,
           eventCallback: function (event) {
             // Paddle confirms client-side, but the webhook is the source of
-            // truth. Re-read entitlement shortly after, once it has landed.
+            // truth. Re-read entitlement shortly after, once the write has landed.
             if (event && event.name === 'checkout.completed') {
               setTimeout(refresh, 2500);
               setTimeout(refresh, 8000);
@@ -256,7 +256,7 @@
      cancellation UI of our own -- Paddle is the merchant of record
      (terms.html §5), so the portal already reflects their actual
      buyer terms and refund policy instead of us reimplementing a
-     second copy of it. */
+     second copy. */
   function openManagePortal() {
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 

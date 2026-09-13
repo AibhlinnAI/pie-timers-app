@@ -3,7 +3,7 @@
 
    One account authenticates a person across every AibhlínnAI app.
    This file knows nothing about Pie Timers, Pomodoro, or whatever
-   comes after — it only knows about signing in, holding a session,
+   comes after — this layer only knows about signing in, holding a session,
    and signing out. A second app copies this file unmodified.
 
    Written against the Supabase HTTP API directly, matching every
@@ -26,12 +26,12 @@
      Aibhlinn.identity.signOut();
 
    What this module deliberately does NOT do:
-     - it does not know what a "product" is (see entitlements.js)
-     - it does not request Google Calendar scope or any other
+     - does not know what a "product" is (see entitlements.js)
+     - does not request Google Calendar scope or any other
        product-specific OAuth scope — that is Pie Timers' concern,
        requested by Pie Timers' own code, using this module only to
        reach an already-signed-in session's token
-     - it does not decide what a session unlocks — see entitlements.js
+     - does not decide what a session unlocks — see entitlements.js
 
    A note on cross-app sign-in: sessions are stored in this browser's
    localStorage, which is scoped per origin. Two apps on different
@@ -71,13 +71,13 @@
      care about WHO is signed in, not about the session object being
      rewritten -- and at least one of them (Pie Timers' sync.js) calls
      loadUser() from inside its own handler, which writes the user back
-     onto the session and stores it again. Emitting on every store
+     onto the session and stores the session again. Emitting on every store
      therefore re-enters that listener and loops: user fetch,
      entitlement, calendar, profile, push, repeat, tens of times a
      second.
 
      This guard lived in supabase.js until CT.auth became a facade and
-     stopped keeping a session of its own. It has to live wherever the
+     stopped keeping a session of its own, and has to live wherever the
      session actually does, which is here. */
   function sessionKey() {
     if (!session || !session.access_token) return '';
@@ -183,9 +183,9 @@
 
   /* Supabase returns tokens in the URL fragment after an OAuth round
      trip (Google). The emailed-code path never comes back this way --
-     it verifies in place and gets its tokens in a response body. Any
+     the client verifies in place and gets its tokens in a response body. Any
      fragment found here is consumed once at init, then scrubbed from
-     the address bar so it is not left sitting in browser history. */
+     the address bar so nothing is left sitting in browser history. */
   function consumeRedirect() {
     var hash = location.hash || '';
     if (hash.indexOf('access_token=') === -1 && hash.indexOf('error=') === -1) return null;
@@ -211,7 +211,7 @@
     }
 
     /* A provider refresh token (e.g. Google, when a product asked for
-       extra scope) rides along here. It is handed back to the caller
+       extra scope) rides along here, handed back to the caller
        and never stored by this module — a product-specific concern. */
     var providerRefreshToken = params.get('provider_refresh_token');
     history.replaceState(null, '', clean);
@@ -219,7 +219,7 @@
   }
 
   /* The plain path: straight to Supabase, no bot check and no throttle
-     in front of it. A product that has either supplies a `signIn`
+     in front. A product that has either supplies a `signIn`
      delegate to init(); this is what runs when none is supplied, or
      when the delegate stands aside. */
   function sendMagicLink(email) {
@@ -246,15 +246,15 @@
        or stored, which matters for an audience this app is built for:
        one thing to remember (an email address) instead of two. The
        code is finished with verifyEmailOtp() below; the email carries
-       no link, so nothing here depends on which device opens it.
+       no link, so nothing here depends on which device opens the message.
 
        A product may supply `signIn` to init() to route this through
        its own endpoint instead of straight to Supabase. Pie Timers
        does, because /auth/v1/otp has nowhere to put a bot check or a
        throttle: called directly, a sign-in form is an open relay for
-       emailing strangers, and it burns the sending quota and the
-       domain's reputation with it. identity stays ignorant of which
-       vendor does the checking; it only knows there is a delegate and
+       emailing strangers, and burns the sending quota and the
+       domain's reputation along the way. identity stays ignorant of which
+       vendor does the checking, and only knows there is a delegate and
        an element the delegate may draw into. */
     prepareSignIn: function (challengeHost) {
       if (!cfg || typeof cfg.prepareSignIn !== 'function') return Promise.resolve(false);
@@ -266,10 +266,10 @@
     },
 
     signInWithEmail: function (email, ctx) {
-      /* A delegate returning null means "I could not do it, you go
+      /* A delegate returning null means "I could not do this, you go
          ahead". Pie Timers uses that when its bot check will not
          render, so a widget that fails cannot become a sign-in nobody
-         can complete. Anything else it returns is the answer. */
+         can complete. Any other return value is the answer. */
       if (cfg && typeof cfg.signIn === 'function') {
         return Promise.resolve(cfg.signIn(email, ctx || {})).then(function (result) {
           return result === null ? sendMagicLink(email) : result;
@@ -280,8 +280,8 @@
 
     /* Finish sign-in with the numeric code from the email. The email
        carries only this code, no link: a link signs in whichever
-       browser opens it and no other, and corporate mail scanners that
-       fetch every URL can spend it before the person even reads the
+       browser opens the link and no other, and corporate mail scanners that
+       fetch every URL can spend that link before the person even reads the
        message. A code is read off the device that holds the inbox and
        typed into the device running the app — a personal address that
        is only reachable on a phone while the app is open on a
@@ -291,7 +291,7 @@
        carries, in the response body rather than a URL fragment, so the
        session is adopted identically.
 
-       type 'email' is GoTrue's unified passwordless type — it settles
+       type 'email' is GoTrue's unified passwordless type, which settles
        both a brand-new account and a returning one, matching the
        create_user:true request that sent the code. */
     verifyEmailOtp: function (email, code) {
@@ -342,7 +342,7 @@
     },
 
     /* Deletes the AibhlínnAI account itself — every product's data
-       with it, via each product's own cascading delete. Products with
+       alongside, via each product's own cascading delete. Products with
        data to clean up beyond auth.users register that server-side;
        this module only proves who is asking. */
     deleteAccount: function (functionUrl) {

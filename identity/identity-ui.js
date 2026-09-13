@@ -96,7 +96,7 @@
     });
     form.appendChild(submit);
 
-    /* Where a product's bot check renders, if it supplies one. Empty and
+    /* Where a product's bot check renders, if the product supplies one. Empty and
        invisible otherwise -- identity itself knows nothing about
        Turnstile or any other vendor. */
     var challengeHost = el('div', { class: 'aib-signin-challenge' });
@@ -105,10 +105,10 @@
     var status = el('p', { class: 'aib-signin-status', role: 'status', 'aria-live': 'polite' });
 
     /* The same email carries a short code as well as the link. The link
-       only signs in the browser that opens it; the code can be carried
+       only signs in the browser that opens the link; the code can be carried
        to the device running the app when the inbox is somewhere else
        — a personal address on a work machine, most often. Hidden until
-       a send has actually happened, so it never invites a code that
+       a send has actually happened, so the panel never invites a code that
        was never issued. */
     var codeRow = el('div', { class: 'aib-signin-code', hidden: 'hidden' });
     var codeField = el('label', { class: 'aib-signin-field' });
@@ -125,9 +125,9 @@
     codeRow.appendChild(codeSubmit);
     form.appendChild(codeRow);
 
-    /* Below the code field, not the send button -- it reports on the
+    /* Below the code field, not the send button -- the line reports on the
        code (arrived? wrong? expired?) at least as often as on the send
-       itself, so it reads better sitting next to what it is reporting
+       itself, and reads better sitting next to whatever is being reported
        on. */
     form.appendChild(status);
 
@@ -179,7 +179,7 @@
 
        What sits between them is the product's business, not identity's:
        a plan badge, a trial, an upgrade prompt. A product supplies
-       renderStatus(container) and draws whatever it likes; identity
+       renderStatus(container) and draws whatever they like; identity
        neither knows nor asks what entitlement means here. */
     function renderSignedIn() {
       wrap.innerHTML = '';
@@ -201,7 +201,7 @@
         out.disabled = true;
         out.textContent = 'Signing out…';
         /* Whatever happens, stop looking signed in. signOut() clears the
-           local session before it calls the server, so a failed request
+           local session before calling the server, so a failed request
            means the token was already gone -- not that the person is
            still signed in. */
         identity.signOut().catch(function () {}).then(function () {
@@ -240,7 +240,7 @@
 
     /* The label carries the state. Once a code is on its way, "Email me a
        sign-in code" is a lie -- the useful thing to say is where to look
-       and who it is from, since a message from a brand-new domain often
+       and who the sender is, since a message from a brand-new domain often
        lands in spam and an unfamiliar sender name is what makes people
        give up. The button stays out of action until a resend is genuinely
        useful, so a second press cannot quietly burn the throttle. */
@@ -284,7 +284,7 @@
       /* Last resort. If the promise above never settles at all -- a hung
          network, a third-party script that neither loads nor errors --
          the button would sit on "Sending…" with nothing to press. Give
-         it back rather than leaving someone stuck with a reload as their
+         the panel back rather than leaving someone stuck with a reload as their
          only option. */
       setTimeout(function () {
         if (submit.textContent === 'Sending…') {
@@ -321,7 +321,7 @@
     });
 
     /* Editing the address makes the previous "check your inbox" stale --
-       it refers to somewhere the person is no longer signing in to, and
+       the value refers to somewhere the person is no longer signing in to, and
        the code that was sent there no longer applies either. */
     emailInput.addEventListener('input', function () {
       clearTimeout(resendTimer);

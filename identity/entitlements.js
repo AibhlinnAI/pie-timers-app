@@ -6,7 +6,7 @@
    hasCapability('pie-timers', 'can_sync'), gets true or false, and
    never learns or cares whether that came from a subscription, a
    complimentary grant, or a friends-and-family pass. That distinction is
-   deliberate: it is what lets a complimentary grant, a suite bundle, and a
+   deliberate, and is what lets a complimentary grant, a suite bundle, and a
    single-app subscription all satisfy the same check with no branching
    in product code.
 
