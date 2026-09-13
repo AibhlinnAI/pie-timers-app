@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v82';
+var CACHE = 'countdown-timers-v83';
 
 var SHELL = [
   './',
@@ -17,8 +17,8 @@ var SHELL = [
   'terms.html',
   'privacy.html',
   'styles.css',
-  /* The self-hosted face. Precached because styles.css asks for it and
-     nothing else will fetch it offline — without these two the app still
+  /* The self-hosted face. Precached because styles.css asks for these
+     and nothing else fetches them offline — without both the app still
      works with the network off, but silently in the fallback font, which
      is a difference people notice and cannot explain. */
   'fonts/instrument-sans-latin.woff2',
@@ -36,7 +36,7 @@ var SHELL = [
   'qrcode.js',
   'app.js',
   'icon.svg',
-  /* The header plan chip carries it, so it is part of the shell rather
+  /* The header plan chip carries this image, so the file belongs in the shell rather
      than an image that arrives late and shifts the toolbar. */
   'aibhlinn-mark-40.png',
   'manifest.webmanifest'

@@ -1,19 +1,19 @@
 /* ─────────────────────── Instrument Sans ───────────────────────
    Self-hosted, deliberately. Served from Google's CDN this would be a
-   third-party request on every page load, it would not resolve with the
+   third-party request on every page load, would not resolve with the
    network off -- breaking the offline promise the whole app is built on
-   -- and it sits badly beside "No ads. No tracking. No selling your
+   -- and sits badly beside "No ads. No tracking. No selling your
    data. Ever." in the footer of every page. Two files in app/fonts/
    instead, precached in sw.js, and nothing leaves the origin.
 
    One variable file per subset covers 400-700, which is every weight
    this stylesheet uses (400, 600, 700). 41KB for both.
 
-   This is the app's first webfont, and it makes typography MORE
+   This is the app's first webfont, and makes typography MORE
    consistent rather than less: Aptos ships with Microsoft 365 and recent
-   Windows, so it was never reaching Android, iOS or Mac users, who fell
+   Windows, so Aptos was never reaching Android, iOS or Mac users, who fell
    through to whatever system-ui gave them. Nobody on the coming Play
-   build would have seen Aptos at all. It stays in the stack below as the
+   build would have seen Aptos at all. Aptos stays in the stack below as the
    first fallback.
 
    font-display:swap on purpose -- text paints immediately in the
@@ -51,7 +51,7 @@
      green    the default. Chrome, set fields, anything already decided.
      purple   differentiation. Marks out a section that is not the default.
      orange   highlight. Urgency, and where input is wanted — nowhere else.
-     peach    general fill. Never on a field, or it reads as editable.
+     peach    general fill. Never on a field, or the field reads as editable.
 
      Everything below is from the workbook. What changed is which role each
      one plays, and a few darker variants added purely so text passes
@@ -112,7 +112,7 @@
   /* "Marmalade" — three-quarters of the way from brand orange (#FF8A00)
      back toward a muted amber, in HSL: same ~33° hue, saturation and
      lightness interpolated 75/25 (orange/amber). Still genuinely vivid
-     — it needs to catch the eye — with just enough saturation pulled
+     — catching the eye is the job — with just enough saturation pulled
      back that escalating to --urgent below reads as a real state
      change (a hue shift to crimson) rather than the same warm colour
      turning up louder. Shown against three alternatives, chosen by
@@ -127,7 +127,7 @@
   --appt-soft:   #FFEAD1;
   --urgent-appt: #C41E3A;
   /* Lunch and End-of-day escalate to green, not crimson: running out of
-     time there is a good thing — the workday's nearly over — so it needs
+     time there is a good thing — the workday's nearly over — so the colour needs
      its own hue rather than borrowing the appointment/danger one.
      Appointments keep --urgent-appt above; a looming appointment is
      exactly what crimson is for. #1B7A44 (not the fill colour itself) for
@@ -145,7 +145,7 @@
   --field-input-border: #E8CE8A;
   --placeholder: #A5885A;
   /* Ribbon: dulled green at rest, bright green rule under the selection. */
-  /* The calculator block keeps a dark ground in BOTH themes: it carries
+  /* The calculator block keeps a dark ground in BOTH themes, and carries
      cream and orange text, and --purple is light in dark mode. */
   --calc-sub-fg: #D7CCE2;
   --calc-from:   #2E1838;
@@ -224,10 +224,10 @@
   --appt-soft:   #3A2A18;
   --urgent-appt: #D91E48;
   /* Same neon green as the sign-in/brand accent (#6FD08C), reused rather
-     than invented — it already clears ~5.1:1 against this plate colour
+     than invented — the value already clears ~5.1:1 against this plate colour
      (Government Green, #32493C), better separated than the crimson urgent
      state manages on the same plate (~2.2:1, which is why THAT one needs
-     a lightened edge below). It also clears ~8.9:1 on the dark card, so
+     a lightened edge below), and also clears ~8.9:1 on the dark card, so
      unlike the light theme above, fill and text can be the same shade. */
   --urgent-good:      #6FD08C;
   --urgent-good-text: #6FD08C;
@@ -290,7 +290,7 @@
    Deliberately leaves the pie fills and urgent colour themselves
    alone -- that colour coding is the core information the app exists
    to show, not decoration. What's toned down is the decoration
-   around it: gradients, the crimson glow, animation, and the one
+   around them: gradients, the crimson glow, animation, and the one
    broad "loud" accent token used for UI chrome rather than the pies. */
 :root[data-calm="1"]{
   --orange:      var(--orange-deep);
@@ -306,7 +306,7 @@
 }
 
 /* Flattened to one flat colour apiece, rather than removed outright --
-   each still separates the section it's on from the page around it,
+   each still separates the section below from the page around,
    just without the gradient sweep. */
 [data-calm="1"] body{ background:var(--shell); }
 [data-calm="1"] .topbar{ background:var(--header-mid); }
@@ -325,7 +325,7 @@
 html{ -webkit-text-size-adjust:100%; }
 
 /* Present for screen readers, invisible on screen. Not display:none, which
-   would remove it from the accessibility tree entirely. */
+   would remove the element from the accessibility tree entirely. */
 .sr-only{
   position:absolute; width:1px; height:1px; margin:-1px; padding:0;
   overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
@@ -333,8 +333,8 @@ html{ -webkit-text-size-adjust:100%; }
 
 /* Hidden until focused, so a keyboard user can jump the tab bar.
    Fixed, not absolute: an absolutely-positioned skip link sits at the top
-   of the *document*, so once the page is scrolled it stays off-screen even
-   when focused — which is precisely when someone needs it. */
+   of the *document*, so once the page is scrolled the link stays off-screen even
+   when focused — which is precisely when someone needs to see one. */
 .skip-link{
   position:fixed; left:12px; top:-100px; z-index:60;
   padding:10px 16px; border-radius:0 0 var(--radius-sm) var(--radius-sm);
@@ -401,11 +401,11 @@ button{ font:inherit; }
 /* The mark sits in a socket rather than on top of the header. In light
    theme the plate (#32493C) is the same green family as the header
    gradient — --header-mid *is* --forest — so without this the plate's
-   edge has almost nothing to separate it from the ground it sits on.
+   edge has almost nothing to separate the plate from the ground beneath.
 
    #3E5A4A is the plate rim colour the 512px icon already carries
    (app/icon.svg), so the lift is the mark's own edge colour rather than
-   a new one: a bed of it at low alpha, then a soft blur of the same
+   a new one: a bed of that purple at low alpha, then a soft blur of the same
    dissolving into the header.
 
    Blurred, with no hard 1px lip — unlike the Play feature graphic, where
@@ -429,7 +429,7 @@ button{ font:inherit; }
    Same purple-fill, neon-green-edge treatment as the Welcome panel's
    buttons (.welcome .btn) — fixed colours rather than theme variables,
    on purpose, matching that panel's own reasoning: this button sits on
-   a fixed-colour header gradient in both themes, so it cannot inherit
+   a fixed-colour header gradient in both themes, and so cannot inherit
    --ink either. Literal values here, not --welcome-btn/-text, because
    those custom properties are scoped to .welcome and don't reach here. */
 .topbar-signin{ flex:none; }
@@ -447,7 +447,7 @@ button{ font:inherit; }
 .upgrade-signin .aib-signin-context{ margin-top:6px; }
 
 /* Orange rather than white, because white was the one dull thing on the
-   page. Government Green as an offset shadow gives it depth without
+   page. Government Green as an offset shadow gives the title depth without
    touching legibility — the green is the shadow, never the text, since
    #32493C on this header would be 1.6:1. */
 .brand-text h1{
@@ -457,7 +457,7 @@ button{ font:inherit; }
   letter-spacing:-.01em;
 }
 
-/* One line, always. The clamp is what keeps it unbroken on a phone. */
+/* One line, always. The clamp is what keeps the line unbroken on a phone. */
 .brand-text p{
   margin:4px 0 0; color:var(--cream); opacity:.92;
   line-height:1.3;
@@ -515,7 +515,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 
 /* ───────────────────────── Welcome ─────────────────────────
    A Government Green panel with fixed colours in both themes, like the
-   calculator block. It carries light text, so it cannot inherit --ink,
+   calculator block, which carries light text and so cannot inherit --ink,
    which flips dark in light mode. */
 .welcome{
   --welcome-btn: #4B2A5A;
@@ -531,7 +531,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   text-shadow:1px 1px 0 rgba(0,0,0,.45);
 }
 /* Two sentences, two lines — the second is the one that explains the point,
-   so it earns its own line rather than trailing the first. Tight spacing
+   so the figure earns its own line rather than trailing the first. Tight spacing
    between them, a proper gap before the buttons. */
 .welcome p{
   margin:8px 0 2px; font-size:.9rem; color:#F0EFE6;
@@ -548,7 +548,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   background:var(--welcome-btn);
   /* The purple sits at 1.2:1 against Government Green — near-identical
      luminance, so the button would dissolve into the panel. The neon edge
-     is what makes it a button, and it clears 7.7:1 on the green. */
+     is what makes the control read as a button, and clears 7.7:1 on the green. */
   border:2px solid var(--welcome-btn-text);
   color:var(--welcome-btn-text);
   font-weight:700;
@@ -592,7 +592,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 
 /* ───────────────────────── Timer cards ───────────────────────── */
 /* min() so the 320px track can shrink below its floor on a narrow phone.
-   Without it an iPhone SE (320px) overflowed by 16px and scrolled sideways. */
+   Without this an iPhone SE (320px) overflowed by 16px and scrolled sideways. */
 .timer-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(min(320px, 100%), 1fr));
@@ -665,10 +665,10 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .daystrip-item .v.is-off{ color:var(--off); }
 
 /* ── Urgent ──
-   A halo spilling off the pie onto the card behind it, in whichever
+   A halo spilling off the pie onto the card behind, in whichever
    --urgent hue the card type set — crimson for Appointment, neon green
    for Lunch/End (see --urgent-good above). This block itself is
-   colour-agnostic on purpose: it only ever reads the --urgent* custom
+   colour-agnostic on purpose, and only ever reads the --urgent* custom
    properties, never a literal colour, so the two hues share one set of
    rules instead of forking into two near-identical blocks. Static, not
    pulsing: the colour change is the signal, and a throbbing card would
@@ -788,7 +788,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    A plain segmented control. The purple "Plan feature" chip inside the
    Calendar button is what carries the premium signal -- the toggle
    itself stays in the app's ordinary neutral palette, the same as the
-   page-level tabs, so it reads as a display choice rather than a sale. */
+   page-level tabs, so the control reads as a display choice rather than a sale. */
 .view-toggle{
   display:flex; gap:2px; padding:3px; flex:none;
   background:var(--amber-tint); border:1px solid var(--line); border-radius:999px;
@@ -861,7 +861,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    (.topbar-signin .aib-signin-btn) -- one consistent "this is the paid
    part of the app" colour, whether the button is signing in or buying.
    Fixed colours rather than theme variables, for the same reason as
-   that button: it needs to read the same in both themes. */
+   that button, which needs to read the same in both themes. */
 .btn-premium{
   display:inline-flex; align-items:center; justify-content:center;
   padding:6px 14px; min-height:36px;
@@ -983,7 +983,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    area the way every other checkbox in this app has (they all sit
    inside a clickable <label>; this one, built per-row in app.js, does
    not). Raised to the minimum directly rather than adding a wrapper,
-   since a table cell's own padding already gives it room. */
+   since a table cell's own padding already gives room. */
 .grid--edit td.home-cell input{ width:24px; height:24px; }
 .grid--edit td.home-cell input:disabled{ opacity:.35; cursor:not-allowed; }
 
@@ -1054,7 +1054,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
    as the unmoved text). Flipping is immune to that by construction:
    whatever the text colour was becomes the fill, and vice versa, so
    the two can never converge. --btn-primary-fg is reused here (not
-   just on .btn-primary) because it is already the colour proven to
+   just on .btn-primary) because that is already the colour proven to
    read on a --forest fill in both themes. */
 .btn:hover{ background:var(--forest); color:var(--btn-primary-fg); border-color:var(--forest); }
 .btn:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
@@ -1117,7 +1117,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .share-body{ display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
 
 /* Fixed white tile regardless of theme -- a QR code's contrast is a
-   scanning requirement, not a design choice, so it keeps its own
+   scanning requirement, not a design choice, so the rule keeps its own
    quiet zone rather than sitting straight on a dark page. */
 .share-qr{
   flex:none; width:132px; height:132px; box-sizing:border-box;
@@ -1156,7 +1156,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .sync-pill i{ width:7px; height:7px; border-radius:50%; background:currentColor; flex:none; }
 .sync-pill[data-status="synced"]{ background:var(--green-mid); color:var(--forest); }
 /* WCAG audit finding: the literal #8A5A00 was never given a dark-theme
-   value, unlike --amber-tint underneath it -- 2.24:1 in dark mode, an
+   value, unlike --amber-tint underneath -- 2.24:1 in dark mode, an
    almost-invisible pill. --orange-text is the existing theme-aware
    token already used for this exact "orange text on a tinted amber/
    peach chip" pattern elsewhere (see the error-status pill below):
@@ -1226,8 +1226,8 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 }
 .upgrade h3{ font-size:1rem; color:var(--purple); }
 .upgrade > p{ margin:6px 0 16px; font-size:.85rem; color:var(--ink-muted); max-width:62ch; }
-/* The lead-in sits directly above the list, so it keeps its top margin
-   and drops the bottom one -- otherwise the sentence and the bullets it
+/* The lead-in sits directly above the list, so the paragraph keeps its top margin
+   and drops the bottom one -- otherwise the sentence and the bullets that
    introduces read as two unrelated blocks. */
 .upgrade > p:has(+ .upgrade-list){ margin-bottom:6px; }
 .upgrade-list{ margin:0 0 16px; padding-left:1.15rem; max-width:62ch;
@@ -1291,7 +1291,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 /* WCAG audit finding: literal #9C90A3, meant to de-emphasise "(optional)"
    below the already-muted .field span colour, measured 3.03:1 in light
    theme on --card (needs 4.5, and this text is 11px -- no large-text
-   exception). Simplest correct fix: drop the override and let it
+   exception). Simplest correct fix: drop the override and let the element
    inherit --ink-muted from .field span, the token this app already
    relies on everywhere else for readable secondary text. */
 .discount-row .field span em{ font-style:normal; font-weight:600; }
@@ -1345,7 +1345,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .notice--info{ background:var(--purple-tint); border-color:var(--forest); color:var(--ink); }
 
 /* Owner-facing setup hint: present, but clearly secondary to the plain
-   sentence above it. */
+   sentence above. */
 .setup-note{
   display:block; margin-top:8px; padding-top:8px;
   border-top:1px solid var(--line);
@@ -1358,7 +1358,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   padding:1px 5px; border-radius:4px;
 }
 /* Inside a settings row the description is already small, so the note
-   needs no rule above it — just separation. */
+   needs no rule above — just separation. */
 .setting .setup-note{ border-top:0; padding-top:0; margin-top:5px; opacity:.85; }
 .notice--warn{ background:var(--amber-tint); border-color:var(--orange); color:var(--orange-text); }
 
@@ -1383,7 +1383,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
    so the pie can take whatever space there is.
 
    Sized with min(vw, vh) rather than a fixed width: snapped to the side
-   of a screen the window is tall and narrow, full-screen it is wide and
+   of a screen the window is tall and narrow, full-screen wide and
    short, and the pie has to stay a circle that fits either way. */
 body.is-focus > *:not(.focus){ display:none !important; }
 
@@ -1434,7 +1434,7 @@ body.is-focus{
    vision, two buttons sitting under the pie are two things to ignore
    all day; they are still reachable by Tab, which is what matters. */
 /* Taken out of the flow: an invisible row still occupies height, which
-   pushes the pie above the centre of the window it is meant to sit in
+   pushes the pie above the centre of the window the pie is meant to sit in
    the middle of. */
 .focus-actions{
   position:absolute;
@@ -1456,7 +1456,7 @@ body.is-focus{
   .focus-actions{ flex-direction:column; }
 }
 
-/* The pie takes the same colour it has on the dashboard, so the focus
+/* The pie takes the same colour worn on the dashboard, so the focus
    window is recognisably the same timer rather than a second opinion.
    Without these the accent is unset outside a timer card and the wedge
    falls back to black — a black pie on a green plate, which reads as
@@ -1481,7 +1481,7 @@ body.is-focus{
 }
 
 /* Urgent and off reuse the same colours as the dashboard cards, so the
-   focus window never disagrees with the app it came from. */
+   focus window never disagrees with the app behind. */
 .focus.is-urgent .dial-pie{
   fill:var(--urgent);
   stroke:var(--urgent-edge);
@@ -1570,7 +1570,7 @@ body.is-focus{
 
 /* ── Code entry ─────────────────────────────────────────────────────
    A checkbox, then a type, then the field for that type. Each step
-   appears only once the one before it is answered. */
+   appears only once the one before is answered. */
 .code-entry{ margin-top:16px; }
 .code-toggle{ display:flex; align-items:center; gap:8px; cursor:pointer;
   font-size:.85rem; color:var(--ink-muted); }
@@ -1580,7 +1580,7 @@ body.is-focus{
 .code-entry .access-code-row{ margin-top:10px; }
 .code-entry .hint{ margin-top:6px; }
 
-/* The product name is the one piece of brand on this panel, so it wears
+/* The product name is the one piece of brand on this panel, so the name wears
    the brand colour. --orange-text is the accessible pairing for text at
    this size; --orange itself is for fills and large glyphs. */
 .upgrade h3{ color:var(--orange-text); }
@@ -1589,14 +1589,14 @@ body.is-focus{
    jumped to is the thing you cannot see. */
 #account{ scroll-margin-top:5rem; }
 
-/* Smooth only where it is wanted, and never for people who have asked
+/* Smooth only where wanted, and never for people who have asked
    the system for less motion. */
 @media (prefers-reduced-motion: no-preference){
   html{ scroll-behavior:smooth; }
 }
 
 /* Account as a settings row rather than a button. Inherits .setting, so
-   it matches Appearance and Notifications exactly; the only additions
+   the layout matches Appearance and Notifications exactly; the only additions
    are the things a link needs and a select does not. */
 .setting--link{ text-decoration:none; color:inherit; }
 .setting--link:hover strong{ color:var(--orange-text); }
@@ -1630,7 +1630,7 @@ body.is-focus{
   border:1px solid var(--purple-mid);
 }
 
-/* The ask. The only one that is a link, so it is the only one that
+/* The ask. The only one that is a link, and so the only one that
    looks pressable. */
 .plan-chip--offer{
   color:var(--purple-lift);
