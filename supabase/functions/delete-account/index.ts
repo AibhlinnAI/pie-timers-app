@@ -2,7 +2,7 @@
    delete-account — permanently removes the calling user.
 
    Deleting an auth user needs the service-role key, which must
-   never reach the browser, so it happens here instead. The
+   never reach the browser, so deletion happens here instead. The
    caller's own access token is validated first and the user id
    is taken from that token — never from the request body — so
    one user cannot delete another.
@@ -28,7 +28,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/* Resolve the bearer token to a user, or null if it is not valid. */
+/* Resolve the bearer token to a user, or null when invalid. */
 async function userFromToken(token: string) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },

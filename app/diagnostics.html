@@ -13,11 +13,11 @@
 
      Everything here runs in the browser against whatever config.js
      currently points at, using only the anon key — which is public by
-     design. There are no secrets on this page and nothing it does is
+     design. There are no secrets on this page and nothing here is
      destructive: no writes, no emails sent, no checkout opened.
 
-     Deploy it, open it, read the reds. Delete it before launch if you
-     would rather it were not public; it exposes nothing, but it does
+     Deploy the page, open the page, read the reds. Delete before launch if you
+     would rather the page were not public: the page exposes nothing, but does
      tell a stranger which services you use.
      ============================================================ -->
 
@@ -165,7 +165,7 @@
         ' — service workers and push are permitted here.');
     } else if (location.protocol === 'file:') {
       done('warn', 'Opened from a file. Service workers, push and sign-in ' +
-        'redirects will not work. Deploy it and run this page again.');
+        'redirects will not work. Deploy the app and run this page again.');
     } else {
       done('fail', 'Not HTTPS. Push notifications and the service worker are ' +
         'blocked by the browser, and sign-in links will not return correctly.');
@@ -179,11 +179,11 @@
       done('fail', 'Not set. The terms and the privacy policy both have ' +
         'nowhere to point.');
     } else if (/\.example$|@example\./i.test(email)) {
-      done('fail', 'Still the placeholder (' + email + '). It is printed in ' +
+      done('fail', 'Still the placeholder (' + email + '). The address is printed in ' +
         'your terms and privacy policy and shown to customers.');
     } else if (/@(gmail|outlook|hotmail|yahoo|icloud)\./i.test(email)) {
-      done('warn', email + ' is a personal mailbox. It works, but it will be ' +
-        'scraped once published and you cannot hand it over or rotate it later.');
+      done('warn', email + ' is a personal mailbox. Workable, but the address will be ' +
+        'scraped once published, and cannot be handed over or rotated later.');
     } else {
       done('pass', email);
     }
@@ -203,7 +203,7 @@
       var unique = found.filter(function (v, i) { return found.indexOf(v) === i; });
       if (unique.length) {
         done('fail', 'Published, but ' + unique.length +
-          ' placeholder(s) are still in it: ' + unique.join(', '));
+          ' placeholder(s) remain: ' + unique.join(', '));
       } else {
         done('pass', 'Published and no placeholders left.');
       }
@@ -222,17 +222,17 @@
     }
     /* Probe a real table, not the PostgREST root. The root answers 401
        to a publishable key even when everything is healthy, so checking
-       it reported a broken project that was working perfectly. */
+       the check reported a broken project that was working perfectly. */
     /* select=* rather than a named column. Naming one means the check
        fails whenever the schema differs from what this file assumed —
-       which is how it reported HTTP 400 against a healthy project whose
+       which is how the check reported HTTP 400 against a healthy project whose
        primary key is user_id, not id. */
     return get(cfg.supabaseUrl + '/rest/v1/timer_profiles?select=*&limit=1',
                { headers: anonHeaders() })
       .then(function (res) {
         if (res.status === 401 || res.status === 403) {
           done('fail', 'Rejected the key (HTTP ' + res.status +
-            '). Copy it again from Project Settings → API Keys.');
+            '). Copy the key again from Project Settings → API Keys.');
           return false;
         }
         if (res.status === 404) {
@@ -264,12 +264,12 @@
           : 'Email sign-in enabled');
         /* The sign-in panel renders 'Continue with Google' unconditionally
            (identity-ui.js), so a disabled provider is not a missing feature --
-           it is a visible button that answers 'Unsupported provider' to every
-           visitor who clicks it. */
+           the result is a visible button answering 'Unsupported provider' to every
+           visitor who clicks. */
         notes.push(providers.google
           ? 'Google enabled'
           : 'Google NOT enabled, but the sign-in panel still shows a Continue ' +
-            'with Google button — clicking it errors');
+            'with Google button — clicking errors');
         var bad = providers.email === false;
         done(bad ? 'fail' : (providers.google ? 'pass' : 'warn'), notes.join('. ') + '.');
       }).catch(function (err) {
@@ -278,7 +278,7 @@
   }
 
   /* Asking for a row we are not entitled to is the point. A healthy
-     table answers 200 with an empty array: it exists, and RLS is doing
+     table answers 200 with an empty array: the table exists, and RLS is doing
      its job. A 404 means the SQL was never applied. Rows coming back
      unauthenticated would mean RLS is off, which is a live data leak. */
   function checkTable(table, sqlFile) {
@@ -302,7 +302,7 @@
       if (Array.isArray(parsed) && parsed.length > 0) {
         done('fail', 'SECURITY: returned ' + parsed.length + ' row(s) to an ' +
           'unauthenticated request. Row-level security is not enabled on this ' +
-          'table. Anyone with the anon key — which is public — can read it.');
+          'table. Anyone with the anon key — which is public — can read the rows.');
       } else {
         done('pass', 'Exists, and returns nothing without a session.');
       }
@@ -342,7 +342,7 @@
     var key = cfg.vapidPublicKey || '';
     if (!key) {
       done('skip', 'Not set. Alerts still work while the app is open; ' +
-        'notifications when it is closed will not.');
+        'notifications when the app is closed will not.');
       return;
     }
     try {
@@ -370,7 +370,7 @@
     if (!('Notification' in window)) bits.push('no Notification API');
     if (bits.length) {
       done('warn', 'This browser: ' + bits.join(', ') +
-        '. Others may still support it — iOS needs the app added to the ' +
+        '. Others may still support push — iOS needs the app added to the ' +
         'Home Screen first.');
     } else {
       done('pass', 'Supported here. Permission is currently "' +
@@ -431,12 +431,12 @@
   function checkPaddleWebhookNote() {
     var done = row('Paddle webhook');
     if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
-    done('warn', 'Cannot be verified from the browser — it is server to server. ' +
+    done('warn', 'Cannot be verified from the browser — the exchange is server to server. ' +
       'Paddle -> Notifications must have an ACTIVE destination pointing at the ' +
       'paddle-webhook function URL, subscribed to subscription.created, ' +
       '.updated and .canceled, with its signing secret in Supabase as ' +
       'PADDLE_WEBHOOK_SECRET. Without a destination, checkout still takes ' +
-      'money and nobody is ever entitled — silently. Prove it with a real ' +
+      'money and nobody is ever entitled — silently. Prove the path with a real ' +
       'purchase, then refund; there is no test event for Production.');
   }
 
@@ -455,13 +455,13 @@
       '"transaction_checkout_not_enabled" means one of these two is missing.');
   }
 
-  /* The identity schema is served by PostgREST only if it is listed under
+  /* The identity schema is served by PostgREST only if the schema is listed under
      Project settings -> Data API -> Exposed schemas. That is a dashboard
-     step with no SQL equivalent, and skipping it fails silently at both
+     step with no SQL equivalent, and skipping that fails silently at both
      ends: paddle-webhook's grant_capability call throws on every event
      (so Paddle retries forever and nobody is entitled), and the screen
      saver reads a permission error instead of an empty set, with no
-     fallback behind it. PostgREST says which case we are in outright --
+     fallback behind. PostgREST says which case we are in outright --
      PGRST106 for an unexposed schema, a permissions error for an exposed
      one that is properly locked down. */
   function checkIdentityExposed(relation, note) {
@@ -507,8 +507,8 @@
   /* Role grants cannot be read from the browser: has_schema_privilege needs
      a database session, and grant_capability is deliberately revoked from
      anon and authenticated. So this check cannot pass or fail on its own --
-     it hands over the query that settles it. Worth running once per project,
-     because identity-schema.sql creates the schema without granting it, and
+     the page hands over the query that settles the question. Worth running once per project,
+     because identity-schema.sql creates the schema without granting access, and
      the resulting failure looks exactly like the one above. */
   function checkIdentityGrantsNote() {
     var done = row('Identity schema — role grants');
@@ -527,7 +527,7 @@
       '1. Sign in with a real email and confirm the link arrives, not in spam. ' +
       '2. Change your hours on one device and confirm they appear on another. ' +
       '3. Buy the monthly plan for real and confirm three rows appear in ' +
-      'identity.product_entitlements, then refund it — Production has no ' +
+      'identity.product_entitlements, then refund — Production has no ' +
       'test events and no test cards. ' +
       '4. Delete a throwaway account and confirm the rows are gone. ' +
       '5. Close the app and confirm a milestone alert still arrives.');
@@ -576,12 +576,12 @@
           .then(function () { return checkTable('calendar_events', 'schema-calendar.sql'); })
           .then(function () { return checkFunction('signin', 'Needed for rate-limited magic links.'); })
           .then(function () { return checkFunction('delete-account', 'Needed for the delete button in Settings.'); })
-          .then(function () { return checkFunction('paddle-webhook', 'Without it, payments never unlock access.'); })
-          .then(function () { return checkFunction('manage-subscription', 'Without it, the Manage button in Settings has nowhere to send people.'); })
-          .then(function () { return checkFunction('notify-milestones', 'Without it, no alerts when the app is closed.'); })
+          .then(function () { return checkFunction('paddle-webhook', 'Without this, payments never unlock access.'); })
+          .then(function () { return checkFunction('manage-subscription', 'Without this, the Manage button in Settings has nowhere to send people.'); })
+          .then(function () { return checkFunction('notify-milestones', 'Without this, no alerts when the app is closed.'); })
           .then(function () { return checkFunction('calendar-sync', 'Needed for calendar feeds.'); })
           .then(function () { return checkFunction('google-connect', 'Needed for one-click Google Calendar.'); })
-          .then(function () { return checkIdentityExposed('product_entitlements', 'Run identity-schema.sql first if it has never been run.'); })
+          .then(function () { return checkIdentityExposed('product_entitlements', 'Run identity-schema.sql first if that has never been run.'); })
           .then(function () { return checkIdentityExposed('my_entitlements', 'The Windows screen saver is gated on this view alone.'); })
           .then(checkIdentityGrantsNote);
       })

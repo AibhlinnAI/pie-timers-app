@@ -5,7 +5,7 @@
    This runs server-side for three reasons: browsers cannot fetch
    calendar URLs cross-origin, the feed URL is a secret that must
    never reach the client again once saved, and expanding
-   recurrence once per user beats doing it on every device.
+   recurrence once per user beats repeating the work on every device.
 
    Two entry points:
      { feedId }  — one feed, authorised by the caller's own token
@@ -41,7 +41,7 @@ function json(body: unknown, status = 200) {
 }
 
 /* ─────────────────────────── SSRF guard ───────────────────────────
-   The feed URL comes from a user, and this server fetches it. Without
+   The feed URL comes from a user, and this server fetches that URL. Without
    a check that is a request-forgery hole pointed at the internal
    network and the cloud metadata endpoint. */
 
@@ -103,10 +103,10 @@ async function rest(path: string, init: RequestInit = {}) {
     throw new Error(`${init.method ?? "GET"} ${path} → ${response.status} ${await response.text()}`);
   }
   /* An empty body is a success, not a value. PostgREST answers a
-     Prefer: return=minimal write with 200 and nothing in it -- not the
+     Prefer: return=minimal write with 200 and an empty body -- not the
      204 this used to check for -- so calling .json() threw "Unexpected
      end of JSON input" AFTER the events had already been written. The
-     parse fixed the sync; this is what was failing behind it: the run
+     parse fixed the sync; here is what was failing behind that: the run
      recorded an error, left event_count at zero, and the calendar
      looked broken while its events sat in the table. */
   const body = await response.text();
@@ -148,7 +148,7 @@ async function fetchFeed(rawUrl: string): Promise<string> {
     if (!response.ok) {
       throw new Error(
         response.status === 404
-          ? "The calendar link was not found. Check it has not been reset."
+          ? "The calendar link was not found. Check the link has not been reset."
           : `The calendar server replied ${response.status}.`,
       );
     }
@@ -249,11 +249,11 @@ async function syncFeed(feed: FeedRow) {
 
     const patch: Record<string, unknown> = {
       last_synced: new Date().toISOString(),
-      // The message is shown to the user, so keep it human and bounded.
+      // The message is shown to the user, so keep the wording human and bounded.
       last_error: message.slice(0, 300),
     };
 
-    // A dead Google grant will never recover on its own. Stop retrying it
+    // A dead Google grant will never recover on its own. Stop retrying
     // every 15 minutes and clear the useless token, so the UI can prompt
     // for a reconnect instead of showing the same error forever.
     if (error instanceof GrantExpiredError) {

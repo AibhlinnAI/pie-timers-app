@@ -10,8 +10,8 @@
      3. Supabase's own auth rate limits, still active behind us.
 
    Without this, the sign-in form is an open relay for emailing
-   strangers — it burns the sending quota and the domain's
-   reputation along with it.
+   strangers — and burns the sending quota and the domain's
+   reputation along the way.
    ============================================================ */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -49,7 +49,7 @@ async function hash(value: string) {
 
 /* The action and hostname a token must have been minted for. A
    siteverify success only says "Cloudflare issued this token for this
-   sitekey" -- it does not say for which page or which form. Without
+   sitekey" -- without naming which page or which form. Without
    these two checks a token harvested from any other widget on the same
    sitekey is accepted here, which is most of the point of having one. */
 const TURNSTILE_ACTION = "signin";

@@ -4,7 +4,7 @@
    Two things make this safe:
    1. The Paddle-Signature header is verified before anything is
       read from the body. An unsigned request is never trusted.
-   2. An event id is recorded only once everything it triggers has
+   2. An event id is recorded only once every write the event triggers has
       actually succeeded -- not before. Paddle retries on failure, so
       a genuine duplicate must be a no-op, but a *partial* failure
       must NOT look like one: recording the id first (an earlier
@@ -18,7 +18,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WEBHOOK_SECRET = Deno.env.get("PADDLE_WEBHOOK_SECRET")!;
 
-// Paddle calls this server-to-server, so it is never subject to CORS --
+// Paddle calls this server-to-server, so CORS never applies --
 // these headers exist only so a browser (diagnostics.html's own health
 // check) gets a real response instead of a blocked preflight.
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
@@ -81,60 +81,94 @@ async function rest(path: string, init: RequestInit = {}) {
 
 /* ─────────────────── Honouring the unused trial ───────────────────
    A person who buys on day 10 of a 14-day trial should not lose the
-   four days they had left. The rule: the first charge lands 30 days
-   after the account was created, whenever they happen to buy.
+   four days they had left. The rule: the first charge lands a fixed
+   number of days after the account was created, whenever they happen
+   to buy.
+
+   That number is 30 normally, and 60 for anyone who signed up inside
+   the launch window -- the same cohort public.trial_length() gives a
+   30-day trial rather than 14. Keyed on the account's creation date,
+   not the purchase date, so everyone who signed up during launch gets
+   the same answer no matter when they decide, and nobody can gain days
+   by timing the click.
+
+   LAUNCH_WINDOW_END must match the timestamp inside
+   public.trial_length() in supabase/schema-access-codes.sql. Two copies
+   of one date is not ideal; the alternative is a round trip to Postgres
+   on every subscription.created, and a date that is wrong in one place
+   is visible immediately as a wrong billing date rather than silently.
+   If either moves, move both.
 
    Paddle has no way to say this at checkout -- a trial length lives on
-   the price and is the same for everyone -- so it is corrected here,
-   once, when the subscription first appears. next_billed_at moves to
-   account start + 30 days, with proration_billing_mode "do_not_bill"
-   so moving the date does not itself raise an invoice.
+   the price and is the same for everyone -- so the date is corrected
+   here, once, when the subscription first appears. next_billed_at moves
+   to account start + the free window, with proration_billing_mode
+   do_not_bill so moving the date does not itself raise an invoice.
 
-   Only ever pins it to day 30, and only while day 30 is still ahead.
-   Someone who buys after their trial lapsed is on the price without a
-   trial, has paid today, and is left entirely alone.
+   Applies ONLY to a subscription that arrived on a trial price, which
+   the payload states outright as status trialing. Earlier this was
+   inferred from the target date still being in the future, which held
+   only while the free window and the trial length were both 30. At 60
+   that inference breaks: someone who signs up in launch month, lets the
+   30-day trial lapse and subscribes on day 35 pays the full price today
+   -- and would have had their next charge dragged back to day 60,
+   paying for a month and receiving 25 days. Ask the payload; never
+   infer.
 
-   Requires PADDLE_API_KEY. Without it the subscription still works and
-   the person is simply billed on Paddle's own schedule, so a missing
-   key is logged rather than thrown: a payment that already succeeded
-   must not be undone by a courtesy that failed. */
+   Requires PADDLE_API_KEY. Without that key the subscription still
+   works and the person is simply billed on Paddle's own schedule, so a
+   missing key is logged rather than thrown: a payment that already
+   succeeded must not be undone by a courtesy that failed. */
 const PADDLE_API_KEY = Deno.env.get("PADDLE_API_KEY") ?? "";
 const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") === "sandbox"
   ? "https://sandbox-api.paddle.com"
   : "https://api.paddle.com";
+
 const FREE_DAYS_FROM_SIGNUP = 30;
+const FREE_DAYS_LAUNCH = 60;
+/* Adelaide time, matching public.trial_length(). */
+const LAUNCH_WINDOW_END = Date.parse("2026-10-19T00:00:00+10:30");
+
+function freeDaysFor(createdAt: string): number {
+  return Date.parse(createdAt) < LAUNCH_WINDOW_END ? FREE_DAYS_LAUNCH : FREE_DAYS_FROM_SIGNUP;
+}
 
 async function accountCreatedAt(userId: string): Promise<string | null> {
   /* public.subscriptions is created by the grant_trial trigger the
      moment the account exists, and its created_at is never rewritten,
-     so it dates the account without needing the auth schema exposed. */
+     so that column dates the account without needing the auth schema exposed. */
   const response = await rest(`/subscriptions?user_id=eq.${userId}&select=created_at`);
   if (!response.ok) return null;
   const rows = await response.json();
   return rows?.[0]?.created_at ?? null;
 }
 
-async function deferFirstCharge(userId: string, subscriptionId: string, currentNextBilledAt: string | null) {
+async function deferFirstCharge(userId: string, subscriptionId: string, currentNextBilledAt: string | null, status: string) {
   if (!PADDLE_API_KEY) {
-    console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set it.");
+    console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set one.");
     return;
   }
+
+  /* Only a subscription that arrived on a trial price. Anyone else has
+     paid today and their anniversary is Paddle's business, not ours.
+     See the note above: this used to be inferred from the date and the
+     inference stops holding once the free window outlasts the trial. */
+  if (status !== "trialing") return;
 
   const createdAt = await accountCreatedAt(userId);
   if (!createdAt) return;
 
-  const target = new Date(new Date(createdAt).getTime() + FREE_DAYS_FROM_SIGNUP * 86400000);
-  /* Past day 30 means they bought after their trial lapsed: they are
-     on the plain price, they have paid today, and their anniversary is
-     Paddle's business, not ours. */
+  const target = new Date(new Date(createdAt).getTime() + freeDaysFor(createdAt) * 86400000);
+  /* Already past the free window -- nothing to defer to. */
   if (target.getTime() <= Date.now()) return;
 
-  /* Otherwise pin it to day 30 exactly, in whichever direction. The
-     trial price gives everyone the same fixed run from the day they
-     buy, so an early buyer overshoots day 30 and a late one falls
-     short; only the account start date knows where day 30 actually is.
-     Pulling a date earlier can only ever bring it back to day 30, and
-     never to today, because of the check above. */
+  /* Otherwise pin to the end of the free window exactly, in whichever
+     direction. The trial price gives everyone the same fixed run from
+     the day they buy, so an early buyer falls short of the window and a
+     late one overshoots; only the account start date knows where the
+     window actually ends. Pulling a date earlier can only ever bring
+     one back to that boundary, never to today, because of the check
+     above. */
   if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return;
 
   const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
@@ -186,7 +220,7 @@ async function recordEvent(eventId: string, eventType: string, userId: string | 
   // A 409 here means a concurrent duplicate delivery finished its own
   // (idempotent) processing microseconds before this one and logged
   // the event first -- the work was done twice safely, so losing the
-  // race to log it is not a failure.
+  // race to log the same id is not a failure.
   if (!response.ok && response.status !== 409) {
     throw new Error(`record failed: ${response.status} ${await response.text()}`);
   }
@@ -240,7 +274,7 @@ async function grantCapability(
 
    Deliberately time-bounded (expiresAt, never null-forever): a
    subscription's access is only ever as good as its current period.
-   Granting once and leaving it to expire on its own -- rather than
+   Granting once and leaving the grant to expire on its own -- rather than
    requiring an explicit revoke on cancellation -- is what stops
    access surviving a cancellation forever. Nothing calls this for a
    status this function decides is NOT currently entitled, which is
@@ -375,11 +409,11 @@ Deno.serve(async (request) => {
     /* Only on creation, and only after the writes above have stuck:
        this is a courtesy, and a courtesy must not be what decides
        whether someone is entitled. Any failure inside is logged, not
-       thrown, so a retry is never triggered by it -- Paddle would
+       thrown, so a retry is never triggered from here -- Paddle would
        replay the whole event and the guard against moving the date
        earlier is what makes that harmless anyway. */
     if (eventType === "subscription.created" && data?.id) {
-      await deferFirstCharge(userId, String(data.id), data?.next_billed_at ?? null);
+      await deferFirstCharge(userId, String(data.id), data?.next_billed_at ?? null, status);
     }
 
     // Recorded only now that every write above has actually succeeded.
@@ -393,7 +427,7 @@ Deno.serve(async (request) => {
     console.error(error);
     // A 500 makes Paddle retry. Nothing on this path was recorded, so
     // the retry actually redoes whatever failed instead of the
-    // duplicate check silently absorbing it.
+    // duplicate check silently absorbing the failure.
     return Response.json({ ok: false, error: String(error) }, { status: 500, headers: corsHeaders });
   }
 });

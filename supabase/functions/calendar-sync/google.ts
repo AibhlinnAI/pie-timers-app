@@ -54,7 +54,7 @@ async function accessTokenFrom(refreshToken: string): Promise<string> {
     // to tell them what to do rather than quote an OAuth error code.
     if (payload?.error === "invalid_grant") {
       throw new GrantExpiredError(
-        "Google access has expired. Reconnect your calendar to restore it.",
+        "Google access has expired. Reconnect your calendar to restore access.",
       );
     }
     throw new Error(`Google refused the token (${payload?.error ?? response.status}).`);
@@ -94,7 +94,7 @@ export async function fetchGoogleEvents(
 
     if (response.status === 401 || response.status === 403) {
       throw new GrantExpiredError(
-        "Google denied access to that calendar. Reconnect to restore it.",
+        "Google denied access to that calendar. Reconnect to restore access.",
       );
     }
     if (!response.ok) {
