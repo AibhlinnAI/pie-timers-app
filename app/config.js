@@ -54,6 +54,16 @@ window.CT.config = {
      at all. */
   googleCalendarEnabled: false,
 
+  /* Google Play testing opt-in, shown as a small "Become a tester" badge
+     next to the app name. Leave blank to hide it — there is nothing to
+     opt into until the Play Console listing and a testing track both
+     exist. The URL is always the same shape:
+     https://play.google.com/apps/testing/<package name>
+     (ai.aibhlinn.pietimers here — see app/.well-known/assetlinks.json).
+     Blank this again once the track graduates to production: the opt-in
+     page stops being useful, and the badge would just be a dead link. */
+  playTestingUrl: '',
+
   /* Cloudflare Turnstile site key (the public half). When set, the
      sign-in form is bot-checked and magic links are throttled. Leaving
      it blank sends sign-ins straight to Supabase, unthrottled — fine
