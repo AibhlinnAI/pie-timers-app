@@ -1,6 +1,6 @@
 # Applying the database schema
 
-Everything here is **idempotent** — safe to run again if you are unsure whether it
+Everything here is **idempotent** — safe to run again if you are unsure whether a file
 took. Nothing drops a table or deletes user data.
 
 ## The short version
@@ -8,7 +8,7 @@ took. Nothing drops a table or deletes user data.
 In Supabase → **SQL Editor**, open a new query, then paste and run each file's
 contents in this order:
 
-| # | File | What it creates | Needed if |
+| # | File | What the file creates | Needed if |
 | - | ---- | --------------- | --------- |
 | 1 | `schema.sql` | profiles, push subscriptions, notification log | Always |
 | 2 | `schema-billing.sql` | subscriptions, entitlement, billing events | Always |
@@ -19,16 +19,16 @@ contents in this order:
 | 7 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
 
 Steps 1–6 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
-editing**, and only after the edge functions are deployed, because it points at
+editing**, and only after the edge functions are deployed, because the file points at
 their URLs.
 
 Two of these are needed even if you skip the optional features:
 
 - **Step 3** carries the free-trial trigger, not just the access codes.
-- **Step 5** adds the `appointments` column to `timer_profiles`. Without it, manual
+- **Step 5** adds the `appointments` column to `timer_profiles`. Without that column, manual
   appointments do not sync between devices.
 
-## Checking it worked
+## Checking the run worked
 
 ```sql
 select table_name from information_schema.tables
@@ -48,7 +48,7 @@ select relname, relrowsecurity from pg_class
 ```
 
 Every row should read `true`. If any is `false`, that table is readable by anyone
-holding the public anon key — re-run the file that created it.
+holding the public anon key — re-run the file that created the key.
 
 Confirm the trial trigger exists:
 
@@ -56,7 +56,7 @@ Confirm the trial trigger exists:
 select tgname from pg_trigger where tgname = 'on_auth_user_created_grant_trial';
 ```
 
-Then sign up a test account and check it was granted:
+Then sign up a test account and check the grant landed:
 
 ```sql
 select u.email, s.status, s.plan, s.current_period_end
@@ -90,7 +90,7 @@ select jobname, status, return_message, start_time
 Every file can simply be run again. The common causes:
 
 - **`schema "cron" does not exist`** — the `pg_cron` extension is not enabled.
-  Each schema file creates it, so re-running the file usually fixes it. Otherwise
+  Each schema file creates the role grant, so re-running the file usually repairs this. Otherwise
   enable `pg_cron` and `pg_net` under Database → Extensions.
 - **`relation "subscriptions" does not exist`** — step 2 has not run yet. The order
   in the table above matters.
@@ -101,13 +101,13 @@ Every file can simply be run again. The common causes:
 ## A note on secrets
 
 `cron.sql`'s `Authorization` header only has to satisfy the edge function
-gateway's own JWT check, not grant any real permission -- the functions it
+gateway's own JWT check, not grant any real permission -- the functions the gateway
 calls read their own service-role key from their own environment, never from
-this header — so it deliberately uses the anon key (already public in
+this header — so the call deliberately uses the anon key (already public in
 `app/config.js`) instead of the service-role key. `<CRON_SECRET>` is the
-real gate: it must match the `CRON_SECRET` set on both the
+real gate, and must match the `CRON_SECRET` set on both the
 `notify-milestones` and `calendar-sync` functions, and both those functions
-now fail closed (reject every request) if it is ever unset, rather than
+now fail closed (reject every request) when unset, rather than
 silently accepting anything. Keep the filled-in copy of this file out of
 public source control regardless — the cron secret is still worth
 protecting, just not at "database password" severity.

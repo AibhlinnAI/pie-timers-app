@@ -18,7 +18,7 @@ token are *designed* to be public and are protected by row-level security.
 
 These must **never** be committed:
 
-| Secret | Where it belongs |
+| Secret | Correct home |
 | --- | --- |
 | Supabase service-role key | Supabase → Edge Functions → Secrets |
 | VAPID **private** key | Supabase → Edge Functions → Secrets |
@@ -29,7 +29,7 @@ These must **never** be committed:
 | Resend API key | Supabase → Authentication → SMTP |
 
 `.gitignore` covers the usual accidents, and the deploy workflow refuses to
-publish if it finds a private key or a service-role JWT in `app/`. Neither is a
+publish on finding a private key or a service-role JWT in `app/`. Neither is a
 substitute for not pasting them in.
 
 ---
@@ -65,7 +65,7 @@ Do not pick "Deploy from a branch". The workflow in
 `.github/workflows/deploy.yml` uploads only the `app/` folder, which is what
 keeps `supabase/` out of the published site.
 
-The first deploy runs automatically on push. Watch it in the **Actions** tab.
+The first deploy runs automatically on push. Watch the run in the **Actions** tab.
 
 ## 3. Point the domain
 
@@ -87,13 +87,13 @@ Two things that are easy to get wrong here, and both fail quietly:
   Full (strict) or you get a redirect loop.
 
 Then repo → **Settings → Pages → Custom domain** → `pietimers.aibhlinn.ai` → Save.
-`app/CNAME` already contains this, so it survives every redeploy.
+`app/CNAME` already contains this, so the setting survives every redeploy.
 
 Wait for the DNS check to go green, then tick **Enforce HTTPS**. This can take
-up to an hour while the certificate is issued. Do not skip it: without HTTPS
+up to an hour while the certificate is issued. Do not skip this step: without HTTPS
 the service worker will not register and push notifications cannot work at all.
 
-## 4. Check it
+## 4. Check the site
 
 Open **https://pietimers.aibhlinn.ai/diagnostics.html**.
 
@@ -119,8 +119,18 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
 - [ ] `schema-calendar.sql`
 - [ ] `schema-google-calendar.sql`
 - [ ] `identity-schema.sql`
-- [ ] `cron.sql` — last: it schedules a job against edge functions that do
+- [ ] `cron.sql` — last, because the file schedules a job against edge functions that do
       not exist until 5.3.
+
+Then, on any project that existed before self-certified hardship was removed:
+
+- [ ] `drop-hardship.sql` — drops `public.grant_hardship_access()`. Safe on a
+      project that never had one, and worth running even where the function
+      looks harmless: a `security definer` function nothing calls is attack
+      surface earning nothing. Not needed on a project created from scratch
+      today. Check with
+      `select proname from pg_proc where proname = 'grant_hardship_access';`
+      — no rows means nothing to do.
 
 ### 5.2 Expose the identity schema
 
@@ -132,7 +142,7 @@ while the screen saver reads a permission error instead of an empty set.**
 - [ ] **Project settings → Data API → Exposed schemas** → add `identity`
       alongside `public` and `graphql_public`. Save.
 
-Verify rather than assume — this query answers all of it at once:
+Verify rather than assume — this query answers all of that at once:
 
 ```sql
 select
@@ -154,20 +164,20 @@ select
 
 Note that `current_setting('pgrst.db_schemas', true)` returns NULL in the SQL
 editor whether or not the schema is exposed — the setting applies to the
-`authenticator` role, not your session. Do not read anything into it. To check
+`authenticator` role, not your session. Do not read anything into the result. To check
 exposure from outside, request the schema over the REST API: `PGRST106 Invalid
 schema` means not exposed, and a permissions error means exposed and correctly
 locked down.
 
 ### 5.3 Edge functions and URL configuration
 
-- [ ] Deploy the six edge functions.
+- [ ] Deploy the seven edge functions.
 - [ ] **Authentication → URL Configuration → Site URL**:
       `https://pietimers.aibhlinn.ai` — no trailing slash.
 - [ ] **Redirect URLs**: `https://pietimers.aibhlinn.ai/**` — both asterisks.
 
-Sign-in links silently fail to return if these do not match. It is the most
-common cause of "the email arrived but clicking it does nothing".
+Sign-in links silently fail to return if these do not match, and this is the most
+common cause of "the email arrived but clicking the link does nothing".
 
 ### 5.4 Wire the app up
 
@@ -188,7 +198,7 @@ team, so a real customer can never receive a sign-in link. The symptom is a
 - [ ] Add every record Resend lists to Cloudflare DNS — an MX and a TXT on the
       `send` subdomain, and the `resend._domainkey` TXT.
 - [ ] Set every one to **DNS only** (grey cloud). Proxying a mail record breaks
-      it.
+      that record.
 - [ ] Optionally add a DMARC TXT at `_dmarc`: `v=DMARC1; p=none;`
 - [ ] Click **Verify DNS Records**.
 
@@ -205,10 +215,10 @@ DNS. Check the truth from outside with `nslookup -type=TXT _dmarc.aibhlinn.ai
 1.1.1.1` and stop clicking Verify — repeated checks can re-cache a stale
 answer.
 
-### 6.2 Point Supabase at it
+### 6.2 Point Supabase at Resend
 
 - [ ] Resend → **API Keys → Create API Key**, sending permission only,
-      restricted to `aibhlinn.ai`. It is shown once.
+      restricted to `aibhlinn.ai`. The key is shown once.
 - [ ] Supabase → **Authentication → Emails → SMTP Settings** → enable custom
       SMTP:
 
@@ -228,9 +238,9 @@ Keep the sender name ASCII. Non-ASCII display names need MIME encoding and
 some clients render mojibake in the From line; the `í` belongs everywhere
 customer-facing, not in a mail header.
 
-### 6.3 Prove it
+### 6.3 Prove delivery
 
-- [ ] Request a sign-in link and confirm it arrives.
+- [ ] Request a sign-in link and confirm the message arrives.
 - [ ] Check spam. A brand-new sending domain has no reputation and the first
       few messages often land there.
 
@@ -241,7 +251,7 @@ with no error anywhere.
 
 ### 6.4 Make the sign-in email a code, not a link
 
-A link in the sign-in email only signs in the browser that opens it — no use to
+A link in the sign-in email only signs in the browser that opens the link — no use to
 someone whose inbox is on a phone while the app is open on a locked-down work
 machine. Worse, corporate mail scanners (Safe Links, Mimecast, Proofpoint) fetch
 every URL in an inbound message, which can spend a one-time link before the person
@@ -250,11 +260,11 @@ whichever device is running the app.
 
 Supabase mints the code (`{{ .Token }}`) for the same `/auth/v1/otp` request that
 would have carried a link. The default templates render the link, not the code —
-you have to swap it.
+you have to swap them.
 
 - [ ] **Authentication → Emails**. In **both** the *Magic Link* template and the
       *Confirm signup* template (new accounts get the second one), replace the whole
-      body with the block below. It is deliberately image-free — a text wordmark,
+      body with the block below, which is deliberately image-free — a text wordmark,
       not the logo lockup: a new sending domain with no reputation delivers better
       without images, image-off clients still show the brand, and nothing in the
       email phones home. A second suite app reuses this block unchanged.
@@ -270,26 +280,26 @@ you have to swap it.
 ```
 
 The body names no product, so the *Subject heading* is where a person sees which
-app asked — set it to `Your Pie Timers sign-in code` rather than repeating the
+app asked — set the subject to `Your Pie Timers sign-in code` rather than repeating the
 neutral wording.
 
 - [ ] Do not leave a bare `{{ .ConfirmationURL }}` anywhere in the body, even as
-      plain text — a scanner will still follow it and burn the code.
-- [ ] Change the **Subject heading** on both templates too — it is a separate
+      plain text — a scanner will still follow the URL and burn the code.
+- [ ] Change the **Subject heading** on both templates too — the subject is a separate
       field above the body and the stock text says "magic link" / "confirm your
-      signup". Set it to something like `Your Pie Timers sign-in code`.
+      signup". Set the subject to something like `Your Pie Timers sign-in code`.
 - [ ] Shorten the code's lifetime at **Authentication → Providers → Email → Email
       OTP Expiration** — default is 3600s; 600s is plenty and narrows the window
       on a code read to the wrong person.
-- [ ] Test across two devices: on device A request a code, read it off device B's
-      inbox, type it into device A. ✅ device A lands signed in with no redirect.
+- [ ] Test across two devices: on device A request a code, read the code off device B's
+      inbox, type the code into device A. ✅ device A lands signed in with no redirect.
       ❌ "Token has expired or is invalid" means the code expired, was already
-      used, or the address on device A does not match the one it was sent to.
+      used, or the address on device A does not match the address the code was sent to.
       ❌ a message mentioning `otp_type` / `type` means the `type: 'email'` verify
-      value needs revisiting for this GoTrue version — flag it.
+      value needs revisiting for this GoTrue version — flag that.
 
-The **Redirect URLs** allowlist (§5.3) still matters — it is used by the Google
-OAuth return — so do not remove it just because the email no longer carries a link.
+The **Redirect URLs** allowlist (§5.3) still matters — the allowlist is used by the Google
+OAuth return — so do not remove the allowlist just because the email no longer carries a link.
 
 ## 7. Push notifications
 
@@ -323,10 +333,10 @@ for.
 
 ### 8.2 Notification destination
 
-**This is the step that entitles customers. Without it, checkout still takes
+**This is the step that entitles customers. Without this step, checkout still takes
 money and nobody is ever entitled — silently, with no error the customer or the
-app can see. Do not skip it, and do not treat a working checkout as evidence it
-is done.**
+app can see. Do not skip this, and do not treat a working checkout as evidence the
+step is done.**
 
 Order matters: Paddle mints the signing secret when the destination is created,
 so the secret cannot be put in Supabase first.
@@ -339,7 +349,7 @@ so the secret cannot be put in Supabase first.
       version, and 1 is the current one for Paddle Billing — there is no 2 to
       choose. (An earlier version of this file said "notification version v2",
       conflating Paddle *Billing* — sometimes called the v2 platform, as
-      opposed to Paddle Classic — with this per-destination field. Changing it
+      opposed to Paddle Classic — with this per-destination field. Changing the version
       would not help and could break the payload `paddle-webhook` parses.)
 - [ ] Tick exactly `subscription.created`, `subscription.updated`,
       `subscription.canceled`. Nothing else — the handler ignores every other
@@ -357,20 +367,20 @@ Neither is part of the catalogue, and both fail with the same opaque
 - [ ] **Checkout → Checkout settings → Default payment link** →
       `https://pietimers.aibhlinn.ai/`, then Save.
 - [ ] **Checkout → Website approval** → add `pietimers.aibhlinn.ai` and wait
-      for it to move from **Pending** to approved. Subdomains are reviewed
+      for the entry to move from **Pending** to approved. Subdomains are reviewed
       individually; approving `aibhlinn.ai` does not approve this one.
 
 Approval requires the site to link to, or contain, terms of service, privacy
 notice and refund policy. All three are linked from the footer of every page —
-refunds via `terms.html#refunds`. Keep it that way.
+refunds via `terms.html#refunds`. Keep that true.
 
 When either is missing, `POST checkout-service.paddle.com/transaction-checkout`
 returns 400 with `"details": "transaction_checkout_not_enabled"`. Read that
 body in the Network tab before assuming anything else is wrong; the overlay's
 own message says nothing useful. The body is discarded when the overlay
-closes, so read it while the error is still on screen.
+closes, so read the body while the error is still on screen.
 
-### 8.4 Prove it end to end
+### 8.4 Prove the whole path end to end
 
 Paddle removed per-destination test sends. **Simulations** (Developer tools →
 Simulations) run in Sandbox only, so a Production destination can never be
@@ -388,7 +398,7 @@ Test A — still in trial, takes no money, exercises the most code:
 
 - [ ] Buy the monthly plan through your own live checkout.
 - [ ] Confirm the `public.subscriptions` row's **`plan` changes from `trial` to
-      `monthly`**. The status stays `trialing` — it does *not* become `active`
+      `monthly`**. The status stays `trialing` and does *not* become `active`
       on this path, and looking for `active` here reads a working webhook as a
       broken one.
 - [ ] Confirm a row in `public.billing_events`.
@@ -398,7 +408,7 @@ Test A — still in trial, takes no money, exercises the most code:
       than just counting rows.
 - [ ] Confirm `next_billed_at` in Paddle sits at exactly day 30 from account
       creation. This is the only check that exercises `deferFirstCharge`, and
-      therefore the only proof `PADDLE_API_KEY` is set — without it the
+      therefore the only proof `PADDLE_API_KEY` is set — without that key the
       function logs a warning and silently leaves Paddle's own date.
 
 Test B — the money path. Expire the same account's trial first:
@@ -409,12 +419,12 @@ update public.subscriptions
  where user_id = '<test account uuid>';
 ```
 
-- [ ] Buy the monthly plan again. This time it is a real charge.
+- [ ] Buy the monthly plan again. This time the charge is real.
 - [ ] Confirm the row flips to `active`/`monthly`.
 - [ ] Refund and cancel in Paddle.
 
-Diagnostics cannot check any of 8.2 or 8.4 for you — it is server to server, so
-it is the one you must watch happen.
+Diagnostics cannot check any of 8.2 or 8.4 for you — the exchange is server to server, so
+this is the one you must watch happen.
 
 Note that a fresh account is already entitled: `grant_trial` (in
 `schema-access-codes.sql`) gives every new user a 14-day trial (`public.trial_length()`), and the upgrade
@@ -424,11 +434,11 @@ panel only reappears in the final 4 days. To reach checkout before then, call
 Reading a failure:
 
 - **400 `transaction_checkout_not_enabled`** — see 8.3. Not your code.
-- **401** — the secret in Supabase does not match the destination's. Recopy it.
+- **401** — the secret in Supabase does not match the destination's. Recopy the secret.
 - **500** — the signature passed and a write failed. Read the Supabase function
   logs, not the Paddle delivery log.
 - **200 but no row** — the event carried no `custom_data.user_id`. That means
-  the checkout was opened outside `billing.js`, which always attaches it.
+  the checkout was opened outside `billing.js`, which always attaches the id.
 
 ### 8.5 Before switching `environment` to `'production'`
 
@@ -450,7 +460,7 @@ and none of them exist in this repo today:
 2. **An Android wrapper.** Pie Timers is a PWA, so this is a Trusted Web
    Activity — typically generated with
    [PWABuilder](https://www.pwabuilder.com/), not written by hand. The
-   wrapper's own code is where a purchase is initiated, and it must pass
+   wrapper's own code is where a purchase is initiated, and must pass
    your AibhlínnAI account id as Play Billing's `obfuscatedAccountId` —
    that value is the *only* way a later server notification can be linked
    back to an account, since Play's Real-Time Developer Notifications
@@ -483,7 +493,7 @@ would:
 nothing in the app links to Paddle, mentions a price, or references the web
 checkout from inside what would become the Play-wrapped build — see the
 comment above `initPaddle()` in `app/billing.js`. If a Play build variant
-is ever introduced, gate the whole upgrade panel out of it rather than
+is ever introduced, gate the whole upgrade panel out of that variant rather than
 editing its copy.
 
 ## Redeploying
@@ -498,9 +508,9 @@ Pages redeploys in a minute or two.
 copies serve the old cached shell until the version string changes, so without
 the bump your fix reaches new visitors and nobody else.
 
-## If you ever need to take it down
+## If you ever need to take the service down
 
 The terms promise **60 days' notice by email and a pro-rata refund** before
 shutting the service down, and to keep the free on-device version working for
 as long as reasonably possible. That is a commitment you made in writing, so
-plan a wind-down around it rather than switching the repo to private.
+plan a wind-down around that promise rather than switching the repo to private.
