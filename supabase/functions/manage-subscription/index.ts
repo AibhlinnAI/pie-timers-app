@@ -41,7 +41,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/* Resolve the bearer token to a user, or null if it is not valid. */
+/* Resolve the bearer token to a user, or null when invalid. */
 async function userFromToken(token: string) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },
@@ -51,7 +51,7 @@ async function userFromToken(token: string) {
   return user?.id ? user : null;
 }
 
-/* This account's Paddle identifiers, or null if it has never
+/* This account's Paddle identifiers, or null when the account has never
    actually checked out (complimentary access, or a free account that
    has never upgraded -- both real, both with nothing for Paddle to
    show a portal for). */
@@ -119,7 +119,7 @@ Deno.serve(async (request) => {
       return json(
         // Reachable only as a fallback now that the button is hidden
         // unless there is a paid plan (app.js, renderAccount). Worded as
-        // reassurance rather than a fault, because it is not one: free
+        // reassurance rather than a fault, because nothing has failed: free
         // access is the normal state for a trialling or complimentary
         // account, and nothing has gone wrong.
         { error: "This account has free access, so there is no billing to manage and nothing has been charged." },

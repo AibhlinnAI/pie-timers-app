@@ -4,8 +4,8 @@
    For each user who has alerts switched on, works out where each
    of today's timers sits in their own timezone and pushes the
    milestones that have just come due. The notification_log table
-   is the idempotency guard: a milestone is written before it is
-   sent, and the primary key stops a second run repeating it.
+   is the idempotency guard: a milestone is written before
+   sending, and the primary key stops a second run repeating one.
    ============================================================ */
 
 import { sendPush, type PushSubscription } from "./webpush.ts";
@@ -17,7 +17,7 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
-// pg_cron calls this server-to-server, so it is never subject to CORS --
+// pg_cron calls this server-to-server, so CORS never applies --
 // these headers exist only so a browser (diagnostics.html's own health
 // check) gets a real response instead of a blocked preflight.
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
@@ -88,7 +88,7 @@ function localNow(timezone: string) {
 
 /* ─────────────────────────── Timer maths ───────────────────────────
    Deliberately mirrors computeTimer() in app.js. If one changes, the
-   other must change with it, or the app and the push will disagree. */
+   other must change to match, or the app and the push will disagree. */
 
 function remainingMinutes(nowMin: number, startMin: number, targetMin: number) {
   let total = targetMin - startMin;
@@ -169,7 +169,7 @@ async function run() {
       }
 
       // Claim the milestone first. A duplicate key means another run
-      // already has it, so this run must not send.
+      // already holds one, so this run must not send.
       const claimed = await claim(sub.user_id, now.isoDate, timer.key, milestone);
       if (!claimed) continue;
 
@@ -190,7 +190,7 @@ async function run() {
 
       if (result.gone) {
         await rest(`/push_subscriptions?id=eq.${sub.id}`, { method: "DELETE" })
-          .catch(() => {/* it will be retried next run */});
+          .catch(() => {/* retried on the next run */});
       } else if (result.ok) {
         sent++;
       }
@@ -226,13 +226,13 @@ Deno.serve(async (request) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // pg_cron passes the shared secret; without it this endpoint is closed.
+  // pg_cron passes the shared secret; without one this endpoint is closed.
   // Deliberately fail-closed: `if (CRON_SECRET)` here would skip this
   // check entirely -- and let anyone trigger a real push send -- for as
   // long as the secret happens to be unset, which is exactly backwards
-  // for a guard whose own comment says "without it this endpoint is
+  // for a guard whose own comment says "without one this endpoint is
   // closed." calendar-sync's identical guard already gets this right;
-  // this one didn't match it until now.
+  // this one did not match until now.
   if (!CRON_SECRET || request.headers.get("x-cron-secret") !== CRON_SECRET) {
     return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }

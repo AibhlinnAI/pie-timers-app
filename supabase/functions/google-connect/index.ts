@@ -3,7 +3,7 @@
 
    The browser receives a provider_refresh_token in the OAuth
    redirect fragment. That token is a long-lived key to the user's
-   calendar, so it is handed straight here and never kept client
+   calendar, and is handed straight here rather than kept client
    side, never written to localStorage, and never returned again.
 
    Two actions:

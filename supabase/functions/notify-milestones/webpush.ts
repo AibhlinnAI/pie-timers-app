@@ -62,7 +62,7 @@ async function hkdf(
 
 /* ─────────────────────────── VAPID ─────────────────────────── */
 
-/* Rebuild a JWK from the raw key pair so WebCrypto can import it.
+/* Rebuild a JWK from the raw key pair so WebCrypto can import them.
    publicKey is the uncompressed P-256 point (0x04 || x || y). */
 function vapidJwk(publicKey: Uint8Array, privateKey: Uint8Array): JsonWebKey {
   if (publicKey.length !== 65 || publicKey[0] !== 0x04) {
