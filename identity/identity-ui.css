@@ -83,6 +83,11 @@
   font:inherit; font-weight:700; font-size:.96rem;
   cursor:pointer;
 }
+/* Flips the button's own two colours rather than shifting only one --
+   a same-shaped bug (background moved, text didn't) is what made the
+   host app's .btn-primary go invisible on hover in dark mode. Guarded
+   against :disabled so "Sending…" doesn't fight the dimmed state. */
+.aib-signin-submit:hover:not(:disabled){ background:#1C1024; color:var(--accent, #B07FE0); }
 .aib-signin-submit:focus-visible{ outline:3px solid var(--ink, #EFE6F5); outline-offset:2px; }
 .aib-signin-submit:disabled{ opacity:.6; cursor:default; }
 
@@ -101,6 +106,7 @@
   font:inherit; font-weight:600; font-size:.9rem;
   cursor:pointer;
 }
+.aib-signin-google:hover{ background:var(--ink, #EFE6F5); color:var(--card, #241730); border-color:var(--ink, #EFE6F5); }
 .aib-signin-google:focus-visible{ outline:3px solid var(--accent, #B07FE0); outline-offset:2px; }
 
 .aib-signin-status{

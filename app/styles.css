@@ -440,7 +440,7 @@ button{ font:inherit; }
   color:#6FD08C;
   font-weight:700;
 }
-.topbar-signin .aib-signin-btn:hover{ background:#5C3570; }
+.topbar-signin .aib-signin-btn:hover{ background:#6FD08C; color:#4B2A5A; }
 .topbar-signin .aib-signin-btn:focus-visible{ outline:2px solid #6FD08C; outline-offset:2px; }
 
 .upgrade-signin{ margin-top:14px; }
@@ -553,7 +553,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   color:var(--welcome-btn-text);
   font-weight:700;
 }
-.welcome .btn:hover{ background:#5C3570; }
+.welcome .btn:hover{ background:#6FD08C; color:#4B2A5A; }
 .welcome .btn:focus-visible{ outline:2px solid var(--welcome-btn-text); outline-offset:2px; }
 
 /* The panel is the first thing on the page, so the view's own focus ring
@@ -872,7 +872,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   font-weight:700; font-size:.9rem; text-decoration:none;
   white-space:nowrap;
 }
-.btn-premium:hover{ background:#5C3570; }
+.btn-premium:hover{ background:#6FD08C; color:#4B2A5A; }
 .btn-premium:focus-visible{ outline:2px solid #6FD08C; outline-offset:2px; }
 
 #googleConnect .hint{ margin-top:10px; }
@@ -1048,7 +1048,15 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   border:1px solid var(--field-border); background:transparent; color:var(--forest);
   transition:background .15s ease, color .15s ease, border-color .15s ease;
 }
-.btn:hover{ background:var(--green-tint); }
+/* Hover flips the button's own two colours rather than only shifting
+   the background -- a background-only hover is how .btn-primary went
+   invisible in dark mode (its hover fill landed almost the same shade
+   as the unmoved text). Flipping is immune to that by construction:
+   whatever the text colour was becomes the fill, and vice versa, so
+   the two can never converge. --btn-primary-fg is reused here (not
+   just on .btn-primary) because it is already the colour proven to
+   read on a --forest fill in both themes. */
+.btn:hover{ background:var(--forest); color:var(--btn-primary-fg); border-color:var(--forest); }
 .btn:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
 .btn-ghost{ background:transparent; }
 .btn-quiet{ border-color:var(--line); color:var(--ink-muted); }
@@ -1145,7 +1153,11 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   background:var(--forest); border-color:var(--forest); color:var(--btn-primary-fg);
   padding:10px 22px;
 }
-.btn-primary:hover{ background:var(--header-from); border-color:var(--header-from); }
+/* The actual bug report: background moved to --header-from while the
+   text stayed --btn-primary-fg, and in dark mode those two are both
+   near-black -- the button's text vanished into its own hover fill.
+   A literal flip of the button's own two colours can't do that. */
+.btn-primary:hover{ background:var(--btn-primary-fg); color:var(--forest); border-color:var(--btn-primary-fg); }
 .btn-primary:disabled{ opacity:.55; cursor:not-allowed; }
 
 .hint{ margin:12px 0 0; font-size:.82rem; color:var(--ink-muted); }
@@ -1162,7 +1174,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   padding:10px 20px; border-radius:999px; cursor:pointer;
   font-size:.88rem; font-weight:600;
 }
-.btn-google:hover{ background:var(--shell); }
+.btn-google:hover{ background:var(--ink); color:var(--card); border-color:var(--ink); }
 .btn-google:focus-visible{ outline:2px solid var(--forest); outline-offset:2px; }
 
 .status-line{ margin:16px 0 0; font-size:.85rem; color:var(--ink-muted); min-height:1.2em; }
@@ -1276,7 +1288,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .btn-danger{
   background:var(--danger); border-color:var(--danger); color:var(--card);
 }
-.btn-danger:hover{ filter:brightness(.9); }
+.btn-danger:hover{ background:var(--card); color:var(--danger); }
 .btn-danger:disabled{ opacity:.45; cursor:not-allowed; background:var(--danger); }
 
 /* ───────────────────────── Modal ───────────────────────── */
