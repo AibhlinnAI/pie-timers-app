@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ai.aibhlinn.pietimers",
+      "sha256_cert_fingerprints": [
+        "62:07:4F:44:DD:E4:DE:67:58:FA:AC:0D:44:0E:F9:8D:96:92:E2:3B:78:02:A4:2C:B0:04:3E:46:56:D7:65:C8",
+        "3B:60:B9:65:C8:B2:D1:EE:C9:35:53:EF:4F:91:99:B6:A4:FF:2D:7C:3F:8A:5E:8C:A5:99:BB:11:DB:A2:6E:23"
+      ]
+    }
+  }
+]
