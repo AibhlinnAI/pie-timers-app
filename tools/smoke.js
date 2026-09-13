@@ -39,6 +39,7 @@ const SCRIPTS = [
   ['app/billing.js',            ['CT.turnstile', 'CT.billing']],
   ['app/notify.js',             ['CT.notify']],
   ['app/sync.js',               ['CT.sync']],
+  ['app/qrcode.js',             ['qrcode']],
 ];
 
 /* A DOM stub that says yes to everything. Deliberately shallow: the

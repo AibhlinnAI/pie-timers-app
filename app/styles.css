@@ -1111,6 +1111,29 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   font-variant-numeric:tabular-nums;
 }
 
+/* ───────────────────────── Share the Pie ───────────────────────── */
+.share-panel .panel-head{ margin-bottom:16px; }
+.share-panel .sub{ margin-top:4px; max-width:52ch; }
+.share-body{ display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
+
+/* Fixed white tile regardless of theme -- a QR code's contrast is a
+   scanning requirement, not a design choice, so it keeps its own
+   quiet zone rather than sitting straight on a dark page. */
+.share-qr{
+  flex:none; width:132px; height:132px; box-sizing:border-box;
+  padding:10px; border-radius:var(--radius-sm);
+  background:#fff;
+}
+.share-qr svg{ display:block; width:100%; height:100%; }
+
+.share-link{ flex:1 1 240px; }
+.share-url-row{ display:flex; gap:8px; }
+.share-url-row input{
+  flex:1; min-width:0; font:inherit; font-size:.85rem;
+  padding:9px 12px; border:1px solid var(--line);
+  border-radius:var(--radius-sm); background:var(--card); color:var(--ink);
+}
+
 /* ───────────────────────── Settings ───────────────────────── */
 .settings-list{ display:flex; flex-direction:column; }
 .setting{
