@@ -2307,6 +2307,16 @@
     }
   }());
 
+  /* Play testing opt-in badge. Off (hidden) until playTestingUrl is set
+     -- see the comment in config.js for why it stays off by default. */
+  (function applyTesterBadge() {
+    var url = CT.config.playTestingUrl;
+    var badge = $('testerBadge');
+    if (!url) { badge.hidden = true; return; }
+    badge.href = url;
+    badge.hidden = false;
+  }());
+
   /* Captured once up front, so the button can be put back exactly as
      the markup already had rather than a hard-coded copy that drifts from
      index.html. Read at boot, not lazily on first submit: the email

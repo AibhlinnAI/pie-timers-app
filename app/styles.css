@@ -447,6 +447,24 @@ button{ font:inherit; }
    a fixed-colour header gradient in both themes, and so cannot inherit
    --ink either. Literal values here, not --welcome-btn/-text, because
    those custom properties are scoped to .welcome and don't reach here. */
+/* Sits between the brand and the sign-in/clock cluster rather than
+   inside either -- .topbar-right's sign-in+clock pairing is deliberately
+   tight (see the comment above it) and .brand-text's height is tuned to
+   match the mark next to it, so a third element belongs to .topbar
+   itself. Literal colours, not theme tokens, for the same reason as the
+   sign-in button below: this sits on the fixed-colour header gradient in
+   both themes. Hidden by default -- see config.js: playTestingUrl. */
+.tester-badge{
+  flex:none; display:inline-flex; align-items:center;
+  padding:6px 14px; border-radius:999px;
+  border:1px solid rgba(255,255,255,.4);
+  color:var(--on-dark); text-decoration:none;
+  font-size:.8rem; font-weight:600; white-space:nowrap;
+}
+.tester-badge:hover{ background:var(--on-dark); color:var(--header-mid); border-color:var(--on-dark); }
+.tester-badge:focus-visible{ outline:2px solid var(--on-dark); outline-offset:2px; }
+.tester-badge[hidden]{ display:none; }
+
 .topbar-signin{ flex:none; }
 .topbar-signin > .aib-signin{ position:relative; }
 .topbar-signin .aib-signin-btn{
