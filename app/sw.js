@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v81';
+var CACHE = 'countdown-timers-v82';
 
 var SHELL = [
   './',
@@ -33,6 +33,7 @@ var SHELL = [
   'billing.js',
   'notify.js',
   'sync.js',
+  'qrcode.js',
   'app.js',
   'icon.svg',
   /* The header plan chip carries it, so it is part of the shell rather

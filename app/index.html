@@ -466,6 +466,33 @@
 
   <!-- ───────────────────────── SETTINGS ───────────────────────── -->
   <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0">
+
+    <!-- First in the tab on purpose: it is the one thing here a person
+         on someone else's device -- a colleague being shown the app, a
+         phone handed across a desk -- can actually use, before they
+         have an account or any settings of their own. Encodes nothing
+         but this page's own address: no session, no schedule, no
+         account travels with it. -->
+    <section class="panel share-panel">
+      <header class="panel-head">
+        <div>
+          <h2>Share the Pie</h2>
+          <p class="sub">Show this to a colleague, friend or family member —
+          scanning it opens Pie Timers on their own device.</p>
+        </div>
+      </header>
+      <div class="share-body">
+        <div class="share-qr" id="shareQr" role="img" aria-label="QR code linking to Pie Timers"></div>
+        <label class="field share-link">
+          <span>Or send this link</span>
+          <div class="share-url-row">
+            <input type="text" id="shareUrl" readonly aria-label="Pie Timers link">
+            <button class="btn btn-ghost" id="shareCopy" type="button">Copy</button>
+          </div>
+        </label>
+      </div>
+    </section>
+
     <section class="panel">
       <header class="panel-head">
         <h2>Settings</h2>
@@ -892,6 +919,7 @@
 <script src="billing.js"></script>
 <script src="notify.js"></script>
 <script src="sync.js"></script>
+<script src="qrcode.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

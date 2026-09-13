@@ -1722,6 +1722,39 @@
 
   /* ─────────────────────────── Settings ─────────────────────────── */
 
+  /* ── Share the Pie ──
+     A QR code for this page's own address, nothing else -- no session,
+     no schedule, no account rides along. Drawn once at boot, since the
+     address does not change while the app stays open. qrcode.js is the
+     vendored encoder (see its own header); typeNumber 0 tells it to
+     pick the smallest size that fits whatever this URL turns out to
+     be, rather than this file guessing a fixed one. */
+  (function renderShareQr() {
+    var url = location.origin + location.pathname;
+    $('shareUrl').value = url;
+
+    var qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    $('shareQr').innerHTML = qr.createSvgTag({ scalable: true });
+  }());
+
+  $('shareCopy').addEventListener('click', function () {
+    var input = $('shareUrl');
+    var done = function () { toast('Link copied.'); };
+    var fallback = function () {
+      input.focus();
+      input.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { toast('Could not copy — select the link and copy it instead.'); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(input.value).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  });
+
   var SETTING_INPUTS = {
     opt24h: 'clock24',
     optSeconds: 'showSeconds',
