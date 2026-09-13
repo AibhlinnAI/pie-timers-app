@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="identity/identity-ui.css">
 
 <!-- ============================================================
-     Public pricing page. Two jobs, and it must do both:
+     Public pricing page. Two jobs, and both must be done:
 
      1. Something a Paddle reviewer (or anyone else) can open with no
         sign-in and see real prices on. Required for domain approval --
@@ -89,7 +89,7 @@
       <button class="plan-card" id="buyMonthly" type="button">
         <span class="plan-name">Monthly</span>
         <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
-        <span class="plan-note">Try it first — cancel any time</span>
+        <span class="plan-note">Try before you pay — cancel any time</span>
       </button>
     </div>
 
@@ -113,11 +113,11 @@
   </div>
 </footer>
 
-<!-- Same order as index.html, and it matters: identity-bridge.js reads
+<!-- Same order as index.html, and the order matters: identity-bridge.js reads
      window.Aibhlinn.identity/.entitlements/.identityUI, which must exist
-     first, and it resolves CT.turnstile/CT.auth lazily (at click time,
+     first, and resolves CT.turnstile/CT.auth lazily (at click time,
      not at parse time) so that billing.js and supabase.js can load
-     after it, exactly as they do in the app itself. sync.js, notify.js
+     after that file, exactly as they do in the app itself. sync.js, notify.js
      and app.js are not loaded -- there is no dashboard here to wire. -->
 <script src="identity/identity.js"></script>
 <script src="identity/entitlements.js"></script>
@@ -170,7 +170,7 @@
     if (!billingOn) {
       status.textContent = '';
     } else if (ent.entitled && !trialing) {
-      status.textContent = "You're already on AibhlínnAI Premium — manage or cancel it from the app's Settings.";
+      status.textContent = "You're already on AibhlínnAI Premium — manage or cancel from the app's Settings.";
     } else if (CT.auth.isSignedIn()) {
       status.textContent = '';
     } else {
@@ -178,12 +178,12 @@
     }
   }
 
-  /* Signed out, clicking a plan does not fail quietly -- it says what
-     to do and moves focus to the control that does it, so the whole
+  /* Signed out, clicking a plan does not fail quietly -- the page says what
+     to do and moves focus to the control that does that, so the whole
      interaction stays on this one page. */
   function promptSignIn() {
     var status = $('pricingStatus');
-    status.textContent = 'Sign in above first — it only takes an email address, then choose a plan again.';
+    status.textContent = 'Sign in above first — an email address is all you need, then choose a plan again.';
     status.classList.add('is-error');
     var host = $('topbarSignin');
     var control = host && host.querySelector('button, a');
