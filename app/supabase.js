@@ -11,7 +11,7 @@
   var cfg = CT.config;
 
   /* No session state, no refresh timer, no listener list, no localStorage
-     key. Aibhlinn.identity holds all of it -- see the note above the
+     key. Aibhlinn.identity holds all of that -- see the note above the
      facade below for why this module stopped keeping its own copy. */
 
   /* ─────────────────────────── Utilities ─────────────────────────── */
@@ -54,7 +54,7 @@
   }
 
   /* ─────────────────────────── Session ───────────────────────────
-     There is no session here any more. Aibhlinn.identity owns it: one
+     There is no session here any more. Aibhlinn.identity owns the session: one
      store, one refresh timer, one place the magic-link hash is read.
 
      This module used to keep its own, under its own localStorage key,
@@ -67,7 +67,7 @@
 
      Bridging the two sessions fixed that and immediately produced two
      more faults -- both modules refreshing the same rotating refresh
-     token, and a listener that stored the session it was listening to.
+     token, and a listener that stored the session being listened to.
      Neither was a coincidence: two owners of one thing is the fault,
      and copying between them is not a cure. So CT.auth is now a facade.
 
@@ -90,8 +90,8 @@
 
        Routed through the `signin` edge function whenever Turnstile is
        configured, because that is the only place a bot check and a
-       throttle can sit. Without it the form would email any address
-       given to it, as often as asked. This is the one auth call that
+       throttle can sit. Without one the form would email any address
+       supplied, as often as asked. This is the one auth call that
        does NOT go to identity: identity posts straight to Supabase,
        which is exactly what this exists to avoid. */
     signInWithEmail: function (email, turnstileToken) {
@@ -118,11 +118,11 @@
       });
     },
 
-    /* Finish sign-in with the emailed code. It completes on this
+    /* Finish sign-in with the emailed code, which completes on this
        device — the machine running the app — with no redirect, which
        is the whole point: the inbox can be on a phone the work machine
        cannot open. Straight to identity: this is a verification call,
-       not a send, so it needs neither the bot check nor the throttle
+       not a send, so neither the bot check nor the throttle applies
        the `signin` function exists to apply. */
     verifyEmailOtp: function (email, code) {
       var i = id();
@@ -137,13 +137,13 @@
     /* Re-authorise with Google, additionally asking for read-only calendar
        access. access_type=offline is what yields a refresh token, and
        prompt=consent forces Google to re-issue one even if the user has
-       approved before — without it a reconnect silently returns nothing.
+       approved before — without that a reconnect silently returns nothing.
 
        select_account matters as much as consent. The calendar someone
        wants is frequently not the account they signed up with: a work
        calendar reached from a personal subscription, or the reverse
        where an employer's policy forbids paying on the work account.
-       Without it Google silently uses whichever account the browser is
+       Without this Google silently uses whichever account the browser is
        already signed into, and there is no way back to the chooser --
        so the person is offered the wrong calendar with no visible
        reason and nothing to click. */
@@ -151,7 +151,7 @@
       /* events.readonly, not calendar.readonly. The app calls exactly
          one endpoint -- calendars/{id}/events -- and never lists
          calendars or reads calendar metadata, so the wider scope asks
-         for access it would not use. Google's verification form asks
+         for access the app would not use. Google's verification form asks
          why a more limited scope is not sufficient; here one is. */
       var scopes = 'email profile https://www.googleapis.com/auth/calendar.events.readonly';
       var url = authUrl('/authorize') +
@@ -194,9 +194,9 @@
     },
 
     /* identity.init() consumes the magic-link hash before this file is
-       loaded, and the bridge keeps what it returned. Reading it here is
+       loaded, and the bridge keeps what came back. Reading the value here is
        what lets sync.js surface a redirect error without knowing any of
-       that happened. Consumed once, like the hash it came from. */
+       that happened. Consumed once, like the hash the value came from. */
     consumeRedirect: function () {
       var pending = CT.pendingIdentityRedirect || null;
       CT.pendingIdentityRedirect = null;
@@ -236,7 +236,7 @@
         .then(function (rows) { return rows && rows.length ? rows[0] : null; });
     },
 
-    /* Insert-or-update this user's row. RLS pins it to their own user_id. */
+    /* Insert-or-update this user's row. RLS pins the write to their own user_id. */
     saveProfile: function (payload) {
       var user = auth.getUser();
       if (!user) return Promise.reject(new Error('Not signed in.'));
@@ -270,7 +270,7 @@
     },
 
     /* Read this user's entitlement. The view already filters to auth.uid(),
-       and the client can only read it — every write comes from the Paddle
+       and the client can only read — every write comes from the Paddle
        webhook, so an account cannot grant itself access. */
     getEntitlement: function () {
       if (!CT.config.billingEnabled) {
@@ -290,7 +290,7 @@
 
     /* ── Calendar feeds ──
        Reads go through my_calendar_feeds, a view that deliberately omits
-       feed_url. That URL is a bearer secret for the whole calendar, so it
+       feed_url. That URL is a bearer secret for the whole calendar, so the column
        is write-only from the browser's point of view: sent once on save,
        never returned. */
     listCalendarFeeds: function () {
@@ -341,7 +341,7 @@
         body: JSON.stringify({ p_code: code })
       });
     },
-    /* Hand Google's refresh token to the server. It is never kept here. */
+    /* Hand Google's refresh token to the server. Never kept here. */
     connectGoogle: function (refreshToken, email) {
       return validToken().then(function (token) {
         if (!token) throw new Error('Not signed in.');

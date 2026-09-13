@@ -2,9 +2,9 @@
    Pie Timers' own glue for the shared identity/entitlements modules.
 
    This file is the ONLY place in Pie Timers that says "pie-timers" as
-   a product string. Everything upstream of it (identity/*.js) has no
-   idea what app is calling it; everything downstream of it (the rest
-   of app.js) never sees a product string at all — it asks
+   a product string. Everything upstream (identity/*.js) has no
+   idea which app is calling; everything downstream (the rest
+   of app.js) never sees a product string at all, and asks
    hasCapability('can_sync') via CT.entitlements, a thin product-scoped
    wrapper defined below.
    ============================================================ */
@@ -31,9 +31,9 @@
     });
   }
 
-  /* init() consumes the magic-link hash and returns what it found.
-     Keeping it is what lets CT.auth.consumeRedirect() report a redirect
-     error to sync.js without sync.js knowing identity exists -- and it
+  /* init() consumes the magic-link hash and returns whatever was found.
+     Keeping that result is what lets CT.auth.consumeRedirect() report a redirect
+     error to sync.js without sync.js knowing identity exists -- and the value
      must be kept rather than re-read, because a hash can only be
      consumed once. */
   CT.pendingIdentityRedirect = window.Aibhlinn.identity.init({
@@ -55,8 +55,8 @@
        prepareSignIn draws the check when the panel opens, so the
        person is not left waiting on a widget after they have already
        pressed the button. CT.turnstile lives in billing.js, which
-       loads after this file, so both hooks resolve it lazily at call
-       time rather than capturing it here. */
+       loads after this file, so both hooks resolve the reference lazily at call
+       time rather than capturing one here. */
     prepareSignIn: function (challengeHost) {
       if (!cfg.turnstileEnabled || !CT.turnstile) return Promise.resolve(false);
       return CT.turnstile.mount(challengeHost);
@@ -77,8 +77,8 @@
       return mounted.then(function () {
         /* The widget is drawn when the panel opens, but a token only
            arrives once Cloudflare finishes -- and someone typing an
-           email address fast can beat it. Wait a few seconds rather
-           than standing aside the moment it is not ready, so the
+           email address fast can beat the check. Wait a few seconds rather
+           than standing aside the moment nothing is ready, so the
            checked path is the normal one and not a race. */
         return waitForToken(6000);
       }).then(function (token) {
@@ -93,7 +93,7 @@
            than refusing: a bot check that will not complete must not
            become a sign-in nobody can complete. That request is
            unchecked -- the state the app was in before this delegate
-           existed -- so it is not a new hole, but it is not where this
+           existed -- so nothing new is exposed, but this is not where the
            ends either. Loud on purpose: silence is how the unchecked
            path survived unnoticed in the first place. */
         console.warn('Turnstile produced no token in time; signing in without ' +
@@ -127,7 +127,7 @@
          hidden for the same window and for the same reason.
 
        trial ending, or ended            →  a button. Now is when asking
-         is useful, and it is the only state here that is an action.
+         is useful, and the only state here that is an action.
 
        entitled                          →  a bordered badge. Status,
          not an offer. Nothing to click.
@@ -145,7 +145,7 @@
   function mark() {
     var img = document.createElement('img');
     img.src = 'aibhlinn-mark-40.png';
-    img.alt = '';                 // decorative; the label beside it carries the meaning
+    img.alt = '';                 // decorative; the label alongside carries the meaning
     img.className = 'ai-mark';
     img.width = 20;
     img.height = 20;
@@ -153,11 +153,11 @@
   }
 
   /* Every slot the chip has been drawn into. identity-ui calls
-     renderStatus once, when it renders the signed-in header -- but the
+     renderStatus once, when drawing the signed-in header -- but the
      entitlement is not known then. CT.billing.get() answers from a
      default of "not entitled" until refresh() returns, so the first
      draw of a complimentary or paid account was the Get Premium
-     button, and nothing ever came back to correct it.
+     button, and nothing ever came back to correct that.
 
      Slots are kept rather than re-mounted so sign-out is untouched,
      and detached ones are dropped as they are found: identity-ui
@@ -189,7 +189,7 @@
       /* Every premium touch-point in the app points at the same page
          now, rather than some going to #account and others to
          pricing.html -- one place to buy, everywhere the offer is
-         made. On pricing.html itself this would be a self-link, so it
+         made. On pricing.html itself this would be a self-link, so the button
          is skipped there; the whole page already is the offer. */
       if (/(^|\/)pricing\.html$/.test(location.pathname)) return;
       node = document.createElement('a');
