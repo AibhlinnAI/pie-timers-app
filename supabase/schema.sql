@@ -139,9 +139,13 @@ begin
         keys       = excluded.keys,
         timezone   = excluded.timezone,
         updated_at = now(),
-        -- The new owner has never been sent anything on this device, so a
-        -- stale last_sent from the previous owner must not suppress their
-        -- first alert.
+        -- Reset because the row now describes a different person, not
+        -- because anything reads the column: nothing in the app or in
+        -- notify-milestones writes or consults last_sent today. An
+        -- earlier version of this comment claimed a stale value would
+        -- suppress the new owner's first alert, which is not true of the
+        -- code as written. Left in place so the column stays honest if
+        -- something ever does start using one.
         last_sent  = null;
 end;
 $$;
