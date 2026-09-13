@@ -242,7 +242,7 @@
         <div>
           <h2>Weekly schedule</h2>
           <p class="sub">Set your start, lunch and finish for each day. Untick a day
-          to mark it as time off. Each day of the week then shows a different word
+          to mark that day as time off. Each day of the week then shows a different word
           for freedom.</p>
         </div>
         <button class="btn btn-ghost" id="resetSchedule">Restore defaults</button>
@@ -280,9 +280,9 @@
         <!-- List is the default and always free. Calendar is a month grid
              of the same events -- manual appointments and synced calendar
              events together -- and is an AibhlinnAI Premium feature: unlike
-             calendar sync itself, it costs nothing extra to render once the
-             data already exists, so it is a clean example of what a plan
-             buys beyond the sync it is named for. -->
+             calendar sync itself, the view costs nothing extra to render once the
+             data already exists, and is a clean example of what a plan
+             buys beyond the sync the plan is named for. -->
         <div class="view-toggle" id="apptViewToggle" role="tablist" aria-label="Appointments view">
           <button class="view-toggle-btn is-active" id="apptViewList" type="button"
                   role="tab" aria-selected="true">List</button>
@@ -290,14 +290,14 @@
                   role="tab" aria-selected="false">Calendar</button>
         </div>
         <!-- Takes the Calendar toggle's place entirely while not entitled --
-             one unambiguous button straight to the place that sells it,
+             one unambiguous button straight to the place that sells access,
              not a locked control sitting next to an explanation. -->
         <a class="btn-premium" id="apptCalendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
       </header>
 
       <form class="appt-form" id="apptForm" novalidate>
         <label class="field field--grow">
-          <span>What is it?</span>
+          <span>What is this?</span>
           <input type="text" id="apptTitle" placeholder="Team stand-up" maxlength="80" required>
         </label>
         <label class="field">
@@ -375,7 +375,7 @@
         </button>
         <p class="hint">One click. We ask only for permission to <strong>read</strong>
         your calendar — nothing can be changed or deleted. Google will ask which
-        account: it does not have to be the one you signed in with.</p>
+        account, which does not have to be the one you signed in with.</p>
         <div class="or"><span>or paste an iCal address</span></div>
       </div>
 
@@ -386,7 +386,7 @@
                  placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
         </label>
         <label class="field">
-          <span>Name it</span>
+          <span>Name</span>
           <input type="text" id="calendarLabel" maxlength="40" placeholder="Work">
         </label>
         <button class="btn btn-primary" type="submit" id="calendarAdd">Connect</button>
@@ -394,13 +394,13 @@
 
       <!-- The route for locked-down work accounts. Plenty of employers
            block third-party OAuth outright, and for those people this is
-           not a fallback, it is the only way in -- worth saying before
+           not a fallback but the only way in -- worth saying before
            they conclude the feature does not work for them. -->
       <p class="hint" id="icalHint" hidden>If your workplace blocks connecting apps to
       your calendar, a private iCal address usually still works. In Google Calendar
-      it is under <strong>Settings → your calendar → Secret address in iCal format</strong>;
+      the address is under <strong>Settings → your calendar → Secret address in iCal format</strong>;
       in Outlook, <strong>Settings → Calendar → Shared calendars → Publish a calendar</strong>.
-      Treat that address like a password — anyone holding it can read your calendar.</p>
+      Treat that address like a password — anyone holding a copy can read your calendar.</p>
 
       <p class="status-line" id="calendarMessage" role="status" aria-live="polite"></p>
 
@@ -415,8 +415,8 @@
           beside the calendar → Public Calendar → copy the link.</li>
         </ul>
         <p class="notice notice--warn">Treat this address like a password — anyone
-        holding it can read that calendar. It is never shown again once saved, and
-        only the sync server can read it back. You can revoke it at any time from
+        holding a copy can read that calendar. The address is never shown again once saved, and
+        only the sync server can read the value back. You can revoke access at any time from
         your calendar provider, which immediately makes the old address useless.</p>
       </details>
     </section>
@@ -467,18 +467,18 @@
   <!-- ───────────────────────── SETTINGS ───────────────────────── -->
   <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0">
 
-    <!-- First in the tab on purpose: it is the one thing here a person
+    <!-- First in the tab on purpose: this is the one thing here a person
          on someone else's device -- a colleague being shown the app, a
          phone handed across a desk -- can actually use, before they
          have an account or any settings of their own. Encodes nothing
          but this page's own address: no session, no schedule, no
-         account travels with it. -->
+         account travels along. -->
     <section class="panel share-panel">
       <header class="panel-head">
         <div>
           <h2>Share the Pie</h2>
           <p class="sub">Show this to a colleague, friend or family member —
-          scanning it opens Pie Timers on their own device.</p>
+          scanning opens Pie Timers on their own device.</p>
         </div>
       </header>
       <div class="share-body">
@@ -499,7 +499,7 @@
       </header>
 
       <div class="settings-list">
-        <!-- First, because it is the reason most people open this tab, and
+        <!-- First, because this is the reason most people open this tab, and
              because Account otherwise sits at the very bottom behind
              appearance, notifications and calendar settings -- which is
              also where cancelling lives. A row rather than a button: this
@@ -515,7 +515,7 @@
         <label class="setting">
           <div>
             <strong>Appearance</strong>
-            <span>Dark by default. Light is there if you prefer it.</span>
+            <span>Dark by default. Light is there if you prefer.</span>
           </div>
           <select id="optTheme" class="mini-select">
             <option value="dark">Dark</option>
@@ -553,7 +553,7 @@
           <div>
             <strong>Urgent warning</strong>
             <span>When this much time is left, the timer turns crimson and
-            glows. Choose Off if you would rather it stayed calm.</span>
+            glows. Choose Off if you would rather the timer stayed calm.</span>
           </div>
           <select id="optUrgent" class="mini-select">
             <option value="0">Off</option>
@@ -666,7 +666,7 @@
       create or remember.</p>
 
       <!-- The emailed code is typed in here to finish signing in on this
-           device. It carries where a link cannot: a code works on the
+           device. A code carries where a link cannot, working on the
            machine running the app even when the inbox is only reachable
            on a phone. Shown once a code has actually been sent. -->
       <form class="signin-form" id="codeForm" novalidate hidden>
@@ -679,7 +679,7 @@
       </form>
 
       <!-- Reports on the code at least as often as on the send -- arrived,
-           wrong, expired -- so it sits with what it is reporting on
+           wrong, expired -- so the line sits beside whatever is being reported on
            rather than after the Google alternative below. -->
       <p class="status-line" id="authMessage" role="status" aria-live="polite"></p>
 
@@ -740,7 +740,7 @@
             <span>Connect or disconnect a calendar to show your next appointment.</span>
           </div>
           <!-- Connecting/disconnecting itself lives on Appointments, next
-               to the events it affects — this jumps straight there rather
+               to the events affected — this jumps straight there rather
                than duplicating that UI here. Reuses the existing generic
                [data-goto] handler; no new script needed. -->
           <button class="btn btn-quiet" type="button" data-goto="appointments">Manage</button>
@@ -784,7 +784,7 @@
           <button class="plan-card" id="buyMonthly" type="button">
             <span class="plan-name">Monthly</span>
             <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
-            <span class="plan-note">Try it first — cancel any time</span>
+            <span class="plan-note">Try before you pay — cancel any time</span>
           </button>
         </div>
 
@@ -836,7 +836,7 @@
       <section class="danger-zone">
         <h3>Delete account</h3>
         <p>Permanently deletes your account, your synced schedule and settings, and any
-        registered devices. This cannot be undone and support cannot recover it.</p>
+        registered devices. This cannot be undone and support cannot recover the data.</p>
         <button class="btn btn-danger" id="deleteAccountBtn" type="button">Delete my account</button>
       </section>
     </section>
@@ -846,9 +846,9 @@
 </main>
 
 <!-- ───────────────────────── Focus view ─────────────────────────
-     One pie, nothing else. Opened in its own window so it can be
+     One pie, nothing else. Opened in its own window so the view can be
      snapped beside whatever you are actually doing. Hidden entirely
-     unless the page was opened with ?focus, so it costs the normal
+     unless the page was opened with ?focus, so the markup costs the normal
      app nothing. -->
 <section class="focus" id="focusView" hidden>
   <div class="focus-pie">

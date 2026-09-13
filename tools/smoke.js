@@ -8,12 +8,12 @@
    happens when the line runs. supabase.js threw on load, never
    reached its last two lines, and shipped with neither CT.auth
    nor CT.db assigned -- the whole data layer silently absent, for
-   the ten minutes it took a max-age=600 cache to expire.
+   the ten minutes a max-age=600 cache took to expire.
 
    So this runs each script in order, in a stubbed browser, and
-   asserts the globals it is supposed to leave behind. It proves
-   the file executes and exports; it proves nothing about what the
-   exports then do. That is the point -- it is the cheapest check
+   asserts the globals each is supposed to leave behind. The check proves
+   a file executes and exports, and proves nothing about what the
+   exports then do. That is the point -- this is the cheapest check
    that would have caught the worst deploy of the day.
 
    Run: node tools/smoke.js
@@ -28,7 +28,7 @@ const ROOT = path.join(__dirname, '..');
 
 /* Loaded in the order index.html loads them, because that order is
    load-bearing: identity-bridge.js runs before supabase.js exists,
-   and each file may depend on what the ones before it left behind. */
+   and each file may depend on what the earlier ones left behind. */
 const SCRIPTS = [
   ['identity/identity.js',      ['Aibhlinn.identity']],
   ['identity/entitlements.js',  ['Aibhlinn.entitlements']],

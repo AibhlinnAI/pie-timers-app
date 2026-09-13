@@ -18,7 +18,7 @@
      Excel stored these as day fractions; converted here to minutes past midnight. */
   /* Deliberately round, obviously-generic hours. These began as one
      person's real timetable, which meant every new user opened the app to
-     a stranger's working week and no clue it was not theirs. Round numbers
+     a stranger's working week and no clue whose week that was. Round numbers
      read as placeholders; 9:15 and 15:10 read as somebody's actual life. */
   var DEFAULT_SCHEDULE = {
     Monday:    { working: true,  start: 540, lunch: 750, end: 1020 }, // 9:00 / 12:30 / 17:00
@@ -38,7 +38,7 @@
     push: false,
     calcTarget: '13:00',
     calcRollover: false,
-    /* What the midday timer is called. "Head Home" is opt-in because it
+    /* What the midday timer is called. "Head Home" is opt-in because the phrase
        is a prompt to stop, which not everyone wants or needs. */
     lunchLabel: 'Lunch',
     /* 'dark' | 'light' | 'system'. Dark is the default. */
@@ -48,7 +48,7 @@
        want either theme with less visual intensity, not a third theme
        to choose between. */
     calmMode: false,
-    /* Minutes remaining at which a timer turns crimson. 0 turns it off —
+    /* Minutes remaining at which a timer turns crimson. 0 turns the change off —
      one control rather than a switch plus a number, because two controls
      for one idea is exactly the load this app is meant to remove. */
     urgentMinutes: 15,
@@ -59,8 +59,8 @@
   var THEMES = ['dark', 'light', 'system'];
   var URGENT_CHOICES = [0, 5, 10, 15, 30, 60];
 
-  /* A day off is not a gap in the data — it is the point. "N/A | WFH" read
-     like a spreadsheet error; this reads like the thing it describes.
+  /* A day off is not a gap in the data — a day off is the point. "N/A | WFH" read
+     like a spreadsheet error; this reads like the thing being described.
      Each weekday keeps its own word so the table is learnable rather than
      random, and Saoirse leads because Aibhlínn is Irish.
      Roman alphabet only, as asked. */
@@ -135,7 +135,7 @@
     return normalise(saved);
   }
 
-  /* Validate anything arriving from storage or the server before trusting it. */
+  /* Validate anything arriving from storage or the server before trusting any of that. */
   function normalise(saved) {
     saved = saved || {};
     var schedule = {};
@@ -143,7 +143,7 @@
       var base = DEFAULT_SCHEDULE[day];
       var got = (saved.schedule || {})[day] || {};
       /* "Head Home" is per day AND per slot: some days the hard part is
-         stopping for lunch, other days it is leaving at all. A single
+         stopping for lunch, other days leaving at all. A single
          global switch could not express that. */
       // Coerced: the bare && yields undefined on a fresh install, which then
       // serialises as a missing key rather than an explicit false.
@@ -292,7 +292,7 @@
   }
 
   /* Seconds are simply on or off, everywhere. Moving them between surfaces
-     was clever and confusing — the setting should mean what it says. */
+     was clever and confusing — the setting should mean what the label says. */
   function formatNowTime(date) {
     var h = date.getHours();
     var m = date.getMinutes();
@@ -410,7 +410,7 @@
   var LOCALE = 'en-AU';
 
   /* Composed rather than formatted: en-AU renders "Saturday 1 August 2026"
-     with no comma, and the pause after the weekday makes it easier to scan. */
+     with no comma, and the pause after the weekday makes the line easier to scan. */
   function formatLongDate(date) {
     var weekday = date.toLocaleDateString(LOCALE, { weekday: 'long' });
     var rest = date.toLocaleDateString(LOCALE, {
@@ -493,10 +493,10 @@
   /* ─────────────────────────── Appointments ───────────────────────────
 
      The pie needs a meaningful "full". A meeting has no natural start the
-     way a work day does, so it uses a fixed focus window instead: the pie
+     way a work day does, so the pie uses a fixed focus window instead: the pie
      sits full while the appointment is further away than the window, then
-     drains through it. That keeps a full pie meaning the same thing every
-     time, which is the whole point of reading it spatially. */
+     drains through that window. Keeping a full pie meaning the same thing every
+     time is the whole point of reading a shape rather than a number. */
 
   function appointmentDate(appointment) {
     var parts = appointment.date.split('-');
@@ -542,7 +542,7 @@
     return soonest;
   }
 
-  /* The appointment pie rescales as it approaches, rather than sitting
+  /* The appointment pie rescales as the moment approaches, rather than sitting
      uselessly full for days. Three tiers, each starting a fresh pie:
 
        more than a day away  → the pie is N whole days, one notch per day
@@ -657,7 +657,7 @@
   /* One pattern for every "not switched on yet" message: first what the
      person can see and do, then the owner's setup step, marked as such.
      A developer instruction should never be the first thing a user reads,
-     because it looks like an error they have no way to act on. */
+     because that looks like an error they have no way to act on. */
   function setUnavailable(el, plain, setup) {
     if (!el) return;
     el.textContent = '';
@@ -700,7 +700,7 @@
   });
 
   /* Arrow keys along the bar, Home/End to the ends — the keyboard contract
-     a tablist promises the moment it claims that role. */
+     a tablist promises the moment the role is claimed. */
   $('tabList').addEventListener('keydown', function (event) {
     var keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
     if (keys.indexOf(event.key) === -1) return;
@@ -923,17 +923,17 @@
   /* ─────────────────────────── Calendar view (Premium) ───────────────────────────
      A month grid of the same two sources the list already reads --
      manual appointments plus synced calendar events -- so switching
-     views never shows different data, only a different shape of it.
+     views never shows different data, only a different shape of the same thing.
 
      Gated on CT.billing.isEntitled(), the same flag calendar sync
      itself is gated on. Rendering a month once the data already exists
-     costs nothing extra to give away, which is what makes it a clean
-     example of what a plan buys beyond the sync it is named for,
+     costs nothing extra to give away, which is what makes the view a clean
+     example of what a plan buys beyond the sync the plan is named for,
      rather than a feature invented to have something to sell.
 
      Synced events are only ever as complete as calendar-sync's own
      window (a day back, three weeks ahead — see calendar-sync/
-     index.ts), so a month view can show real gaps for days outside it.
+     index.ts), so a month view can show real gaps for days outside the range.
      That is not a new limitation: the list view reads the same capped
      data today, just without a way to notice the cap. */
   var calView = { year: 0, month: 0, selectedDate: null };
@@ -963,12 +963,12 @@
     return events;
   }
 
-  /* Sets which day is selected AND repaints the grid's highlight for it,
+  /* Sets which day is selected AND repaints the grid's highlight to match,
      in that order, in one function. Splitting those two across call
      sites is what caused the bug this replaced: the grid was told to
      redraw before calView.selectedDate had changed, so the highlight
      was always one click behind whichever day was actually showing
-     below it. Every caller wants both effects together, so there is
+     below. Every caller wants both effects together, so there is
      now only one function that can do half the job. */
   function renderCalendarDay(dateStr) {
     var detail = $('calDayDetail');
@@ -1076,7 +1076,7 @@
     var toCalendar = view === 'calendar';
     // The toggle button itself is hidden (replaced by the Premium Feature
     // link) whenever this would be blocked, so reaching here not entitled
-    // would mean stale markup, not a real click -- nothing to say about it.
+    // would mean stale markup, not a real click -- nothing worth saying.
     if (toCalendar && !CT.billing.isEntitled()) return;
     $('apptListView').hidden = toCalendar;
     $('apptCalendarView').hidden = !toCalendar;
@@ -1101,10 +1101,10 @@
     renderCalendarDay(isoDate(now));
   });
 
-  /* The Calendar toggle and the Premium Feature link that replaces it
+  /* The Calendar toggle and the Premium Feature link that replaces one
      trade places by entitlement, and if someone is mid-Calendar-view
      when their plan lapses, falling back to List rather than leaving a
-     paying-only view open to someone who no longer pays for it. */
+     paying-only view open to someone who no longer pays. */
   function renderAppointmentsPlanGate() {
     var entitled = CT.billing.enabled() ? CT.billing.isEntitled() : true;
     $('apptViewCalendar').hidden = !entitled;
@@ -1121,7 +1121,7 @@
     var time = hhmmToMinutes($('apptTime').value);
     var error = $('apptError');
 
-    if (!title) { error.textContent = 'Give it a name so you know what is coming.'; return; }
+    if (!title) { error.textContent = 'Give this appointment a name so you know what is coming.'; return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { error.textContent = 'Pick a date.'; return; }
     if (!isMinute(time)) { error.textContent = 'Pick a time.'; return; }
 
@@ -1276,7 +1276,7 @@
       if (feed.kind === 'google' && !feed.has_google) {
         // The grant died; syncing is off until they reconnect.
         meta.textContent = feed.last_error ||
-          'Google access has expired. Reconnect to restore it.';
+          'Google access has expired. Reconnect to restore access.';
         meta.className = 'is-error';
       } else if (feed.last_error) {
         meta.textContent = feed.last_error;
@@ -1458,7 +1458,7 @@
 
   /* The wedge of time still LEFT.
 
-     It empties clockwise: the gap opens at 12 o'clock and grows round to
+     The wedge empties clockwise: the gap opens at 12 o'clock and grows round to
      the right, so the surviving wedge runs from the elapsed boundary all
      the way back to 12. Zero therefore always sits at 12 o'clock, which
      is what makes the notches below mean something fixed. */
@@ -1507,7 +1507,7 @@
     return 1440;   // days
   }
 
-  /* Two layers per dial: one beneath the wedge and one above it. A single
+  /* Two layers per dial: one beneath the wedge and one above. A single
      layer can only be readable against one of the two backgrounds, and the
      notches you most need to count are the ones still inside the pie. */
   function renderNotchPair(prefix, totalMinutes, forcedInterval) {
@@ -1726,7 +1726,7 @@
      A QR code for this page's own address, nothing else -- no session,
      no schedule, no account rides along. Drawn once at boot, since the
      address does not change while the app stays open. qrcode.js is the
-     vendored encoder (see its own header); typeNumber 0 tells it to
+     vendored encoder (see its own header); typeNumber 0 asks the encoder to
      pick the smallest size that fits whatever this URL turns out to
      be, rather than this file guessing a fixed one. */
   (function renderShareQr() {
@@ -1746,7 +1746,7 @@
       input.focus();
       input.select();
       try { document.execCommand('copy'); done(); }
-      catch (e) { toast('Could not copy — select the link and copy it instead.'); }
+      catch (e) { toast('Could not copy — select the link and copy by hand instead.'); }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(input.value).then(done).catch(fallback);
@@ -1774,7 +1774,7 @@
       if ((key === 'alerts' || key === 'push') && el.checked) {
         CT.notify.requestPermission().then(function (result) {
           if (result !== 'granted') {
-            // Permission refused — don't leave a switch claiming it will work.
+            // Permission refused — don't leave a switch claiming delivery will work.
             state.settings[key] = false;
             el.checked = false;
             save();
@@ -1928,7 +1928,7 @@
   /* ─────────────────────────── Focus view ───────────────────────────
      One pie in its own window, meant to sit snapped beside real work.
 
-     Which pie is not a setting: it is whichever milestone is nearest,
+     Which pie is not a setting: whichever milestone is nearest wins,
      so the view is always showing the thing that is about to happen.
      Choosing is the cognitive load this app exists to remove. */
 
@@ -2028,7 +2028,7 @@
   var openFocusBtn = $('openFocus');
   if (openFocusBtn) {
     openFocusBtn.addEventListener('click', function () {
-      // Tall and narrow by default, which is the shape it ends up in
+      // Tall and narrow by default, which is the shape the window ends up in
       // when snapped down the side of a screen.
       var opened = window.open('index.html?focus=1', 'pieTimersFocus',
                                'width=360,height=560');
@@ -2090,9 +2090,9 @@
       : 'Pie Timers';
 
     /* Last, so its title wins. The rest of the render still runs in a
-       focus window: the elements are hidden, not absent, and it keeps
+       focus window: the elements are hidden, not absent, and the layout keeps
        milestone alerts firing when the focus window is the only one
-       open — which is exactly when someone is relying on it. */
+       open — which is exactly when someone is relying on the view. */
     if (FOCUS) renderFocus(now);
   }
 
@@ -2166,11 +2166,11 @@
     var trialing = isTrial(ent) && ent.entitled;
 
     var left = daysLeft(ent);
-    /* During a trial, stay out of the way until it is nearly over --
+    /* During a trial, stay out of the way until the trial is nearly over --
        people should get to live with the app before being asked. Four
        days matches the header chip, which switches from a quiet Free
        Trial badge to a Get Premium button at the same moment. Two
-       different answers to "is it time to ask yet" on one screen would
+       different answers to "time to ask yet?" on one screen would
        be worse than either. */
     var nudging = trialing && left !== null && left <= 4;
 
@@ -2181,10 +2181,10 @@
                      (CT.billing.isEntitled() && !nudging);
     }
 
-    /* One heading, always. It used to swap between "Unlock" and "Keep"
+    /* One heading, always. The heading used to swap between "Unlock" and "Keep"
        depending on how much trial was left -- a distinction that made
        the panel about the trial rather than about what is being sold.
-       The product has a name; the list underneath already says what it
+       The product has a name; the list underneath already says what the plan
        does, and the trial notice already says how long is left. */
 
     var trialNotice = $('trialNotice');
@@ -2194,7 +2194,7 @@
         trialNotice.textContent =
           'You have ' + left + (left === 1 ? ' day' : ' days') +
           ' left of your free trial. Everything is switched on — no card needed, ' +
-          'and nothing happens automatically when it ends.';
+          'and nothing happens automatically when the trial ends.';
       }
     }
 
@@ -2226,7 +2226,7 @@
     /* Shown only when there is actually a Paddle subscription to manage.
        Gating this on isEntitled() offered the button to every trialling
        account -- which is every account, for its first fortnight -- and
-       clicking it returned a 404 rendered as an error, so the first
+       clicking returned a 404 rendered as an error, so the first
        thing a new customer did on this page was read what looked like a
        broken account. */
     var manage = $('managePlan');
@@ -2251,9 +2251,9 @@
         : 'Never';
     } else {
       /* Nothing sent yet, or just signed out: the code route only makes
-         sense straight after an email goes out, so it starts hidden and
-         the send handler reveals it. renderAccount does not run on send,
-         so this cannot pull it back after that. */
+         sense straight after an email goes out, so the line starts hidden and
+         the send handler reveals one. renderAccount does not run on send,
+         so this cannot pull the line back afterwards. */
       $('codeForm').hidden = true;
       $('codeInput').value = '';
     }
@@ -2262,7 +2262,7 @@
        every auth change, and an unconditional mount here would drag the
        single Turnstile widget back out of the header sign-in panel each
        time -- leaving that panel with no check and a token that never
-       arrives. Whichever form the person can see is the one that gets it. */
+       arrives. Whichever form the person can see is the one that receives one. */
     if (!signedIn && CT.config.turnstileEnabled) {
       var tsHost = $('turnstileHost');
       if (tsHost && tsHost.offsetParent !== null) CT.turnstile.mount(tsHost);
@@ -2274,7 +2274,7 @@
   }
 
   /* Support address and legal URLs live in config.js so there is exactly one
-     place to change them. Runs once at load — none of it varies afterwards. */
+     place to change them. Runs once at load — none of this varies afterwards. */
   (function applyConfigLinks() {
     var email = CT.config.supportEmail || '';
     var mailtos = document.querySelectorAll('[data-support-mailto]');
@@ -2300,7 +2300,7 @@
   }());
 
   /* Captured once up front, so the button can be put back exactly as
-     the markup had it rather than a hard-coded copy that drifts from
+     the markup already had rather than a hard-coded copy that drifts from
      index.html. Read at boot, not lazily on first submit: the email
      input's own listener below resets the button to this value on
      every keystroke, and a null read there (before any submit had
@@ -2323,7 +2323,7 @@
        callback already, and token() is the one place that knows whether
        one has arrived. Same pattern as identity-bridge.js's own
        waitForToken, for the same reason: the widget rarely finishes
-       inside the time it takes to type an email address and press the
+       inside the time needed to type an email address and press the
        button, and bailing outright the first time round used to strand
        the form on "Just a moment" for good -- the check would quietly
        pass a moment later with nothing left on screen to press. */
@@ -2345,7 +2345,7 @@
 
       CT.auth.signInWithEmail(email, token).then(function () {
         /* Same as the header panel: the label says where to look and who
-           it is from, and stays put until a resend is actually useful. */
+           the sender is, and stays put until a resend is actually useful. */
         button.textContent = 'Check your inbox';
         authMessage('We sent a sign-in code to ' + email + '.', false,
           'This email comes from AibhlinnAI ➡️ check your spam folder if the email has not hit your inbox.');
@@ -2520,11 +2520,11 @@
       // for longer than the request takes.
       //
       // Deliberately NOT passing 'noopener' to window.open(): compliant
-      // browsers return null instead of a window reference when it's
-      // set, which would silently break the redirect below before it
+      // browsers return null instead of a window reference when that is
+      // set, which would silently break the redirect below before that
       // ever ran. Setting .opener = null by hand afterwards gets the
       // same protection (the new tab can't navigate this one) while
-      // still leaving us the reference we need to control it.
+      // still leaving us the reference we need to control the tab.
       var portalTab = window.open('', '_blank');
       if (portalTab) portalTab.opener = null;
 
@@ -2566,7 +2566,7 @@
     });
 
     /* ── Account deletion ────────────────────────────────────────────
-       Irreversible, so it is gated behind a typed confirmation rather
+       Irreversible, and so gated behind a typed confirmation rather
        than a single click that could be hit by accident. */
 
     var deleteDialog = $('deleteDialog');
@@ -2665,7 +2665,7 @@
   CT.app = {
     getState: function () { return state; },
 
-    /* Adopt a copy from the server and rebuild everything that reads it. */
+    /* Adopt a copy from the server and rebuild everything that reads from there. */
     replaceState: function (incoming, options) {
       var next = normalise(incoming);
       next.updatedAt = incoming.updatedAt || Date.now();
@@ -2736,6 +2736,6 @@
 
   CT.sync.init();
 
-  // sync.init() consumes the URL fragment, so this must follow it.
+  // sync.init() consumes the URL fragment, so this must follow that call.
   finishGoogleConnect();
 })();
