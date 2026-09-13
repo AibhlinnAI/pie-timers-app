@@ -6,13 +6,13 @@ A live app replacement for `Countdown Timers.xlsx`. Everything the workbook did 
 `NOW()` + F9 now updates itself once a second.
 
 **The name and the tagline are the product thesis.** Time is a pie that empties
-whether you look at it or not. Naming both directions — eating it, and being eaten
-by it — is deliberate: the app never scolds anyone for a bad day. The pie simply
+whether you look or not. Naming both directions — eating the pie, and being eaten
+by the pie — is deliberate: the app never scolds anyone for a bad day. The pie simply
 empties, and tomorrow there is another one. Keep that tone in any copy you add.
 
 Published by Aibhlínn AI.
 
-## Running it
+## Running the app
 
 Double-click `index.html`. That's the whole install — no Node, no build step, no
 dependencies, no internet connection required. In this mode the app is entirely
@@ -20,7 +20,7 @@ local: no account, no sync, in-app alerts only.
 
 Accounts, sync and background notifications need the app **served over HTTPS**
 (or from `localhost`), because service workers and Web Push refuse to run from
-`file://`. See *Deploying* below. Serving it also enables the browser's
+`file://`. See *Deploying* below. Serving the folder also enables the browser's
 **Install app** option, via `manifest.webmanifest` and `icon.svg`.
 
 The app degrades cleanly: until `config.js` is filled in, the Account tab explains
@@ -52,9 +52,9 @@ label the workbook used.
 ## What's new
 
 - **Live ticking.** No F9. The tick is aligned to the top of each second so the
-  clock never visibly stalls, and it re-syncs whenever the tab regains focus.
+  clock never visibly stalls, and the tick re-syncs whenever the tab regains focus.
 - **Editable schedule.** The Schedule tab writes straight to local storage. Untick
-  a day to mark it `N/A | WFH`.
+  a day to mark that day `N/A | WFH`.
 - **Milestone alerts** at 30 / 15 / 10 / 5 minutes remaining and on completion,
   with an optional chime. Each alert fires once per day.
 - **Urgent state.** Under 15 minutes, a pie and its bar switch to the orange
@@ -63,15 +63,15 @@ label the workbook used.
 ### Appointments
 
 Add anything with a fixed time on the Schedule tab — a meeting, a call, a pickup —
-and the soonest one counts down on the Dashboard as a third pie. When it passes,
+and the soonest one counts down on the Dashboard as a third pie. When that one passes,
 the next one takes over automatically. Milestone alerts fire for appointments too.
 
 **The focus window** is what makes the pie meaningful. A work day has a natural
-start, so its pie can span start→finish. A meeting has no such anchor, so it uses
+start, so its pie can span start→finish. A meeting has no such anchor, so the pie uses
 a fixed window instead (default 1 hour, set in Settings): the pie sits full while
-the appointment is further away than the window, then drains through it. A full
+the appointment is further away than the window, then drains through the window. A full
 pie therefore always means the same thing — "at least this long to go" — which is
-what makes it readable at a glance rather than something to decode.
+what makes the pie readable at a glance rather than something to decode.
 
 Appointments are free, on one device, and sync with everything else on a plan.
 
@@ -79,7 +79,7 @@ Appointments are free, on one device, and sync with everything else on a plan.
 
 Connect a calendar on the Schedule tab and meetings appear on their own. Works with
 Google, Outlook, iCloud, Fastmail — anything publishing a private iCal address. No
-OAuth and no app-store review, which is why it ships before the Google one-click
+OAuth and no app-store review, which is why this path ships before the Google one-click
 version.
 
 Synced events and manual appointments are treated identically once loaded: the
@@ -96,14 +96,14 @@ Events are cached locally so the countdown survives going offline.
 **Privacy — read this before launch.** An iCal address is a bearer token for
 somebody's entire calendar: no expiry, no second factor. Handle accordingly.
 
-- It is never returned to the browser after being saved. The client reads
+- The address is never returned to the browser after being saved. The client reads
   `my_calendar_feeds`, a view that omits the URL entirely.
-- Only the edge function, using the service-role key, can read it back.
-- It is **not encrypted at rest** — it sits in Postgres protected by row-level
+- Only the edge function, using the service-role key, can read the address back.
+- The address is **not encrypted at rest** — the value sits in Postgres protected by row-level
   security and Supabase's disk encryption. If you want envelope encryption, that
   is a worthwhile hardening job and is not yet done.
 - The sync function refuses localhost, private ranges and the cloud metadata
-  address, because it fetches a URL a user supplied. Without that check it would
+  address, because the function fetches a URL a user supplied. Without that check the function would
   be a server-side request forgery hole.
 
 ### Google one-click
@@ -115,7 +115,7 @@ in the same table — the merge, the pie and the list are unchanged.
 
 Read-only is the only scope requested. Nothing in the app can alter a calendar.
 
-**Read this before launching it.** `calendar.readonly` is a Google *sensitive
+**Read this before launching the feature.** `calendar.readonly` is a Google *sensitive
 scope*, and that carries real constraints:
 
 - **Verification is required** before public use: privacy policy, a demo video, a
@@ -124,20 +124,20 @@ scope*, and that carries real constraints:
   add by hand** in the Google Cloud console.
 - **In Testing mode, Google refresh tokens expire after 7 days.** Every connected
   user must reconnect weekly until verification completes. The app handles this
-  gracefully — it deactivates the feed, explains what happened, and shows
-  *Reconnect* rather than *Refresh* — but it is a poor experience to launch on.
+  gracefully — the app deactivates the feed, explains what happened, and shows
+  *Reconnect* rather than *Refresh* — but that is a poor experience to launch on.
 
 So: the iCal path is what to ship with. Start Google verification in parallel and
-turn this on when it clears.
+turn this on when verification clears.
 
-**Disconnect genuinely revokes.** It calls Google's revoke endpoint as well as
+**Disconnect genuinely revokes.** The button calls Google's revoke endpoint as well as
 deleting the row, because deleting our record alone would leave the grant live in
 the user's Google account, which is not what the button appears to promise.
 
-**The refresh token** is a long-lived key to the calendar. It arrives in the OAuth
+**The refresh token** is a long-lived key to the calendar, and arrives in the OAuth
 redirect fragment, goes straight to the server, and is never written to
 `localStorage`, never stored client-side, and never returned by any read — the
-client view exposes only a `has_google` boolean. Like the iCal URL it is **not
+client view exposes only a `has_google` boolean. Like the iCal URL the token is **not
 encrypted at rest**.
 
 ### What the iCalendar reader does and does not do
@@ -151,9 +151,9 @@ Not supported: `BYSETPOS`, `BYYEARDAY`, `BYWEEKNO`, `BYHOUR`/`BYMINUTE`,
 `WKST`-sensitive weekly maths, `VTIMEZONE` definitions for zones outside the IANA
 database, and per-attendee status (a meeting you declined still shows).
 
-`ical.js` is written as plain JavaScript rather than TypeScript on purpose: it
+`ical.js` is written as plain JavaScript rather than TypeScript on purpose: the choice
 means the exact shipping file can be unit-tested in a plain JS engine instead of a
-hand-copied approximation of it.
+hand-copied approximation.
 
 ### Why the timers are solid pies
 
@@ -195,8 +195,8 @@ Sign-in is **an emailed one-time code, or Google** — there is no password anyw
 in the product, so there is nothing to hash, reset, or leak.
 
 The sign-in email carries a **short numeric code and no link**. A link only ever
-signs in the browser that opens it, and corporate mail scanners that fetch every
-URL in a message can spend it before the person reads the email. A code is read off
+signs in the browser that opens the link, and corporate mail scanners that fetch every
+URL in a message can spend that link before the person reads the email. A code is read off
 whichever device holds the inbox — a personal address reachable only on a phone,
 say — and typed into the device running the app, which calls `/auth/v1/verify`
 itself and gets its own session, no redirect involved. The code field appears in
@@ -209,18 +209,18 @@ offline are queued and pushed when the connection returns.
 
 **Conflict rule: last write wins**, compared on `updatedAt`. This is the right
 trade-off for a small single-user document edited on a handful of devices — a merge
-UI would cost far more than it saves. Exact ties resolve in favour of the server so
+UI would cost far more than the merge saves. Exact ties resolve in favour of the server so
 devices converge instead of ping-ponging.
 
 ### Deleting an account
 
 Account → **Delete my account**. The user must type `DELETE` to confirm; a single
-misclick cannot trigger it.
+misclick cannot trigger deletion.
 
 Deleting the auth user needs the service-role key, which must never reach the
-browser, so it runs in the `delete-account` edge function. That function takes the
+browser, so deletion runs in the `delete-account` edge function. That function takes the
 user id **from the caller's own validated access token**, never from the request
-body, so one user cannot delete another. It clears `push_subscriptions`,
+body, so one user cannot delete another. The function clears `push_subscriptions`,
 `timer_profiles` and `notification_log`, then removes the auth user.
 
 If the server call fails, nothing is destroyed — the error is shown and local data
@@ -238,7 +238,7 @@ per timer per day. There are two delivery paths:
 | Web Push | App fully closed | Account + VAPID key + the edge function |
 
 Both paths tag a milestone identically (`YYYY-MM-DD\|timer\|milestone`), so a
-milestone shows **once** even if both deliver it.
+milestone shows **once** even if both deliver.
 
 The timer maths is duplicated in `app.js` and in the edge function. Those two must
 stay in step or the push will fire at a different moment than the in-app alert —
@@ -267,7 +267,7 @@ $15.80 and is the one to convert people onto once the timers have proved
 themselves.
 
 $19/yr is **$1.58 a month**, which is the number to lead with in any marketing —
-it is a far easier figure to hear than the annual total, and it undercuts most
+a far easier figure to hear than the annual total, and one that undercuts most
 single-app subscriptions people already carry.
 
 Display prices live in `config.js` under `paddle` — change them there, not in the
@@ -286,7 +286,7 @@ Paddle takes roughly 5% + a **fixed 50c per transaction**:
 Worth knowing: at these prices a monthly subscriber who stays a full year is worth
 *more* to you than an annual one. Annual still wins in practice — cash up front,
 no monthly churn, no failed-card dunning, and far less admin for the user. But the
-$15.80 discount is a genuine cost to you, not a free lever, so don't deepen it
+$15.80 discount is a genuine cost to you, not a free lever, so don't deepen that
 casually.
 
 **Against the goal:** at ~$17.55 net per annual subscriber, covering Claude Max at
@@ -301,17 +301,17 @@ but "Sync now" still downloads the schedule, and Settings → Export still works
 ### Free trial
 
 **Everyone gets 14 days free on sign-up.** No card, no code, nothing to enter.
-It is granted by a database trigger on account creation, so it cannot be requested
+A database trigger grants this on account creation, so nobody can request
 twice or forged from the client.
 
-Fourteen days covers two real working weeks, which is what it takes for the
+Fourteen days covers two real working weeks, which is what the timers need to
 timers to prove themselves. Subscribe inside that window and the first payment
 is not taken until day 30 from sign-up (`FREE_DAYS_FROM_SIGNUP` in
 `paddle-webhook`), so subscribing early never costs someone free time they
 would otherwise have had.
 
 The app stays quiet during the trial and only starts mentioning payment in the last
-14 days. When it ends, automatic sync stops but nothing is deleted, no card is
+14 days. When the trial ends, automatic sync stops but nothing is deleted, no card is
 charged, and "Sync now" still downloads.
 
 **This replaces the launch promo code.** A public "first 50 free" code would end up
@@ -327,7 +327,7 @@ is nothing worth selling:
   a shared or sold code does nothing for anyone else.
 - **Single use**, so a leak costs exactly one slot and you can see whose.
 - **Random and unguessable** — `MATE-K7P2-QX9M`, from an alphabet with no `0/O/1/I`
-  so it can be read aloud.
+  so the code can be read aloud.
 - **Rate limited** to ten attempts an hour per account, so a dictionary attack on
   the redemption endpoint gets nowhere.
 - **Wrong-email and nonexistent codes return an identical error**, so the response
@@ -343,17 +343,17 @@ Add a third argument for a limited grant, e.g. `365` for a year. Kill one instan
 with `update public.access_codes set active = false where code = '…';`.
 
 **Complimentary access** for anyone who cannot pay is a one-line SQL insert — see
-the bottom of `supabase/schema-billing.sql`. Offer it freely.
+the bottom of `supabase/schema-billing.sql`. Offer that freely.
 
 ### Discount codes
 
 The checkout accepts any discount code you create in Paddle → Discounts, entered in
-the field above the plan cards. Paddle validates it and shows the result in its own
+the field above the plan cards. Paddle validates the code and shows the result in its own
 overlay, so a mistyped or expired code fails gracefully.
 
 If you run a public promotion, assume the code reaches a coupon site eventually —
 that is near-certain. Cap redemptions and set an expiry in Paddle rather than
-trying to prevent it.
+trying to prevent that.
 
 ## Deploying
 
@@ -377,8 +377,8 @@ Two of these matter even if you skip the optional features:
 `schema-calendar.sql` adds the **`appointments` column** without which manual
 appointments do not sync between devices.
 
-`cron.sql` is deliberately not in this list — it is the only file with placeholders
-to fill in, and it must wait until the edge functions exist. It is step 6 below.
+`cron.sql` is deliberately not in this list — the file is the only one with placeholders
+to fill in, and must wait until the edge functions exist. See step 6 below.
 
 **3 — Fill in `config.js`** with your Project URL and anon key (Project Settings →
 API). Both are public by design; the RLS policies are what protect the data.
@@ -405,7 +405,7 @@ Send a test magic link to a Gmail, an Outlook and a work address before launch.
 Inbox placement varies by provider and is the thing you actually care about.
 
 **4b — Sign-in protection (Turnstile).** Without this the sign-in form will email
-any address given to it, as often as asked — an email-bombing tool pointed at
+any address supplied, as often as asked — an email-bombing tool pointed at
 strangers that burns your Resend quota and domain reputation.
 
 1. Create a Turnstile widget at Cloudflare (free) for your domain.
@@ -424,9 +424,9 @@ Once `turnstileSiteKey` is set, the client stops calling `/auth/v1/otp` directly
 and routes through the function instead. The function also throttles to 5 emails
 per address and 15 per IP per hour, storing only hashes.
 
-> If `TURNSTILE_SECRET_KEY` is unset the function **fails open** — it still sends,
+> If `TURNSTILE_SECRET_KEY` is unset the function **fails open** — sign-in still works,
 > just without the bot check. That keeps a misconfiguration from locking everyone
-> out, but it does mean you must confirm the secret is actually set in production.
+> out, but you must still confirm the secret is actually set in production.
 
 **5 — For background push**, generate a VAPID key pair:
 
@@ -435,7 +435,7 @@ npx web-push generate-vapid-keys
 ```
 
 Put the public key in `config.js` as `vapidPublicKey`, then set the edge function's
-secrets and deploy it:
+secrets and deploy:
 
 ```bash
 supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com CRON_SECRET=$(openssl rand -hex 32)
@@ -445,8 +445,8 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=ma
 supabase functions deploy notify-milestones
 ```
 
-**6 — Schedule it**: fill in the placeholders in `supabase/cron.sql` and run it.
-It calls the function once a minute and prunes the delivery log nightly.
+**6 — Schedule the refresh**: fill in the placeholders in `supabase/cron.sql` and run the file.
+The job calls the function once a minute and prunes the delivery log nightly.
 
 **7 — Deploy account deletion.** This one is required even if you skip push:
 
@@ -465,7 +465,7 @@ fine for testing but should be pinned to your site before launch.
 **8 — Billing (Paddle).**
 
 1. Create a Paddle account and complete seller verification. Budget several days
-   for this — they review new sellers, and it is not instant.
+   for this — they review new sellers, and review is not instant.
 2. Create one product with two prices: annual and monthly.
 3. Optionally create discount codes, each with a redemption limit and expiry.
 4. Put the client token and both price IDs in `config.js`.
@@ -495,7 +495,7 @@ supabase functions deploy calendar-sync
 ```
 
 Then fill in the placeholders at the bottom of `supabase/schema-calendar.sql` and
-run it, which schedules a refresh every 15 minutes. It reuses `CRON_SECRET` and
+run that file, which schedules a refresh every 15 minutes. The job reuses `CRON_SECRET` and
 `ALLOWED_ORIGIN` from the earlier steps, so there are no new secrets to set.
 
 Test with your own calendar first, and check a recurring meeting shows at the right
@@ -522,7 +522,7 @@ supabase functions deploy google-connect
 supabase functions deploy calendar-sync
 ```
 
-Re-deploy `calendar-sync` even if you already have it — it now handles both kinds.
+Re-deploy `calendar-sync` even if you already have that function — the new version handles both kinds.
 
 ## Files
 
@@ -573,7 +573,7 @@ plain HTTP:
 - `cdn.paddle.com` — checkout, only when `paddle.clientToken` is set
 
 With neither configured, the app still starts, runs and works offline exactly as
-it always did.
+as always.
 
 ## Data & privacy
 
@@ -583,7 +583,7 @@ own Supabase project — no third party is involved.
 
 Row-level security means the public anon key can only ever reach the signed-in
 user's own rows. The `notification_log` table has no client insert policy at all;
-only the edge function writes to it, using the service-role key.
+only the edge function writes there, using the service-role key.
 
 Session tokens are held in `localStorage`, the standard approach for a
 no-backend-server SPA. If you later add a same-origin backend, moving them to
@@ -593,40 +593,40 @@ no-backend-server SPA. If you later add a same-origin backend, moving them to
 
 Billing, email deliverability, rate limiting and account deletion are all built.
 What they still need is **your accounts and credentials** — see *Deploying*. None
-of it is active until `config.js` and the function secrets are filled in.
+of this is active until `config.js` and the function secrets are filled in.
 
 Still genuinely open:
 
 - **Support email — set.** `support@aibhlinn.ai`, in `config.js`. One change
   there updates the upgrade panel, the footer, the terms and the privacy policy;
-  they all read from it. Make sure the mailbox actually exists and is monitored
-  before launch — it is printed in both legal documents, so it is where refund
+  they all read from that value. Make sure the mailbox actually exists and is monitored
+  before launch — the address is printed in both legal documents, and is where refund
   requests and privacy requests will arrive.
 - **Terms and a privacy policy.** Drafts are written: `terms.html` and
   `privacy.html`, linked from the footer of every page. Both carry an HTML
   comment listing what to fill in, and **neither has been reviewed by a lawyer**.
   Fill in `[LEGAL ENTITY NAME]`, `[ABN / ACN if registered]`, `[STATE]`,
   `[DATE]`, and — in the
-  privacy policy — `[SUPABASE REGION]` and `[YOUR HOST]`. The region matters: it
+  privacy policy — `[SUPABASE REGION]` and `[YOUR HOST]`. The region matters, because the claim
   determines whether you are telling customers the truth about their data leaving
   Australia. Get both reviewed before the first sale.
 - **Refund policy.** Written into `terms.html` as 30 days, no justification
   required, on top of the non-excludable Australian Consumer Law guarantees.
-  Confirm it matches what you actually configure in Paddle.
+  Confirm the figure matches what you actually configure in Paddle.
 - **Live verification.** Nothing here has been run against a real Supabase, Google,
   Resend, Turnstile or Paddle account — those need credentials only you can create.
   `diagnostics.html` does as much of that check as a browser can (see below).
 
 ### diagnostics.html
 
-Deploy it, open it, read the reds. It checks, against whatever `config.js`
+Deploy the page, open the page, read the reds. The check runs against whatever `config.js`
 currently points at:
 
 - HTTPS, service worker registration, and push support in this browser
 - that the support address and the legal pages have no placeholders left
 - that Supabase answers, that the anon key is accepted, and that email sign-in
   is enabled
-- that every table exists **and that row-level security is actually on** — it
+- that every table exists **and that row-level security is actually on** — the page
   asks each table for a row without a session, and a row coming back is
   reported as a live data leak, not a pass
 - that every edge function is deployed, by sending an empty request that a
@@ -635,12 +635,12 @@ currently points at:
 - that the Paddle token, environment and price IDs are internally consistent
   (a live token with `environment: 'sandbox'` is the classic launch-day fault)
 
-It performs no writes, sends no email and opens no checkout, so it is safe to
-run in production. It also lists the five things only a human can test —
+The page performs no writes, sends no email and opens no checkout, so running is safe
+run in production, and also lists the five things only a human can test —
 receiving a sign-in email, syncing between two real devices, a test purchase,
 an account deletion, and an alert arriving with the app closed. Delete the file
-before launch if you would rather not advertise which services you use; it
-exposes no secrets, but it does name them.
+before launch if you would rather not advertise which services you use: the page
+exposes no secrets, but does name them.
 
 ## Verified
 
