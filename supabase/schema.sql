@@ -88,6 +88,72 @@ create policy "own subs: delete"
   using (auth.uid() = user_id);
 
 
+-- ──────────────── Claiming a device's push endpoint ────────────────
+-- A push endpoint identifies a BROWSER, not a person, which is why the
+-- column is unique. Sign in as a second account on one browser and that
+-- endpoint is already taken: the upsert falls to its UPDATE path, the
+-- policy's USING sees somebody else's user_id, and Postgres refuses with
+-- "new row violates row-level security policy (USING expression)". The
+-- toggle fails and only the console says why.
+--
+-- The failed write is the smaller half. The previous account's row
+-- survives, and notify-milestones reads every row with the service role,
+-- so that account's milestone alerts keep arriving on a device somebody
+-- else is now using. Two accounts on one browser is ordinary -- a work
+-- login and a personal one, a shared family machine, a demo device at a
+-- conference -- and none of those people did anything wrong.
+--
+-- So ownership follows the device. This claims the endpoint for the
+-- caller and takes the endpoint from whoever held one before, which is
+-- correct in both directions: the new person gets their alerts, and the
+-- previous one stops receiving theirs somewhere they no longer are.
+--
+-- security definer to get past the policy that blocks the takeover, and
+-- auth.uid() rather than a user_id argument, so a caller can only ever
+-- claim an endpoint for themselves.
+
+create or replace function public.claim_push_subscription(
+  p_endpoint text,
+  p_keys     jsonb,
+  p_timezone text default 'UTC'
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not signed in.' using errcode = '42501';
+  end if;
+
+  if p_endpoint is null or length(p_endpoint) = 0 then
+    raise exception 'A push endpoint is required.' using errcode = '22023';
+  end if;
+
+  insert into public.push_subscriptions (user_id, endpoint, keys, timezone, updated_at)
+  values (auth.uid(), p_endpoint, coalesce(p_keys, '{}'::jsonb),
+          coalesce(nullif(p_timezone, ''), 'UTC'), now())
+  on conflict (endpoint) do update
+    set user_id    = auth.uid(),
+        keys       = excluded.keys,
+        timezone   = excluded.timezone,
+        updated_at = now(),
+        -- The new owner has never been sent anything on this device, so a
+        -- stale last_sent from the previous owner must not suppress their
+        -- first alert.
+        last_sent  = null;
+end;
+$$;
+
+-- Signed-in callers only. anon has no auth.uid() and would raise anyway,
+-- but a function that can rewrite ownership should not be callable by an
+-- unauthenticated request at all.
+revoke all on function public.claim_push_subscription(text, jsonb, text) from public;
+revoke all on function public.claim_push_subscription(text, jsonb, text) from anon;
+grant execute on function public.claim_push_subscription(text, jsonb, text) to authenticated;
+
+
 -- ─────────────────────────── Delivery log ───────────────────────────
 -- Guarantees a given milestone is pushed at most once per user per
 -- day, even if the scheduler runs late, twice, or overlaps itself.

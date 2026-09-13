@@ -250,21 +250,28 @@
       }).then(function (rows) { return rows && rows.length ? rows[0] : null; });
     },
 
-    /* Register a Web Push endpoint so the server can reach this device. */
+    /* Register a Web Push endpoint so the server can reach this device.
+
+       An RPC rather than an upsert on the table. The endpoint column is
+       unique because an endpoint identifies a browser, so signing in as a
+       second account on one browser finds the row already taken: the
+       upsert took its UPDATE path, the policy's USING saw the previous
+       owner's user_id, and the write came back 403 with "new row violates
+       row-level security policy". Push then silently never worked for
+       that account, and worse, the previous account kept receiving
+       alerts on a device somebody else was using.
+
+       claim_push_subscription takes the endpoint over for whoever is
+       signed in now. See the note above the function in schema.sql. */
     savePushSubscription: function (subscription, timezone) {
       var user = auth.getUser();
       if (!user) return Promise.reject(new Error('Not signed in.'));
-      return authedFetch('/push_subscriptions?on_conflict=endpoint', {
+      return authedFetch('/rpc/claim_push_subscription', {
         method: 'POST',
-        headers: {
-          Prefer: 'resolution=merge-duplicates,return=representation'
-        },
         body: JSON.stringify({
-          user_id: user.id,
-          endpoint: subscription.endpoint,
-          keys: subscription.keys,
-          timezone: timezone,
-          updated_at: new Date().toISOString()
+          p_endpoint: subscription.endpoint,
+          p_keys: subscription.keys,
+          p_timezone: timezone || 'UTC'
         })
       });
     },
