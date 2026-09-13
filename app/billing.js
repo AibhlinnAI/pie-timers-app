@@ -223,18 +223,37 @@
   function openCheckout(cadence, discountCode) {
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
-    var priceId = priceFor(cadence);
-
-    if (!priceId) return Promise.reject(new Error('That plan is not available yet.'));
-
     var user = CT.auth.getUser();
     if (!user) return Promise.reject(new Error('Please sign in first.'));
 
-    return initPaddle().then(function (ok) {
-      if (!ok) throw new Error('Could not open checkout. Please try again.');
+    /* Re-read entitlement before choosing a price, rather than trusting
+       whatever happens to be cached.
+
+       priceFor() decides between the trial price and the plain one, and a
+       stale answer costs the customer money: a trialling account read as
+       not-entitled gets the plain price and is charged today instead of on
+       day 30. That is not hypothetical -- a live test account on day 6 of
+       a 14-day trial was charged A$2.90 this way.
+
+       Two routes produce a stale read, and only refreshing here closes
+       both. refresh() is async and pricing.html's Buy handler never waited
+       for the one fired at DOMContentLoaded, so a quick click beat the
+       answer back; and a pricing.html tab opened while signed out never
+       hears about a sign-in that happened in a different tab, so its
+       entitlement stays signed-out indefinitely.
+
+       Costs one request before the overlay opens. A failed refresh falls
+       back to the cached value rather than blocking a purchase -- no worse
+       than the behaviour this replaces. */
+    return refresh().catch(function () { return entitlement; }).then(function () {
+      var priceId = priceFor(cadence);
+      if (!priceId) throw new Error('That plan is not available yet.');
+      return initPaddle().then(function (ok) { return { ok: ok, priceId: priceId }; });
+    }).then(function (state) {
+      if (!state.ok) throw new Error('Could not open checkout. Please try again.');
 
       var options = {
-        items: [{ priceId: priceId, quantity: 1 }],
+        items: [{ priceId: state.priceId, quantity: 1 }],
         customer: { email: user.email },
         // The webhook reads this back to know whose account to credit.
         customData: { user_id: user.id },
