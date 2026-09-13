@@ -38,3 +38,20 @@ Thumbs.db
 # in a JS repo. `dotnet publish` regenerates it from source in seconds.
 windows-screensaver/bin/
 windows-screensaver/obj/
+
+# ── Android signing material ─────────────────────────────────────────
+# The PWABuilder download carries signing.keystore and a plain-text file
+# of its passwords. This repo is public, and DEPLOY.md's own redeploy
+# step is "git add . && git commit && git push", so an unignored package
+# folder is one habitual command away from publishing the key that owns
+# the Play listing. Losing that key means never updating the app again;
+# publishing it means somebody else can sign as you.
+#
+# Keep the package OUTSIDE the repo. These patterns are the safety net,
+# not the plan.
+*.keystore
+*.jks
+signing-key-info.txt
+Pie Timers - Google Play package/
+Pie Timers - Google Play package.zip
+*Google Play package*/
