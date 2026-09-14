@@ -99,14 +99,20 @@
   content:''; flex:1; height:1px; background:var(--line, #3A2A47);
 }
 
+/* Google's branding guidelines require its official button, so this is
+   Google's pre-approved artwork (signin-assets.zip → Android + Web → SVG
+   → Light, text, pill), unmodified, drawn at its native 180×40. Do not
+   redraw it, recolour the G, restyle the border or swap in live text —
+   each of those was the non-compliance this replaced. The wording is
+   baked into the file. Self-hosted beside this stylesheet (url() resolves
+   against the CSS file), so it is not a third-party request. */
 .aib-signin-google{
-  width:100%; min-height:44px;
-  border-radius:10px; border:1px solid var(--line, #3A2A47);
-  background:transparent; color:inherit;
-  font:inherit; font-weight:600; font-size:.9rem;
+  display:block; width:180px; height:40px; margin:0 auto;
+  padding:0; border:0; border-radius:20px;
+  background:transparent url(google-signin-light-pill.svg) no-repeat center / 180px 40px;
   cursor:pointer;
 }
-.aib-signin-google:hover{ background:var(--ink, #EFE6F5); color:var(--card, #241730); border-color:var(--ink, #EFE6F5); }
+.aib-signin-google:hover{ filter:brightness(.94); }
 .aib-signin-google:focus-visible{ outline:3px solid var(--accent, #B07FE0); outline-offset:2px; }
 
 .aib-signin-status{

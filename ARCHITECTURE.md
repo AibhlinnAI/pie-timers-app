@@ -6,6 +6,15 @@ aspirational — the five things below are the ones later work (a second app,
 a contributor, future-you six months from now) is most likely to either
 forget or accidentally undo.
 
+**Pie Timers ships as two products at once, not one or the other:**
+
+- **A web app** at `pietimers.aibhlinn.ai` (GitHub Pages), with accounts
+  and sync on Supabase and web subscriptions billed through Paddle.
+- **An Android app** on Google Play, currently in **closed testing** in
+  Play Console — a Trusted Web Activity wrapper over the same site (see
+  `assetlinks.json` and `DEPLOY.md` §9). Section 5 below exists because of
+  this second product.
+
 Everything here is static HTML/CSS/JS with no build step and no npm
 dependency, deployed as-is to GitHub Pages. The file the browser runs is the
 file a person can read — see `app/README.md` for why that constraint exists
