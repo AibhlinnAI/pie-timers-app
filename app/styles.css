@@ -327,8 +327,8 @@
    size is the only lever needed, and nothing drifts out of proportion
    with anything else.
 
-   112.5% is 18px against a default 16px: noticeably larger, still the
-   same design. Enough to read comfortably on a phone at arm's
+   156.25% is 25px against a default 16px -- chosen on a Pixel 6 for
+   comfortable reading at arm's length. Enough to read comfortably on a phone at arm's
    length, which is how this app is actually used.
 
    A PERCENTAGE, never px. Someone who has raised their browser or
@@ -337,7 +337,7 @@
    is the one a fixed root hurts. A percentage multiplies their
    preference instead of replacing one. That matters more here than in
    most apps, given who this is built for. */
-html{ -webkit-text-size-adjust:100%; font-size:112.5%; }
+html{ -webkit-text-size-adjust:100%; font-size:156.25%; }
 
 /* Present for screen readers, invisible on screen. Not display:none, which
    would remove the element from the accessibility tree entirely. */
