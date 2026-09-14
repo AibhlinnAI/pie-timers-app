@@ -538,7 +538,10 @@ app/
   app.js                schedule model, timer maths, render loop
   sw.js                 offline cache + push delivery
   manifest.webmanifest  PWA install metadata
-  icon.svg              app icon
+  icon.svg              app icon (vector, "any" purpose)
+  icon-512-any.png      app icon (raster, "any" purpose -- Android needs a PNG)
+  icon-512-maskable.png app icon (raster, "maskable" -- full-bleed background,
+                         safe-zone content, for Android's adaptive-icon crop)
 
 supabase/
   schema.sql            core tables + row-level security
