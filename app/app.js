@@ -53,7 +53,13 @@
      for one idea is exactly the load this app is meant to remove. */
     urgentMinutes: 15,
     /* False until the welcome panel is dismissed or the schedule is edited. */
-    onboarded: false
+    onboarded: false,
+    /* False until the "Become a tester" prompt is dismissed or acted on.
+       Unrelated to onboarded -- signing off on the app's defaults and
+       deciding about testing are two different questions -- but both
+       gate on it too: the prompt is a first-run moment, not a standing
+       pitch, so finishing onboarding retires it either way. */
+    testerInviteDone: false
   };
 
   var THEMES = ['dark', 'light', 'system'];
@@ -319,10 +325,65 @@
     state.settings.onboarded = true;
     save();
     renderWelcome();
+    renderTesterInvite();
   }
 
   $('welcomeDismiss').addEventListener('click', completeOnboarding);
   $('welcomeSetup').addEventListener('click', completeOnboarding);
+
+  /* ─────────────────────── Become a tester ───────────────────────
+     The funnel behind the QR code printed on t-shirts, which points at
+     the bare pietimers.aibhlinn.ai root and cannot be changed -- so this
+     has to live on the first thing a cold, unauthenticated visit shows,
+     not behind a route of its own.
+
+     Android only: Play closed testing is the only thing on offer, and
+     leading an iPhone toward a page it cannot use is worse than saying
+     nothing -- the web app already in front of them is the whole offer
+     for that visitor. Gone once onboarding finishes even if never
+     acted on, same as the welcome panel it sits beside: a first-run
+     moment, not a standing pitch. */
+  function isAndroid() { return /android/i.test(navigator.userAgent || ''); }
+
+  function renderTesterInvite() {
+    var panel = $('testerInvite');
+    if (!panel) return;
+    panel.hidden = !(isAndroid() && !state.settings.onboarded && !state.settings.testerInviteDone);
+  }
+
+  function dismissTesterInvite() {
+    if (state.settings.testerInviteDone) return;
+    state.settings.testerInviteDone = true;
+    save();
+    renderTesterInvite();
+  }
+
+  $('testerDismiss').addEventListener('click', dismissTesterInvite);
+
+  $('testerInviteForm').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var email = $('testerEmail').value.trim();
+    if (!email) return;
+    var button = $('testerSubmit');
+    var status = $('testerStatus');
+    button.disabled = true;
+    button.textContent = 'Joining…';
+    status.classList.remove('is-error');
+    status.textContent = '';
+
+    CT.db.registerTester(email, 'android').then(function () {
+      $('testerInviteForm').hidden = true;
+      status.textContent = "You're on the list — we'll email the install " +
+        'link once you have been added, usually within a day or two.';
+      state.settings.testerInviteDone = true;
+      save();
+    }).catch(function (err) {
+      button.disabled = false;
+      button.textContent = 'Join the list';
+      status.classList.add('is-error');
+      status.textContent = err.message || 'Could not join right now. Please try again.';
+    });
+  });
 
   /* ─────────────────────── Screen reader announcements ───────────────────
      The dials update every second, but a live region that fired every
@@ -2745,6 +2806,7 @@
   renderAccount();
   renderCalendarPanel();
   renderWelcome();
+  renderTesterInvite();
   startLoop();
 
   CT.notify.register().then(function () {

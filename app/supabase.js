@@ -230,6 +230,23 @@
   }
 
   var db = {
+    /* Unauthenticated on purpose -- this runs before anyone has signed
+       in, from the "Become a tester" prompt a first-time Android
+       visitor sees. RLS on tester_signups grants anon insert and
+       nothing else, so this cannot be used to read the list back. */
+    registerTester: function (email, platform) {
+      return request(restUrl('/tester_signups'), {
+        method: 'POST',
+        headers: {
+          apikey: cfg.supabaseAnonKey,
+          Authorization: 'Bearer ' + cfg.supabaseAnonKey,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({ email: email, platform: platform || 'android' })
+      });
+    },
+
     /* Read this user's row. Returns null when they have never synced. */
     getProfile: function () {
       return authedFetch('/timer_profiles?select=*&limit=1')
