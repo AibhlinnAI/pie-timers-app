@@ -135,8 +135,11 @@
 
     panel.appendChild(el('div', { class: 'aib-signin-divider', text: 'or' }));
 
+    /* Google's own pre-approved button artwork, unmodified (see the
+       comment on .aib-signin-google). The artwork carries the words, so
+       the accessible name has to say the same thing. */
     var googleBtn = el('button', {
-      type: 'button', class: 'aib-signin-google', text: 'Continue with Google'
+      type: 'button', class: 'aib-signin-google', 'aria-label': 'Sign in with Google'
     });
     panel.appendChild(googleBtn);
 

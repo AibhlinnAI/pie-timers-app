@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v92';
+var CACHE = 'countdown-timers-v93';
 
 var SHELL = [
   './',
@@ -29,6 +29,8 @@ var SHELL = [
   'identity/entitlements.js',
   'identity/identity-ui.js',
   'identity/identity-ui.css',
+  /* Drawn by identity-ui.css as the Google sign-in button. */
+  'identity/google-signin-light-pill.svg',
   'supabase.js',
   'billing.js',
   'notify.js',
