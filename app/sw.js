@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v88';
+var CACHE = 'countdown-timers-v89';
 
 var SHELL = [
   './',
@@ -36,6 +36,8 @@ var SHELL = [
   'qrcode.js',
   'app.js',
   'icon.svg',
+  'icon-512-any.png',
+  'icon-512-maskable.png',
   /* The header plan chip carries this image, so the file belongs in the shell rather
      than an image that arrives late and shifts the toolbar. */
   'aibhlinn-mark-40.png',
