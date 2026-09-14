@@ -1200,6 +1200,13 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .sync-pill[data-status="error"]{ background:var(--peach); color:var(--orange-text); }
 .sync-pill[data-status="syncing"] i{ animation:pulse 1.4s ease-in-out infinite; }
 
+/* ───────────────────────── Become a tester ─────────────────────────
+   Reuses .panel, .signin-form, .field and .status-line wholesale --
+   this is a form like any other, not a special occasion. Only the
+   dismiss button's spacing needed its own rule. */
+.tester-invite .sub{ margin-top:4px; max-width:52ch; }
+.tester-invite #testerDismiss{ margin-top:12px; }
+
 /* ───────────────────────── Account ───────────────────────── */
 .signin-form{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
 .field--grow{ flex:1 1 260px; }

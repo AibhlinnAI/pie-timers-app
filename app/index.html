@@ -79,6 +79,32 @@
       </div>
     </section>
 
+    <!-- First run, Android only. Nothing to offer an iPhone here — the
+         web app they are already looking at is the whole thing for
+         them. This is the actual funnel behind the QR code printed on
+         t-shirts (pietimers.aibhlinn.ai, fixed, cannot change), so it
+         has to work from a cold, unauthenticated first visit. -->
+    <section class="panel tester-invite" id="testerInvite" hidden>
+      <header class="panel-head">
+        <div>
+          <h2>Become a tester</h2>
+          <p class="sub">Leave your email and we'll add you to the Android
+          testing list — you'll get the Google Play install link once you're
+          added.</p>
+        </div>
+      </header>
+      <form class="signin-form" id="testerInviteForm" novalidate>
+        <label class="field field--grow">
+          <span>Email address</span>
+          <input type="email" id="testerEmail" placeholder="you@example.com"
+                 autocomplete="email" required>
+        </label>
+        <button class="btn btn-primary" type="submit" id="testerSubmit">Join the list</button>
+      </form>
+      <p class="status-line" id="testerStatus" role="status" aria-live="polite"></p>
+      <button class="btn btn-ghost" id="testerDismiss" type="button">Not right now</button>
+    </section>
+
     <div class="dashboard-toolbar" id="dashboardToolbar" hidden>
       <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false">
         <span id="fullscreenIcon" aria-hidden="true">⛶</span>
