@@ -1,0 +1,49 @@
+# ============================================================
+# Run the smoke test on every pull request.
+#
+# Until now nothing ran on a pull request at all: deploy.yml fires on
+# push to main, so the first thing to look at a change was the live
+# site. tools/smoke.js is the check that would have caught the worst
+# deploy this project has had — a refactor left supabase.js throwing on
+# load, so it shipped with neither CT.auth nor CT.db, and the whole data
+# layer was silently absent until the cache expired. The script's own
+# header tells that story.
+#
+# It loads each browser script in order in a stubbed DOM and asserts the
+# globals each is supposed to leave behind. That proves a file executes
+# and exports; it proves nothing about what the exports then do. That is
+# the point — it is the cheapest check worth having, and it is fast
+# enough to run on every push to a pull request.
+#
+# No install step, because there is nothing to install: this project has
+# no dependencies, which is the same reason deploy.yml has no build step.
+# ============================================================
+name: Smoke test
+
+on:
+  pull_request:
+  workflow_dispatch:      # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+
+# A second push to the same pull request makes the first run pointless.
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Scripts load and export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Exits non-zero and names the file and the missing global if any
+      # script fails to load or comes up short.
+      - name: Run the smoke test
+        run: node tools/smoke.js
