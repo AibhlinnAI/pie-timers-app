@@ -2768,14 +2768,21 @@
   // requestFullscreen at all, so the button stays hidden there instead
   // of offering something that would silently do nothing.
   (function () {
-    var toolbar = $('dashboardToolbar');
     var btn = $('fullscreenToggle');
     var icon = $('fullscreenIcon');
     var label = $('fullscreenLabel');
     var el = document.documentElement;
 
-    if (!el.requestFullscreen || !document.exitFullscreen) return;
-    toolbar.hidden = false;
+    // Only this button is withheld where the API is missing. The toolbar
+    // around it stays put, because focus view sits beside it and works
+    // everywhere — but the hint has to drop the half of its promise the
+    // browser cannot keep.
+    if (!el.requestFullscreen || !document.exitFullscreen) {
+      $('viewHint').textContent =
+        'One pie in a small window you can snap beside your work.';
+      return;
+    }
+    btn.hidden = false;
 
     function sync() {
       var active = !!document.fullscreenElement;

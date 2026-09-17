@@ -105,11 +105,27 @@
       <button class="btn btn-ghost" id="testerDismiss" type="button">Not right now</button>
     </section>
 
-    <div class="dashboard-toolbar" id="dashboardToolbar" hidden>
-      <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false">
-        <span id="fullscreenIcon" aria-hidden="true">⛶</span>
-        <span id="fullscreenLabel">Full screen</span>
-      </button>
+    <!-- The two ways of getting the pies out of an ordinary browser tab,
+         kept side by side so they read as a pair of opposites: focus view
+         shrinks the app to one pie you can snap beside your work, full
+         screen grows it to fill the display. Focus view used to sit at the
+         foot of the dashboard, where nobody found it. -->
+    <div class="dashboard-toolbar" id="dashboardToolbar"
+         role="group" aria-label="Ways to view your pies">
+      <p class="toolbar-hint" id="viewHint">One pie beside your work, or every pie filling the screen.</p>
+      <div class="toolbar-actions">
+        <button class="icon-btn" id="openFocus" type="button">
+          <span aria-hidden="true">⧉</span>
+          <span>Focus view</span>
+        </button>
+        <!-- Hidden where the Fullscreen API is missing (iOS Safari). The
+             toolbar itself is no longer gated on that check, because focus
+             view works everywhere. -->
+        <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false" hidden>
+          <span id="fullscreenIcon" aria-hidden="true">⛶</span>
+          <span id="fullscreenLabel">Full screen</span>
+        </button>
+      </div>
     </div>
 
     <div class="daystrip" id="dayStrip">
@@ -254,11 +270,6 @@
         </table>
       </div>
     </section>
-
-    <p class="focus-launch">
-      <button class="btn btn-ghost" type="button" id="openFocus">Open focus view</button>
-      <span class="hint">One pie in a small window you can snap beside your work.</span>
-    </p>
 
     <p class="livenote"><span class="pulse"></span> Live — updates every second. No refresh needed.</p>
     <p class="byline">Pie Timers from AibhlínnAI</p>

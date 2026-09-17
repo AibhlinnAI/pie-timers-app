@@ -580,7 +580,15 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .view:focus-visible{ outline:2px solid var(--orange); outline-offset:4px; border-radius:var(--radius); }
 
 /* ───────────────────────── Dashboard toolbar ───────────────────────── */
-.dashboard-toolbar{ display:flex; justify-content:flex-end; margin-bottom:10px; }
+/* The hint sits opposite the buttons on a wide screen and drops under them
+   on a narrow one, where a full-width line of text costs less than a
+   cramped row. */
+.dashboard-toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px 16px; flex-wrap:wrap; margin-bottom:10px;
+}
+.toolbar-hint{ margin:0; font-size:.82rem; color:var(--ink-muted); }
+.toolbar-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
 .icon-btn{
   display:inline-flex; align-items:center; gap:6px;
   padding:6px 12px; min-height:36px;
@@ -1517,12 +1525,6 @@ body.is-focus{
 
 .focus.is-off .dial-rim{ stroke:var(--off); stroke-opacity:.4; }
 .focus.is-off .focus-time{ color:var(--off); }
-
-.focus-launch{
-  margin:22px 0 0;
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-}
-.focus-launch .hint{ margin:0; }
 
 /* ───────────────────────── Site footer ─────────────────────────
    Outside the tab panels, so the legal pages are reachable from every
