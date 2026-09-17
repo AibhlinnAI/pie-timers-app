@@ -106,26 +106,25 @@
     </section>
 
     <!-- The two ways of getting the pies out of an ordinary browser tab,
-         kept side by side so they read as a pair of opposites: focus view
-         shrinks the app to one pie you can snap beside your work, full
-         screen grows it to fill the display. Focus view used to sit at the
-         foot of the dashboard, where nobody found it. -->
+         one at each end of the row so they balance as the opposites they
+         are: focus view shrinks the app to one pie you can snap beside
+         your work, full screen grows it to fill the display. The hint sits
+         between them and explains both. Focus view used to sit at the foot
+         of the dashboard, where nobody found it. -->
     <div class="dashboard-toolbar" id="dashboardToolbar"
          role="group" aria-label="Ways to view your pies">
+      <button class="icon-btn" id="openFocus" type="button">
+        <span aria-hidden="true">⧉</span>
+        <span>Focus view</span>
+      </button>
       <p class="toolbar-hint" id="viewHint">One pie beside your work, or every pie filling the screen.</p>
-      <div class="toolbar-actions">
-        <button class="icon-btn" id="openFocus" type="button">
-          <span aria-hidden="true">⧉</span>
-          <span>Focus view</span>
-        </button>
-        <!-- Hidden where the Fullscreen API is missing (iOS Safari). The
-             toolbar itself is no longer gated on that check, because focus
-             view works everywhere. -->
-        <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false" hidden>
-          <span id="fullscreenIcon" aria-hidden="true">⛶</span>
-          <span id="fullscreenLabel">Full screen</span>
-        </button>
-      </div>
+      <!-- Hidden where the Fullscreen API is missing (iOS Safari). The
+           toolbar itself is not gated on that check, because focus view
+           works everywhere. -->
+      <button class="icon-btn" id="fullscreenToggle" type="button" aria-pressed="false" hidden>
+        <span id="fullscreenIcon" aria-hidden="true">⛶</span>
+        <span id="fullscreenLabel">Full screen</span>
+      </button>
     </div>
 
     <div class="daystrip" id="dayStrip">

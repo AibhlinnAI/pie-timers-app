@@ -580,15 +580,17 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .view:focus-visible{ outline:2px solid var(--orange); outline-offset:4px; border-radius:var(--radius); }
 
 /* ───────────────────────── Dashboard toolbar ───────────────────────── */
-/* The hint sits opposite the buttons on a wide screen and drops under them
-   on a narrow one, where a full-width line of text costs less than a
-   cramped row. */
+/* A button at each end with the hint centred between them. Narrow screens
+   reorder the hint onto its own line underneath (see the 640px rules), so
+   the two buttons keep the row and stay opposite each other. */
 .dashboard-toolbar{
   display:flex; align-items:center; justify-content:space-between;
   gap:10px 16px; flex-wrap:wrap; margin-bottom:10px;
 }
-.toolbar-hint{ margin:0; font-size:.82rem; color:var(--ink-muted); }
-.toolbar-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
+.toolbar-hint{
+  margin:0; flex:1 1 auto; text-align:center;
+  font-size:.82rem; color:var(--ink-muted);
+}
 .icon-btn{
   display:inline-flex; align-items:center; gap:6px;
   padding:6px 12px; min-height:36px;
@@ -1580,6 +1582,9 @@ body.is-focus{
 
 /* ───────────────────────── Responsive ───────────────────────── */
 @media (max-width:640px){
+  /* The hint is worth a whole line of its own here; two buttons squeezing
+     a sentence between them is not. */
+  .toolbar-hint{ order:1; flex-basis:100%; text-align:left; }
   .topbar{ padding:16px; }
   .now{ text-align:left; }
   .dial-wrap{ width:190px; }
