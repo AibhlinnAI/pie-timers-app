@@ -548,14 +548,14 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   font-size:1.1rem; color:#FFA333;
   text-shadow:1px 1px 0 rgba(0,0,0,.45);
 }
-/* Two sentences, two lines — the second is the one that explains the point,
-   so the figure earns its own line rather than trailing the first. Tight spacing
-   between them, a proper gap before the buttons. */
+/* Two short paragraphs: what the app is, then what it costs. A small gap
+   between them so they read as two points rather than one wrapped line, and
+   a proper gap before the buttons. */
 .welcome p{
   margin:8px 0 2px; font-size:.9rem; color:#F0EFE6;
   max-width:60ch; line-height:1.5;
 }
-.welcome p + p{ margin-top:0; }
+.welcome p + p{ margin-top:6px; }
 .welcome p:last-of-type{ margin-bottom:16px; }
 .welcome-actions{ display:flex; gap:10px; flex-wrap:wrap; }
 
@@ -1195,7 +1195,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .sync-pill[data-status="error"]{ background:var(--peach); color:var(--orange-text); }
 .sync-pill[data-status="syncing"] i{ animation:pulse 1.4s ease-in-out infinite; }
 
-/* ───────────────────────── Become a tester ─────────────────────────
+/* ────────────────────────── Tester invite ──────────────────────────
    Reuses .panel, .signin-form, .field and .status-line wholesale --
    this is a form like any other, not a special occasion. Only the
    dismiss button's spacing needed its own rule. */

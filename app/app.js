@@ -58,7 +58,7 @@
     urgentMinutes: 15,
     /* False until the welcome panel is dismissed or the schedule is edited. */
     onboarded: false,
-    /* False until the "Become a tester" prompt is dismissed or acted on.
+    /* False until the Android tester invite is dismissed or acted on.
        Unrelated to onboarded -- signing off on the app's defaults and
        deciding about testing are two different questions -- but both
        gate on it too: the prompt is a first-run moment, not a standing
@@ -335,7 +335,7 @@
   $('welcomeDismiss').addEventListener('click', completeOnboarding);
   $('welcomeSetup').addEventListener('click', completeOnboarding);
 
-  /* ─────────────────────── Become a tester ───────────────────────
+  /* ──────────────────── Android tester invite ────────────────────
      The funnel behind the QR code printed on t-shirts, which points at
      the bare pietimers.aibhlinn.ai root and cannot be changed -- so this
      has to live on the first thing a cold, unauthenticated visit shows,
@@ -345,7 +345,7 @@
      leading an iPhone toward a page it cannot use is worse than saying
      nothing -- the web app already in front of them is the whole offer
      for that visitor. Gone once onboarding finishes even if never
-     acted on, same as the welcome panel it sits beside: a first-run
+     acted on, same as the welcome panel it sits above: a first-run
      moment, not a standing pitch. */
   function isAndroid() { return /android/i.test(navigator.userAgent || ''); }
 

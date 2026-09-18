@@ -67,30 +67,19 @@
   <!-- ───────────────────────── DASHBOARD ───────────────────────── -->
   <section class="view is-active" id="view-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" tabindex="0">
 
-    <!-- First run only. The starting hours are placeholders, and saying so
-         plainly is kinder than letting someone assume they are theirs. -->
-    <section class="welcome" id="welcome" hidden>
-      <h2>Welcome to Pie Timers</h2>
-      <p>The current hours set are default settings.</p>
-      <p>Set your own hours and the day will eat away at your pies.</p>
-      <div class="welcome-actions">
-        <button class="btn btn-primary" data-goto="schedule" id="welcomeSetup">Set my hours</button>
-        <button class="btn btn-ghost" id="welcomeDismiss">Keep the defaults for now</button>
-      </div>
-    </section>
-
     <!-- First run, Android only. Nothing to offer an iPhone here — the
          web app they are already looking at is the whole thing for
          them. This is the actual funnel behind the QR code printed on
          t-shirts (pietimers.aibhlinn.ai, fixed, cannot change), so it
-         has to work from a cold, unauthenticated first visit. -->
+         has to work from a cold, unauthenticated first visit. Above the
+         welcome panel for the same reason: on Android, this is what the
+         scan is for. -->
     <section class="panel tester-invite" id="testerInvite" hidden>
       <header class="panel-head">
         <div>
-          <h2>Become a tester</h2>
-          <p class="sub">Leave your email and we'll add you to the Android
-          testing list — you'll get the Google Play install link once you're
-          added.</p>
+          <h2>Test the Android app</h2>
+          <p class="sub">Leave your email and we'll send you the Google Play
+          install link once we've added you.</p>
         </div>
       </header>
       <form class="signin-form" id="testerInviteForm" novalidate>
@@ -103,6 +92,22 @@
       </form>
       <p class="status-line" id="testerStatus" role="status" aria-live="polite"></p>
       <button class="btn btn-ghost" id="testerDismiss" type="button">Not right now</button>
+    </section>
+
+    <!-- First run only. Says what the app is in one glance, for a cold
+         visit that may have come straight off the QR code. The starting
+         hours are placeholders, so the first paragraph ends on setting
+         your own rather than letting someone assume they are theirs. -->
+    <section class="welcome" id="welcome" hidden>
+      <h2>Time you can see</h2>
+      <p>A countdown timer shaped like a pie. It shrinks as time runs out, so
+      one glance tells you how long is left. Set your own hours to start.</p>
+      <p>Free to use, with no account needed. If you do sign in, that's free
+      too, and needs no card.</p>
+      <div class="welcome-actions">
+        <button class="btn btn-primary" data-goto="schedule" id="welcomeSetup">Set my hours</button>
+        <button class="btn btn-ghost" id="welcomeDismiss">Keep the defaults for now</button>
+      </div>
     </section>
 
     <!-- The two ways of getting the pies out of an ordinary browser tab,
