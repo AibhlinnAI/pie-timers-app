@@ -1067,6 +1067,19 @@
     });
   }
 
+  /* The list is built, not ticked, so a phone left open all day would keep
+     listing sessions that are already over. Rebuild it from the render
+     loop whenever the next appointment changes, which is the moment the
+     one before it passes, and at midnight when "Tomorrow" becomes "Today". */
+  var lastListKey = null;
+
+  function refreshAppointmentList(now, todayKey) {
+    var next = nextAppointment(now);
+    var key = todayKey + '|' + (next ? next.id + '@' + next.at : '');
+    if (lastListKey !== null && key !== lastListKey) buildAppointmentList();
+    lastListKey = key;
+  }
+
   /* ─────────────────────────── Calendar view (Premium) ───────────────────────────
      A month grid of the same two sources the list already reads --
      manual appointments plus synced calendar events -- so switching
@@ -2287,6 +2300,7 @@
     checkAlerts('end', endTimer, endLabel(today), todayKey);
 
     renderAppointment(now, todayKey);
+    refreshAppointmentList(now, todayKey);
     renderWeekPreview(now);
     renderCalculator(now);
 
