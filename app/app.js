@@ -377,8 +377,8 @@
 
     CT.db.registerTester(email, 'android').then(function () {
       $('testerInviteForm').hidden = true;
-      status.textContent = "You're on the list — we'll email the install " +
-        'link once you have been added, usually within a day or two.';
+      status.textContent = "You're on the list. We'll email the install " +
+        'link once you have been added, usually within a few days.';
       state.settings.testerInviteDone = true;
       save();
     }).catch(function (err) {
