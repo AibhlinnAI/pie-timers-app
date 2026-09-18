@@ -231,9 +231,17 @@
 
   var db = {
     /* Unauthenticated on purpose -- this runs before anyone has signed
-       in, from the "Become a tester" prompt a first-time Android
-       visitor sees. RLS on tester_signups grants anon insert and
-       nothing else, so this cannot be used to read the list back. */
+       in, from the Android tester invite a first-time Android visitor
+       sees. RLS on tester_signups grants anon insert and nothing else,
+       so this cannot be used to read the list back.
+
+       A trigger on the table skips an address already on the list and
+       the insert still answers 201, so the response never says whether
+       someone had signed up before. Two sign-ups for the same address
+       at once can still reach the unique index on lower(email) and come
+       back as 23505. That is the outcome the person wanted too, so it
+       resolves like a fresh sign-up rather than showing them a database
+       error. Anything else still throws, including any other 409. */
     registerTester: function (email, platform) {
       return request(restUrl('/tester_signups'), {
         method: 'POST',
@@ -244,6 +252,9 @@
           Prefer: 'return=minimal'
         },
         body: JSON.stringify({ email: email, platform: platform || 'android' })
+      }).catch(function (err) {
+        if (err.body && err.body.code === '23505') return null;
+        throw err;
       });
     },
 
