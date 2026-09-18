@@ -15,6 +15,12 @@
 # the point — it is the cheapest check worth having, and it is fast
 # enough to run on every push to a pull request.
 #
+# A syntax check runs first, over every .js file rather than the smoke
+# test's list. app.js is the reason: it needs a real DOM, so the smoke
+# test cannot load it, which left the largest file in the app as the one
+# nothing checked. A parse error there is not a subtle bug — it is a blank
+# page — and this is the cheapest way to never ship one.
+#
 # No install step, because there is nothing to install: this project has
 # no dependencies, which is the same reason deploy.yml has no build step.
 # ============================================================
@@ -34,7 +40,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: Scripts load and export
+    name: Scripts parse, load and export
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +48,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # Found rather than listed, so a new file is covered the day it is
+      # added instead of the day someone remembers this file exists.
+      # --check parses without running, which is what lets it cover app.js
+      # and sw.js: neither can execute outside its real environment.
+      - name: Check every script parses
+        run: |
+          set -u
+          fail=0
+
+          for file in $(find app identity tools -name '*.js' | sort); do
+            if ! node --check "$file"; then
+              echo "::error file=$file::$file does not parse. It would break in the browser."
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "Every script parses."
 
       # Exits non-zero and names the file and the missing global if any
       # script fails to load or comes up short.
