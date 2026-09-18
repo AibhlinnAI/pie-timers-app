@@ -15,7 +15,9 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in. What remains is upkeep:
+     Every placeholder is now filled in, except the three values in
+     "Deleting your account" marked MAL TO CONFIRM, which are provisional.
+     What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
           the project to another region, this becomes a false statement
@@ -46,7 +48,6 @@
 <main class="legal">
   <p class="legal-meta">
     Last updated: <strong>18 September 2026</strong> &middot;
-    <span data-hide-in-play><a href="pricing.html">Pricing</a> &middot;</span>
     <a href="terms.html">Terms of Service</a> &middot;
     <span data-hide-in-play><a href="terms.html#refunds">Refund Policy</a> &middot;</span>
     <a href="index.html">Back to the app</a>
@@ -54,18 +55,58 @@
 
   <h2>The short version</h2>
   <ul>
-    <li>Without an account, nothing leaves your device unless you leave your
-    email on the Android tester form.</li>
+    <li>Without an account, your schedule, appointments and settings never leave
+    your device. The only exceptions are an email you choose to leave on the
+    Android tester form, and the bot check that loads when you open the sign-in
+    form.</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
     <li>We do not sell your data, and there are no analytics, trackers or
     advertising in this app.</li>
-    <li>You can delete your account and every piece of data held in that account, from the Settings tab,
-    without asking us.</li>
+    <li>You can delete your account from the Settings tab, without asking us. See
+    <a href="#delete">Deleting your account</a> below for what is deleted and what
+    we keep.</li>
   </ul>
 
+  <h2 id="delete">Deleting your account</h2>
+  <p>Pie Timers is made by AibhlínnAI. You can delete your Pie Timers account,
+  and the data held with it, whenever you like.</p>
+  <p><strong>In the app</strong>, on Android or in a browser: open Settings, go to
+  Account, press Delete my account, type DELETE, then press Delete permanently.
+  It happens straight away and cannot be undone.</p>
+  <p><strong>If you can't get into the app</strong>, email
+  <a href="mailto:support@aibhlinn.ai" data-support-link>support@aibhlinn.ai</a>
+  from the address you sign in with and ask us to delete your Pie Timers account.
+  We will delete it within 30 days and tell you when it's done.</p>
+  <p><strong>Before you delete:</strong> if you pay for AibhlínnAI Premium,
+  deleting your account does not stop the subscription on its own. Cancel it
+  first from the link in your Paddle receipt, or email us and we will cancel it
+  for you.</p>
+  <p><strong>What gets deleted:</strong> your email address and sign-in details,
+  your schedule, appointments and settings, any calendar you connected and the
+  events we stored from it, your alert registrations, and your trial or
+  subscription status.</p>
+  <p><strong>What we keep:</strong></p>
+  <ul>
+    <li>If you ever paid, the subscription updates Paddle sent us. They hold
+    Paddle's customer number for you, not your email address, and we keep them
+    for five<!-- MAL TO CONFIRM --> years for tax records. Paddle keeps its own
+    records under its own policy.</li>
+    <li>If we gave you an access code, the code and the email address it was
+    issued to, so it can't be used again. Ask and we will remove the email.</li>
+    <li>An email left on the Android tester form is kept apart from your account.
+    Ask and we will remove it, and it is deleted when testing ends.</li>
+    <li>The sign-in log our database provider keeps, with the email address and
+    IP address of each sign-in, for up to 30<!-- MAL TO CONFIRM --> days.</li>
+    <li>Backups held by our database provider drop deleted data within
+    7<!-- MAL TO CONFIRM --> days.</li>
+    <li>Sign-in attempt hashes are cleared within a day.</li>
+  </ul>
+  <p>You can also remove some data without deleting your account. Disconnecting a
+  calendar deletes its address and the events we stored from it.</p>
+
   <h2>1. Who is responsible</h2>
-  <p><strong>AibhlinnAI</strong>, <strong>ABN 70 810 791 817</strong>, of South
+  <p><strong>AibhlínnAI</strong>, <strong>ABN 70 810 791 817</strong>, of South
   Australia, Australia, is responsible for the personal information described
   here. Contact:
   <a href="mailto:support@aibhlinn.ai" data-support-link>support@aibhlinn.ai</a>.</p>
@@ -76,8 +117,9 @@
   and no request carrying them is ever sent anywhere.</p>
   <p>There is no sign-up wall and no tracking on the free version. The only
   email we collect without an account is one you choose to leave on the
-  Android tester form. We use it to add you to Google Play's testing list,
-  which shares it with Google, and to email you the install link.</p>
+  Android tester form. We use it for two things: we add it to Google Play's
+  tester list so Google can give you access, and we email you the install
+  link.</p>
 
   <h2>3. If you create an account</h2>
   <p>We then store:</p>
@@ -87,22 +129,26 @@
     <li><strong>Your weekly schedule and appointments</strong> — so they appear on
     your other devices.</li>
     <li><strong>Your settings</strong> — theme, alert preferences and so on.</li>
-    <li><strong>Push subscription details and your time zone</strong> — only if
-    you switch on alerts for when the app is closed, so we know when and where to
-    send them.</li>
+    <li><strong>Push subscription details and your time zone</strong>: when you
+    are signed in and have allowed notifications, so we know when to send alerts
+    while the app is closed.</li>
     <li><strong>Subscription status</strong> — whether you are on a trial, paying,
     or have complimentary access.</li>
   </ul>
-  <p>We do <em>not</em> store your name, your location, your device identifiers,
-  your browsing behaviour, or anything you do outside this app.</p>
+  <p>We also store a random ID for each device that syncs, so a device can
+  recognise its own changes. If you sign in with Google, Google also sends us the
+  name and profile picture link on your Google account, which we do not use. Your
+  time zone shows roughly where you are, and we use it only to time your alerts.
+  We do not store your precise location, your browsing behaviour, or anything you
+  do outside this app.</p>
 
   <h2>4. If you connect a calendar</h2>
   <p>This is the most sensitive thing the app touches, so precision matters
   here.</p>
   <p>Connecting a calendar gives us <strong>read-only</strong> access. We fetch your calendar
-  on a schedule, take the title, start and end of upcoming events, and store those
-  so your next appointment can be shown. Nothing in this app can create, alter or
-  delete anything in your calendar.</p>
+  on a schedule, take the title, start, end and location of events from yesterday
+  to three weeks ahead, and store those so your next appointment can be shown.
+  Nothing in this app can create, alter or delete anything in your calendar.</p>
   <p>To do that we hold either a private iCal address or a Google refresh token.
   Both are effectively keys to that calendar. They are never sent back to your
   browser after you save them — the app can only see <em>whether</em> a calendar is
@@ -112,8 +158,8 @@
   would rather tell you that than imply more protection than exists. You can
   disconnect at any time, which deletes the stored credential and, for Google,
   revokes our access at Google's end as well.</p>
-  <p>We only fetch events in a short window around today, and we delete stored
-  events older than a day.</p>
+  <p>We only fetch events in that window, and we delete stored events older than
+  a day.</p>
 
   <h2>5. Where your data is held</h2>
   <p>Account data is stored with <strong>Supabase</strong> in the
@@ -136,7 +182,7 @@
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
       <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
-      <tr><td>Cloudflare</td><td>An anonymised bot-check signal</td><td>Stopping the sign-in form being abused to email strangers</td></tr>
+      <tr><td>Cloudflare</td><td>Your IP address and browser signals, while the sign-in form is open</td><td>Checking that a person, not a bot, is using the sign-in form</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
     </tbody>
   </table>
@@ -169,10 +215,13 @@
   <h2>10. Your rights</h2>
   <p>You can, at any time and without contacting us:</p>
   <ul>
-    <li><strong>See and change</strong> everything we hold, from inside the app.</li>
-    <li><strong>Export your data</strong> as a file, from Settings.</li>
-    <li><strong>Delete your account</strong> and all associated data, from Settings.
-    This is immediate and cannot be undone.</li>
+    <li><strong>See and change</strong> your schedule, appointments and settings
+    from inside the app.</li>
+    <li><strong>Export</strong> this device's schedule, appointments and settings as
+    a file, from Settings.</li>
+    <li><strong>Delete your account</strong> from Settings. See
+    <a href="#delete">Deleting your account</a> for what is kept. This is immediate
+    and cannot be undone.</li>
   </ul>
   <p>If you would prefer we did that for you, or you want a copy in another format, write to
   <a href="mailto:support@aibhlinn.ai" data-support-link>support@aibhlinn.ai</a>
