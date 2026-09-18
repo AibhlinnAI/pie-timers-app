@@ -34,6 +34,41 @@
     Sunday:    { working: false, start: 540, lunch: 750, end: 1020 }
   };
 
+  /* One day only: the South Australia ADHD Conference in Adelaide on
+     Saturday 19 September 2026, as published by its organiser. Pie Timers
+     is not part of the event; this only lets a phone in the room read the
+     programme as pies. Times are wall-clock like every other appointment,
+     so a phone on Adelaide time counts to the printed agenda. The ids are
+     fixed so no session can ever be added twice.
+
+     None of it does anything after the day, but other code reads AGENDA,
+     so deleting this block alone breaks every first run. Remove together:
+     this block, the firstRunSeed() line in load() with firstRunSeed() and
+     agendaAppointments(), and hasAgenda() with the agenda lines in
+     dayConfig() (its weekly lookup stays). */
+  var AGENDA = {
+    id: 'sa-adhd-2026',
+    date: '2026-09-19',
+    /* Doors and registration rather than the first talk at 10:00, so the
+       pies are already moving while people look around the stalls. 16:00
+       is the published finish; the 15:50 close is its own appointment. */
+    start: 510, lunch: 750, end: 960,    // 8:30 / 12:30 / 16:00
+    items: [
+      { id: 'sa-adhd-2026-01', time: 510, title: 'Registration opens, exhibits open' },
+      { id: 'sa-adhd-2026-02', time: 600, title: 'Welcome and introduction' },
+      { id: 'sa-adhd-2026-03', time: 605, title: 'Dr Lamb: Supporting neurodivergent young people and families' },
+      { id: 'sa-adhd-2026-04', time: 645, title: 'Break and exhibitors' },
+      { id: 'sa-adhd-2026-05', time: 665, title: 'Kate Donohue: ADHD and multi-neurodivergence' },
+      { id: 'sa-adhd-2026-06', time: 710, title: 'Sandy Booysen: Gut health, diet and micronutrients' },
+      { id: 'sa-adhd-2026-07', time: 750, title: 'Main break (lunch not provided)' },
+      { id: 'sa-adhd-2026-08', time: 800, title: 'Michelle Lewis: ADHD self-awareness at school and home' },
+      { id: 'sa-adhd-2026-09', time: 845, title: 'Sarah Hoff: Breath and body tools for everyday stress' },
+      { id: 'sa-adhd-2026-10', time: 890, title: 'Break and exhibitors' },
+      { id: 'sa-adhd-2026-11', time: 910, title: 'Dr Aleem Khan: ADHD unmasked, first signs to lifelong care' },
+      { id: 'sa-adhd-2026-12', time: 950, title: 'Thank you and close' }
+    ]
+  };
+
   var DEFAULT_SETTINGS = {
     clock24: false,
     showSeconds: true,
@@ -135,14 +170,60 @@
 
   /* ─────────────────────────── Storage ─────────────────────────── */
 
+  /* Nothing saved at all is the only sign of a first run. Saved state that
+     fails to parse is not a first run, so it is never seeded. */
   function load() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem(STORE_KEY);
+    } catch (e) {
+      raw = null;
+    }
+    if (raw === null) return normalise(firstRunSeed());
+
     var saved = {};
     try {
-      saved = JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+      saved = JSON.parse(raw) || {};
     } catch (e) {
       saved = {};
     }
     return normalise(saved);
+  }
+
+  /* Someone scanning in at the conference opens a live agenda without
+     setting anything up. Up to the day they start with its sessions as
+     appointments, and on the day dayConfig() runs the pies on its hours.
+     Nothing is saved or stamped here, same as any other first run, and
+     after the day a new visitor gets the plain defaults again. */
+  function firstRunSeed() {
+    if (isoDate(new Date()) > AGENDA.date) return {};
+    return { appointments: agendaAppointments(AGENDA) };
+  }
+
+  function agendaAppointments(preset) {
+    return preset.items.map(function (item) {
+      return { id: item.id, title: item.title, date: preset.date, time: item.time };
+    });
+  }
+
+  /* Today's hours as the pies read them. On the conference day, for anyone
+     holding its sessions, they follow the programme rather than the weekly
+     schedule. The schedule itself is never written, so the Schedule tab,
+     server reminders and every later Saturday keep the person's own hours,
+     and so does the day itself once they remove every session. Head Home
+     still comes from the schedule through lunchLabel() and endLabel(). */
+  function dayConfig(now) {
+    var cfg = state.schedule[dayNameOf(now)];
+    if (isoDate(now) !== AGENDA.date || !hasAgenda()) return cfg;
+    return Object.assign({}, cfg, {
+      working: true, start: AGENDA.start, lunch: AGENDA.lunch, end: AGENDA.end
+    });
+  }
+
+  function hasAgenda() {
+    return state.appointments.some(function (a) {
+      return a.id.indexOf(AGENDA.id + '-') === 0;
+    });
   }
 
   /* Validate anything arriving from storage or the server before trusting any of that. */
@@ -1478,12 +1559,14 @@
 
   /* ─────────────────────────── Weekly preview table ─────────────────────────── */
 
-  function renderWeekPreview(today) {
+  function renderWeekPreview(now) {
+    var today = dayNameOf(now);
     var body = $('weekPreview').querySelector('tbody');
     body.innerHTML = '';
 
     DAYS.forEach(function (day) {
-      var cfg = state.schedule[day];
+      // Today's row matches the pies above it.
+      var cfg = day === today ? dayConfig(now) : state.schedule[day];
       var tr = document.createElement('tr');
       if (day === today) tr.className = 'is-today';
       else if (!cfg.working) tr.className = 'is-off';
@@ -1672,7 +1755,7 @@
 
   /* Both dials share today's single start time. */
   function todayStartMinute() {
-    var cfg = state.schedule[dayNameOf(new Date())];
+    var cfg = dayConfig(new Date());
     return cfg ? cfg.start : null;
   }
 
@@ -2013,7 +2096,7 @@
 
   function pickFocusTimer(now) {
     var today = dayNameOf(now);
-    var cfg = state.schedule[today];
+    var cfg = dayConfig(now);
     var working = cfg && cfg.working;
     var candidates = [];
 
@@ -2116,7 +2199,7 @@
   function render() {
     var now = new Date();
     var today = dayNameOf(now);
-    var cfg = state.schedule[today];
+    var cfg = dayConfig(now);
     var todayKey = now.toDateString();
 
     // New day → clear fired milestone alerts.
@@ -2152,7 +2235,7 @@
     checkAlerts('end', endTimer, endLabel(today), todayKey);
 
     renderAppointment(now, todayKey);
-    renderWeekPreview(today);
+    renderWeekPreview(now);
     renderCalculator(now);
 
     // Speak only on the minute, not on every tick.
