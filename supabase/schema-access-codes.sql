@@ -3,12 +3,10 @@
 -- Run after schema-billing.sql, in Supabase → SQL Editor.
 --
 -- Design: there is NO public launch promo code. Everyone gets a
--- two-month trial automatically on sign-up, which does the same
--- job with nothing to leak, guess, or resell.
---
--- Two months rather than one is deliberate: the value of these
--- timers only becomes obvious after living with them across a
--- few real working weeks.
+-- trial automatically on sign-up, which does the same job with
+-- nothing to leak, guess, or resell. How long it runs is set in
+-- one place, trial_length() below: 30 days for accounts made
+-- before 19 Oct 2026, 14 days after.
 --
 -- Access codes remain only for friends and family, and are
 -- hardened accordingly: single-use, random, optionally bound to
