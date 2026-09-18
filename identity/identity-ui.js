@@ -104,15 +104,14 @@
 
     var status = el('p', { class: 'aib-signin-status', role: 'status', 'aria-live': 'polite' });
 
-    /* The same email carries a short code as well as the link. The link
-       only signs in the browser that opens the link; the code can be carried
-       to the device running the app when the inbox is somewhere else
-       — a personal address on a work machine, most often. Hidden until
-       a send has actually happened, so the panel never invites a code that
-       was never issued. */
+    /* The email carries a one-time code and no link, so typing the code
+       here is how sign-in finishes. That works on the device running the
+       app even when the inbox is somewhere else (a personal address on a
+       work machine, most often). Hidden until a send has actually
+       happened, so the panel never invites a code that was never issued. */
     var codeRow = el('div', { class: 'aib-signin-code', hidden: 'hidden' });
     var codeField = el('label', { class: 'aib-signin-field' });
-    codeField.appendChild(el('span', { text: 'Signed in elsewhere? Enter the code from the email' }));
+    codeField.appendChild(el('span', { text: 'Enter the code from the email' }));
     var codeInput = el('input', {
       type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code',
       maxlength: '10', placeholder: '00000000'
