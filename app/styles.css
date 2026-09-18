@@ -1569,16 +1569,21 @@ body.is-focus{
 }
 .legal-page .topbar{ margin-bottom:8px; }
 
+/* Hidden outright between messages, not just slid down. 120% of its own
+   height never cleared the 26px it sits above the bottom edge, so an empty
+   pill peeked up over every page. The visibility change waits for the slide
+   down to finish, and comes straight back when a message shows. */
 .toast{ --toast-bg:var(--plum);
   position:fixed; left:50%; bottom:26px; transform:translate(-50%,120%);
   background:var(--toast-bg); color:var(--on-dark);
   padding:12px 20px; border-radius:999px;
   font-size:.87rem; font-weight:600;
   box-shadow:var(--shadow-lg); z-index:60;
-  transition:transform .28s cubic-bezier(.4,0,.2,1);
+  visibility:hidden;
+  transition:transform .28s cubic-bezier(.4,0,.2,1), visibility 0s linear .28s;
   max-width:calc(100vw - 32px);
 }
-.toast.is-visible{ transform:translate(-50%,0); }
+.toast.is-visible{ transform:translate(-50%,0); visibility:visible; transition-delay:0s; }
 
 /* ───────────────────────── Responsive ───────────────────────── */
 @media (max-width:640px){
