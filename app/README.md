@@ -35,19 +35,15 @@ that sync is not set up and everything else works exactly as before.
 | Countdown Reducing Pie Timers | The two reducing pies |
 | Countdown Calculator | **Calculator** tab |
 
-The weekly schedule defaults are the exact values from the workbook, converted from
-Excel day-fractions to minutes past midnight:
+The weekly schedule defaults began as the workbook's own hours. They are now
+round placeholder hours instead, so nobody opens the app to a stranger's week
+(the comment above `DEFAULT_SCHEDULE` in `app.js` says why):
 
 | Day | Start | Lunch \| Head Home | End of day |
 | --- | --- | --- | --- |
-| Monday | 9:15 AM | 1:00 PM | 7:00 PM |
-| Tuesday | 8:50 AM | 1:00 PM | 2:50 PM |
-| Wednesday | 8:00 AM | 3:10 PM | 7:00 PM |
-| Thursday | 9:20 AM | 12:30 PM | 2:40 PM |
-| Friday | 8:40 AM | 12:30 PM | 2:40 PM |
+| Monday to Saturday | 9:00 AM | 12:30 PM | 5:00 PM |
 
-Saturday and Sunday are present but switched off, showing `N/A | WFH` — the same
-label the workbook used.
+Sunday is present but switched off.
 
 ## What's new
 
