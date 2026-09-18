@@ -41,16 +41,30 @@
      so a phone on Adelaide time counts to the printed agenda. The ids are
      fixed so no session can ever be added twice.
 
+     Who gets it: only a first visit in a browser tab, on the day itself,
+     on a phone set to Adelaide time, starts with the sessions, which is
+     what the shirt QR is for. A first visit on any other day, on another
+     clock, inside the Play app or in any installed app window gets the
+     plain defaults; the testers use the Play app with their own weeks.
+     Saved state is never seeded, and on the day dayConfig() changes the
+     hours only for someone already holding a session. The ?agenda link
+     adds the sessions on purpose, anywhere, the Play app included.
+
      None of it does anything after the day, but other code reads AGENDA,
      so deleting this block alone breaks every first run. Remove together:
-     this block, the firstRunSeed() line in load() with firstRunSeed() and
-     agendaAppointments(), hasAgenda() with the agenda lines in dayConfig()
-     (its weekly lookup stays), the apptAgendaNote lines in
-     renderAppointment() with that <p> in index.html, and the Agenda link
-     section with its openAgendaLink() call at the end of boot. */
+     this block, the firstRunSeed() line in load() with firstRunSeed(),
+     inAppWindow() and agendaAppointments(), IN_PLAY_APP above load()
+     unless something else reads it by then, hasAgenda() with the agenda
+     lines in dayConfig() (its weekly lookup stays), the apptAgendaNote
+     lines in renderAppointment() with that <p> in index.html, and the
+     Agenda link section with its openAgendaLink() call at the end of
+     boot. */
   var AGENDA = {
     id: 'sa-adhd-2026',
     date: '2026-09-19',
+    /* Date.getTimezoneOffset() on Adelaide time that day, UTC+9:30:
+       daylight saving there only starts on 4 October. */
+    tzOffset: -570,
     /* Doors and registration rather than the first talk at 10:00, so the
        pies are already moving while people look around the stalls. 16:00
        is the published finish; the 15:50 close is its own appointment. */
@@ -167,19 +181,38 @@
 
   var MILESTONES = [30, 15, 10, 5]; // minutes remaining
 
+  /* The Play app is a Trusted Web Activity over this same site, and it is
+     where the testers keep their own weeks, so the first-run agenda seed
+     must never reach it. The wrapper opens the site with its package as
+     the referrer, on the launch page only, so that is remembered for the
+     rest of the visit. load() reads this on the next line, so it has to
+     stay above it. If the referrer is ever missing, inAppWindow() still
+     keeps the seed out of the app's own window. */
+  var IN_PLAY_APP = (function () {
+    var KEY = 'countdown-timers/play-app';
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    try {
+      if (fromApp) sessionStorage.setItem(KEY, '1');
+      return fromApp || sessionStorage.getItem(KEY) === '1';
+    } catch (e) {
+      return fromApp;
+    }
+  }());
+
   var state = load();
   var firedAlerts = {}; // key -> true, reset each day
 
   /* ─────────────────────────── Storage ─────────────────────────── */
 
   /* Nothing saved at all is the only sign of a first run. Saved state that
-     fails to parse is not a first run, so it is never seeded. */
+     fails to parse is not a first run, so it is never seeded, and nor is
+     storage that cannot be read, which may still hold someone's week. */
   function load() {
     var raw = null;
     try {
       raw = localStorage.getItem(STORE_KEY);
     } catch (e) {
-      raw = null;
+      return normalise({});
     }
     if (raw === null) return normalise(firstRunSeed());
 
@@ -193,13 +226,37 @@
   }
 
   /* Someone scanning in at the conference opens a live agenda without
-     setting anything up. Up to the day they start with its sessions as
-     appointments, and on the day dayConfig() runs the pies on its hours.
-     Nothing is saved or stamped here, same as any other first run, and
-     after the day a new visitor gets the plain defaults again. */
+     setting anything up: its sessions as appointments, and dayConfig()
+     running the pies on its hours. Only on the day, only on Adelaide's
+     clock and only in a browser tab, so a first visit before or after it,
+     on a phone set to another time zone, or in the Play app gets the plain
+     defaults. The day is the phone's own calendar date, as isoDate() reads
+     it everywhere, and the offset check makes that Adelaide's date too.
+     On any other clock the wall-clock sessions would count to the wrong
+     times, so those phones are not seeded at all. Nothing is saved or
+     stamped here, same as any other first run. */
   function firstRunSeed() {
-    if (isoDate(new Date()) > AGENDA.date) return {};
+    var now = new Date();
+    if (IN_PLAY_APP || inAppWindow() || isoDate(now) !== AGENDA.date ||
+        now.getTimezoneOffset() !== AGENDA.tzOffset) return {};
     return { appointments: agendaAppointments(AGENDA) };
+  }
+
+  /* The fallback for a Play app launch that arrives without its referrer.
+     A Trusted Web Activity runs in its own app window, which Chrome reports
+     to the page as a standalone or fullscreen display mode, while the shirt
+     QR always opens a browser tab. So when unsure, a first run in any app
+     window counts as the Play app, and so does one where the check itself
+     fails. */
+  function inAppWindow() {
+    try {
+      if (window.navigator.standalone === true) return true;
+      return ['standalone', 'fullscreen', 'minimal-ui'].some(function (mode) {
+        return window.matchMedia('(display-mode: ' + mode + ')').matches;
+      });
+    } catch (e) {
+      return true;
+    }
   }
 
   function agendaAppointments(preset) {
