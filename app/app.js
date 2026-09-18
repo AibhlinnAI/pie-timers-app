@@ -20,13 +20,17 @@
      person's real timetable, which meant every new user opened the app to
      a stranger's working week and no clue whose week that was. Round numbers
      read as placeholders; 9:15 and 15:10 read as somebody's actual life. */
+  /* Saturday is on by default, so someone opening the app for the first
+     time on a Saturday sees pies counting down rather than empty dials and
+     "Nothing scheduled today". normalise() keeps any saved per-day working
+     flag, so only a fresh install (or Restore defaults) picks this up. */
   var DEFAULT_SCHEDULE = {
     Monday:    { working: true,  start: 540, lunch: 750, end: 1020 }, // 9:00 / 12:30 / 17:00
     Tuesday:   { working: true,  start: 540, lunch: 750, end: 1020 },
     Wednesday: { working: true,  start: 540, lunch: 750, end: 1020 },
     Thursday:  { working: true,  start: 540, lunch: 750, end: 1020 },
     Friday:    { working: true,  start: 540, lunch: 750, end: 1020 },
-    Saturday:  { working: false, start: 540, lunch: 750, end: 1020 },
+    Saturday:  { working: true,  start: 540, lunch: 750, end: 1020 },
     Sunday:    { working: false, start: 540, lunch: 750, end: 1020 }
   };
 
