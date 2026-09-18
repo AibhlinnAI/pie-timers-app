@@ -45,8 +45,9 @@
      so deleting this block alone breaks every first run. Remove together:
      this block, the firstRunSeed() line in load() with firstRunSeed() and
      agendaAppointments(), hasAgenda() with the agenda lines in dayConfig()
-     (its weekly lookup stays), and the Agenda link section with its
-     openAgendaLink() call at the end of boot. */
+     (its weekly lookup stays), the apptAgendaNote lines in
+     renderAppointment() with that <p> in index.html, and the Agenda link
+     section with its openAgendaLink() call at the end of boot. */
   var AGENDA = {
     id: 'sa-adhd-2026',
     date: '2026-09-19',
@@ -759,9 +760,16 @@
       $('apptChip').textContent = 'None';
       $('apptPie').setAttribute('d', '');
       renderNotchPair('appt', 0);
+      $('apptAgendaNote').hidden = true;
       card.classList.remove('is-urgent');
       return;
     }
+
+    // The conference sessions are copied from the organiser's page, not
+    // confirmed by them, so say so while one of them is the next thing up.
+    // Only manual entries carry agenda ids; a calendar uid never counts.
+    $('apptAgendaNote').hidden = !(appointment.source === 'manual' &&
+      appointment.id.indexOf(AGENDA.id + '-') === 0);
 
     var when = new Date(appointment.at);
     var sameDay = isoDate(when) === isoDate(now);
@@ -2142,7 +2150,7 @@
 
     var day = appointmentDate({ date: preset.date, time: 0 })
       .toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
-    toast('Conference agenda added. On ' + day + ' the pies run ' +
+    toast('Unofficial conference agenda added. On ' + day + ' the pies run ' +
           formatClock(preset.start) + ' to ' + formatClock(preset.end) + '.');
   }
 
