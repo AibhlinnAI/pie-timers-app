@@ -9,6 +9,16 @@
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
+<style>
+  /* The October pie. Kept here rather than in styles.css, which the
+     service worker serves cache-first; this page is network-first. The
+     card and pie reuse the Appointment timer's classes and tokens, so both
+     themes come from styles.css as they do for that pie. */
+  .launch{ margin:22px 0 6px; max-width:66ch; text-align:center; }
+  .oct-mark{ display:block; width:100%; max-width:360px; height:auto; margin:0 auto; overflow:visible; }
+  .oct-mark text{ font-family:var(--font); font-weight:700; fill:var(--ink); letter-spacing:-.012em; }
+  .launch-caption{ margin:12px 0 0; font-size:.95rem; font-weight:600; color:var(--accent); }
+</style>
 <!-- DRAFT. Not yet reviewed by a lawyer, and not linked from any page. Update "Last updated" if you change anything below. -->
 </head>
 <body class="legal-page">
@@ -34,6 +44,18 @@
     <a href="privacy.html">Privacy Policy</a> &middot;
     <a href="index.html">Back to the app</a>
   </p>
+
+  <div class="launch timer-card timer-card--amber">
+    <svg class="oct-mark" viewBox="-40 -76 392 80" role="img" focusable="false" aria-label="October">
+      <g transform="translate(0 -36)">
+        <circle class="dial-base" r="37"/>
+        <path class="dial-pie" id="octPie" d="M 0 -37 A 37 37 0 1 1 0 37 A 37 37 0 1 1 0 -37 Z"/>
+        <circle class="dial-rim" r="37"/>
+      </g>
+      <text x="40" y="0" font-size="100">ctober</text>
+    </svg>
+    <p class="launch-caption" id="launchCaption">October is launch month.</p>
+  </div>
 
   <h2>Your price is locked</h2>
   <p>Foundation members lock the price of <strong>AibhlínnAI Premium</strong>
@@ -119,6 +141,68 @@
     for (var i = 0; i < links.length; i++) {
       links[i].textContent = email;
       links[i].setAttribute('href', 'mailto:' + email);
+    }
+  })();
+</script>
+<script>
+  /* The October pie empties clockwise across launch month, the same way
+     app.js's wedgePath() draws the time left. The instants are fixed in
+     UTC, so the result does not depend on the phone's own time zone.
+     Adelaide moves from +09:30 to +10:30 at 02:00 on 4 October, which
+     makes launch month 743 hours long. Without this script the page
+     keeps the full pie and the caption written in the markup. The
+     captions say nothing about whether Foundation is open, which this
+     page cannot know. */
+  (function () {
+    var START = Date.UTC(2026, 8, 30, 14, 30);  // 1 Oct 2026 00:00 +09:30
+    var SHIFT = Date.UTC(2026, 9, 3, 16, 30);   // 4 Oct 2026 02:00 +09:30
+    var END = Date.UTC(2026, 9, 31, 13, 30);    // 1 Nov 2026 00:00 +10:30
+    var R = 37;
+
+    var pie = document.getElementById('octPie');
+    var caption = document.getElementById('launchCaption');
+    if (pie && caption) {
+      render();
+      setInterval(render, 60000);
+    }
+
+    function point(fraction) {
+      var angle = fraction * 2 * Math.PI;
+      return (R * Math.sin(angle)).toFixed(3) + ' ' + (-R * Math.cos(angle)).toFixed(3);
+    }
+
+    function wedge(left) {
+      if (left <= 0) return '';
+      if (left >= 0.99999) {
+        return 'M 0 ' + -R + ' A ' + R + ' ' + R + ' 0 1 1 0 ' + R +
+               ' A ' + R + ' ' + R + ' 0 1 1 0 ' + -R + ' Z';
+      }
+      return 'M 0 0 L ' + point(1 - left) +
+             ' A ' + R + ' ' + R + ' 0 ' + (left > 0.5 ? 1 : 0) + ' 1 0 ' + -R + ' Z';
+    }
+
+    // The date in Adelaide, read from a shifted UTC date.
+    function adelaideDate(t) {
+      var offsetMinutes = t < SHIFT ? 570 : 630;
+      return new Date(t + offsetMinutes * 60000).getUTCDate();
+    }
+
+    function render() {
+      var now = Date.now();
+      var left, text;
+      if (now < START) {
+        left = 1;
+        text = 'Launch month starts 1 October.';
+      } else if (now < END) {
+        left = (END - now) / (END - START);
+        var days = 32 - adelaideDate(now);
+        text = days === 1 ? 'Last day of launch month.' : days + ' days left in launch month.';
+      } else {
+        left = 0;
+        text = 'Launch month is over.';
+      }
+      pie.setAttribute('d', wedge(left));
+      caption.textContent = text;
     }
   })();
 </script>
