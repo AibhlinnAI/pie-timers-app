@@ -3,6 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- An offer, so never shown inside the Google Play app. The same check
+     and the same bounce as the top of pricing.html. -->
+<script>
+  (function () {
+    var KEY = 'countdown-timers/play-app';
+    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    try {
+      if (inPlayApp) sessionStorage.setItem(KEY, '1');
+      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
+    } catch (e) { /* storage blocked: the referrer alone decides */ }
+    if (!inPlayApp) return;
+    document.documentElement.style.display = 'none';
+    location.replace('index.html');
+  }());
+</script>
 <title>Foundation Members · Pie Timers</title>
 <meta name="description" content="Foundation members lock the AibhlínnAI Premium price for as long as their subscription stays active and AibhlínnAI offers a Premium subscription. 100 places. Closes when all 100 are taken or at the start of 1 November 2026, Adelaide time.">
 <meta name="robots" content="noindex">

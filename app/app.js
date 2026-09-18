@@ -53,12 +53,12 @@
      None of it does anything after the day, but other code reads AGENDA,
      so deleting this block alone breaks every first run. Remove together:
      this block, the firstRunSeed() line in load() with firstRunSeed(),
-     inAppWindow() and agendaAppointments(), IN_PLAY_APP above load()
-     unless something else reads it by then, hasAgenda() with the agenda
+     inAppWindow() and agendaAppointments(), hasAgenda() with the agenda
      lines in dayConfig() (its weekly lookup stays), the apptAgendaNote
      lines in renderAppointment() with that <p> in index.html, and the
      Agenda link section with its openAgendaLink() call at the end of
-     boot. */
+     boot. IN_PLAY_APP above load() stays, because it also keeps prices
+     out of the Play app. */
   var AGENDA = {
     id: 'sa-adhd-2026',
     date: '2026-09-19',
@@ -197,6 +197,39 @@
     } catch (e) {
       return fromApp;
     }
+  }());
+
+  /* The Play app is also consumption-only. Google Play's Payments policy
+     allows no prices and no route to paying outside Play Billing in an
+     app installed from Play, so someone who subscribed on the web keeps
+     their features there, but nothing in it sells. Offers are hidden,
+     not reworded, and one plain line stands in wherever the gap would
+     otherwise leave someone guessing. billing.js and identity-bridge.js
+     read CT.inPlayApp when they run. The pages without app.js read the
+     same sessionStorage key themselves: pricing.html and foundation.html
+     send the visit back here, and privacy.html and terms.html hide
+     their links to pricing and refunds.
+
+     Only this flag decides it, never inAppWindow(). An installed web app
+     or an iPhone home screen icon is still the web, and keeps its
+     prices. */
+  CT.inPlayApp = IN_PLAY_APP;
+  var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription.';
+
+  /* Markup that only ever belongs to an offer carries data-hide-in-play.
+     Anything other code shows and hides checks IN_PLAY_APP where it
+     decides instead, so a later render cannot bring it back. */
+  (function hideOffersInPlayApp() {
+    if (!IN_PLAY_APP) return;
+    var offers = document.querySelectorAll('[data-hide-in-play]');
+    for (var i = 0; i < offers.length; i++) offers[i].hidden = true;
+
+    /* The Settings row that leads to Account names Premium and
+       cancelling, and the Play app has neither to offer, so there it
+       says what Account does hold. Swapped whole rather than split into
+       spans, because .setting span is a block. */
+    var accountHint = $('accountRowHint');
+    if (accountHint) accountHint.textContent = 'Sign in, sync, delete your account.';
   }());
 
   var state = load();
@@ -486,13 +519,15 @@
      nothing -- the web app already in front of them is the whole offer
      for that visitor. Gone once onboarding finishes even if never
      acted on, same as the welcome panel it sits above: a first-run
-     moment, not a standing pitch. */
+     moment, not a standing pitch. Never inside the Play app, which is
+     the thing it invites people to test. */
   function isAndroid() { return /android/i.test(navigator.userAgent || ''); }
 
   function renderTesterInvite() {
     var panel = $('testerInvite');
     if (!panel) return;
-    panel.hidden = !(isAndroid() && !state.settings.onboarded && !state.settings.testerInviteDone);
+    panel.hidden = !(isAndroid() && !IN_PLAY_APP &&
+                     !state.settings.onboarded && !state.settings.testerInviteDone);
   }
 
   function dismissTesterInvite() {
@@ -1329,11 +1364,15 @@
   /* The Calendar toggle and the Premium Feature link that replaces one
      trade places by entitlement, and if someone is mid-Calendar-view
      when their plan lapses, falling back to List rather than leaving a
-     paying-only view open to someone who no longer pays. */
+     paying-only view open to someone who no longer pays.
+
+     The Play app never draws the link, and nor does it leave the toggle
+     holding List on its own, so there the header simply ends. */
   function renderAppointmentsPlanGate() {
     var entitled = CT.billing.enabled() ? CT.billing.isEntitled() : true;
     $('apptViewCalendar').hidden = !entitled;
-    $('apptCalendarPremiumBtn').hidden = entitled;
+    $('apptCalendarPremiumBtn').hidden = entitled || IN_PLAY_APP;
+    $('apptViewToggle').hidden = !entitled && IN_PLAY_APP;
     if (!entitled && !$('apptCalendarView').hidden) setAppointmentsView('list');
   }
 
@@ -1402,13 +1441,14 @@
     } else if (!CT.auth.isSignedIn()) {
       reason = 'Sign in on the Account tab to connect a calendar.';
     } else if (!CT.billing.isEntitled()) {
-      reason = 'Calendar sync is included with a plan. Manual appointments above ' +
-               'stay free.';
+      reason = (IN_PLAY_APP ? PLAY_PREMIUM_NOTE : 'Calendar sync is included with a plan.') +
+               ' Manual appointments above stay free.';
     }
 
     // Only a real paywall earns the button -- not configured or not
     // signed in are setup states, not something Premium Feature fixes.
-    premiumBtn.hidden = !(CT.config.isConfigured && CT.auth.isSignedIn() &&
+    // Never in the Play app, where the line above is all that is said.
+    premiumBtn.hidden = IN_PLAY_APP || !(CT.config.isConfigured && CT.auth.isSignedIn() &&
       CT.billing.enabled() && !CT.billing.isEntitled());
     unavailable.hidden = !reason;
     if (reason) setUnavailable(unavailable, reason, setupNote);
@@ -2054,7 +2094,8 @@
       setUnavailable(hint, 'Sign in on the Settings tab to get alerts when the app is closed.');
     } else if (!CT.billing.isEntitled()) {
       pushBox.disabled = true;
-      setUnavailable(hint, 'Included with a plan. In-app alerts stay free.');
+      setUnavailable(hint, (IN_PLAY_APP ? PLAY_PREMIUM_NOTE : 'Included with a plan.') +
+        ' In-app alerts stay free.');
     } else {
       pushBox.disabled = false;
       setUnavailable(hint, 'Deliver milestone alerts even when the app is closed.');
@@ -2461,12 +2502,17 @@
        be worse than either. */
     var nudging = trialing && left !== null && left <= 4;
 
+    /* In the Play app the whole panel, prices, codes and all, gives way
+       to the one plain line, at exactly the moments it would have shown. */
+    var offering = CT.billing.enabled() &&
+                   CT.auth.isSignedIn() &&
+                   (!CT.billing.isEntitled() || nudging);
+
     var panel = $('upgradePanel');
-    if (panel) {
-      panel.hidden = !CT.billing.enabled() ||
-                     !CT.auth.isSignedIn() ||
-                     (CT.billing.isEntitled() && !nudging);
-    }
+    if (panel) panel.hidden = !offering || IN_PLAY_APP;
+
+    var playNote = $('playPremiumNote');
+    if (playNote) playNote.hidden = !offering || !IN_PLAY_APP;
 
     /* One heading, always. The heading used to swap between "Unlock" and "Keep"
        depending on how much trial was left -- a distinction that made
@@ -2478,10 +2524,14 @@
     if (trialNotice) {
       trialNotice.hidden = !trialing || nudging;
       if (trialing && !nudging) {
+        // The Play app says nothing about cards or paying.
         trialNotice.textContent =
           'You have ' + left + (left === 1 ? ' day' : ' days') +
-          ' left of your free trial. Everything is switched on — no card needed, ' +
-          'and nothing happens automatically when the trial ends.';
+          ' left of your free trial. ' + (IN_PLAY_APP
+            ? 'Everything is switched on, and nothing happens automatically ' +
+              'when the trial ends.'
+            : 'Everything is switched on — no card needed, ' +
+              'and nothing happens automatically when the trial ends.');
       }
     }
 
@@ -2515,9 +2565,10 @@
        account -- which is every account, for its first fortnight -- and
        clicking returned a 404 rendered as an error, so the first
        thing a new customer did on this page was read what looked like a
-       broken account. */
+       broken account. Never in the Play app: the portal is Paddle's,
+       and it takes card details. */
     var manage = $('managePlan');
-    if (manage) manage.hidden = !CT.billing.enabled() || !CT.billing.hasPaidPlan();
+    if (manage) manage.hidden = IN_PLAY_APP || !CT.billing.enabled() || !CT.billing.hasPaidPlan();
 
   }
 
@@ -2587,11 +2638,12 @@
   }());
 
   /* Play testing opt-in badge. Off (hidden) until playTestingUrl is set
-     -- see the comment in config.js for why it stays off by default. */
+     -- see the comment in config.js for why it stays off by default.
+     Off in the Play app too, where the person is already testing. */
   (function applyTesterBadge() {
     var url = CT.config.playTestingUrl;
     var badge = $('testerBadge');
-    if (!url) { badge.hidden = true; return; }
+    if (!url || IN_PLAY_APP) { badge.hidden = true; return; }
     badge.href = url;
     badge.hidden = false;
   }());

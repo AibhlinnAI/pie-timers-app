@@ -180,6 +180,19 @@
       node.className = 'plan-chip plan-chip--premium';
       node.appendChild(mark());
       node.appendChild(document.createTextNode('AibhlínnAI Premium'));
+    } else if (CT.inPlayApp) {
+      /* The Play app is consumption-only (app.js, IN_PLAY_APP): the
+         Premium badge above is status and stays, but the Free Trial
+         badge and the Get Premium button are both steps toward paying
+         outside Google Play, so neither is drawn. Read here, at draw
+         time, because app.js sets the flag after this file has loaded.
+
+         An empty text node rather than nothing at all: identity-ui only
+         keeps a slot that has something in it after the first draw,
+         which comes before the entitlement is known, and a paying
+         account's badge still has to land here when it arrives. */
+      container.appendChild(document.createTextNode(''));
+      return;
     } else if (trialing && left !== null && left > NUDGE_DAYS) {
       node = document.createElement('span');
       node.className = 'plan-chip plan-chip--trial';

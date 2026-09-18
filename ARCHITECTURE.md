@@ -153,16 +153,30 @@ therefore made typography *more* consistent, not less.
 
 ## 5. Google Play anti-steering
 
-Nothing in the app links to, mentions, or hints at web/Paddle pricing —
-`app/billing.js`, the comment above `initPaddle()`. This matters specifically
-because if Pie Timers is ever wrapped for Google Play (a Trusted Web Activity
-over this same site — see `DEPLOY.md` §9 for the real requirements), Play's
-policy on external purchase links prohibits steering a Play user to pay
-outside Play Billing. The annual-only offer stays exclusive to the normal
-web context.
+The Android app on Google Play is a Trusted Web Activity over this same site
+(see `DEPLOY.md` §9), and Play's Payments policy prohibits steering a Play
+user to pay outside Play Billing. So the Play app is consumption-only.
+Someone who subscribed on the web keeps their features there, but it shows
+no prices, no checkout, no customer portal and no link to any of them.
 
-If a Play-specific build variant is ever introduced, the upgrade panel should
-be gated out of that variant entirely rather than having the copy edited —
-editing copy per-build is how this constraint quietly breaks six months
-later, when someone changes the wording without knowing why the wording was
-chosen.
+The site tells the Play app apart by its referrer,
+`android-app://ai.aibhlinn.pietimers`, which the wrapper sends on the launch
+page only. `app/app.js` remembers it for the visit in sessionStorage
+(`countdown-timers/play-app`) as `IN_PLAY_APP`, and exposes it as
+`CT.inPlayApp`. Gated on it: the upgrade panel with its prices and code
+fields, both Premium Feature buttons, the header plan chip's trial and offer
+states, the Manage button, the welcome panel's "needs no card", the footer
+Pricing and Refund Policy links, and the Android tester invite. The Settings
+row that leads to Account drops Premium and cancelling from its line. The one
+line left is "Some features need an AibhlínnAI Premium subscription." As a
+backstop, `billing.js` refuses to open checkout or the portal there.
+`pricing.html` and `foundation.html` send a Play visit back to the app, and
+`privacy.html` and `terms.html` hide their links to pricing and refunds, each
+reading the same sessionStorage key.
+
+Only the referrer counts, never display mode (`inAppWindow()`). An installed
+web app or an iPhone home screen icon is still the web, and keeps its prices.
+
+Offers are gated out rather than reworded on purpose. Editing copy per
+context is how this constraint quietly breaks six months later, when someone
+changes the wording without knowing why the wording was chosen.

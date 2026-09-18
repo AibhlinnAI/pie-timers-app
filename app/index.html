@@ -97,13 +97,14 @@
     <!-- First run only. Says what the app is in one glance, for a cold
          visit that may have come straight off the QR code. The starting
          hours are placeholders, so the first paragraph ends on setting
-         your own rather than letting someone assume they are theirs. -->
+         your own rather than letting someone assume they are theirs.
+         The Play app drops the card, since it may not talk about paying. -->
     <section class="welcome" id="welcome" hidden>
       <h2>Time you can see</h2>
       <p>A countdown timer shaped like a pie. It shrinks as time runs out, so
       one glance tells you how long is left. Set your own hours to start.</p>
       <p>Free to use, with no account needed. If you do sign in, that's free
-      too, and needs no card.</p>
+      too<span data-hide-in-play>, and needs no card</span>.</p>
       <div class="welcome-actions">
         <button class="btn btn-primary" data-goto="schedule" id="welcomeSetup">Set my hours</button>
         <button class="btn btn-ghost" id="welcomeDismiss">Keep the defaults for now</button>
@@ -336,7 +337,8 @@
         </div>
         <!-- Takes the Calendar toggle's place entirely while not entitled --
              one unambiguous button straight to the place that sells access,
-             not a locked control sitting next to an explanation. -->
+             not a locked control sitting next to an explanation. Never in
+             the Play app, and nor is the second one below (app.js). -->
         <a class="btn-premium" id="apptCalendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
       </header>
 
@@ -548,11 +550,12 @@
              because Account otherwise sits at the very bottom behind
              appearance, notifications and calendar settings -- which is
              also where cancelling lives. A row rather than a button: this
-             list is the pattern already on the page. -->
+             list is the pattern already on the page. The Play app words
+             the line without Premium or cancelling (app.js). -->
         <a class="setting setting--link" href="#account">
           <div>
             <strong>Account</strong>
-            <span>Sign in, AibhlínnAI Premium, cancel.</span>
+            <span id="accountRowHint">Sign in, AibhlínnAI Premium, cancel.</span>
           </div>
           <span class="setting-go" aria-hidden="true">→</span>
         </a>
@@ -796,6 +799,11 @@
            account is not currently entitled. -->
       <div class="notice notice--info" id="trialNotice" hidden></div>
 
+      <!-- Stands in for the upgrade panel in the Play app, which may say a
+           plan exists but not sell it. Same sentence as PLAY_PREMIUM_NOTE
+           in app.js. -->
+      <p class="notice notice--info" id="playPremiumNote" hidden>Some features need an AibhlínnAI Premium subscription.</p>
+
       <section class="upgrade" id="upgradePanel" hidden>
         <h3 id="upgradeHeading">AibhlínnAI Premium</h3>
         <p>Timers, schedule and calculator are free forever on one device.</p>
@@ -911,11 +919,13 @@
 
 <footer class="site-foot">
   <p class="site-foot-promise">No ads. No tracking. No selling your data. Ever.</p>
+  <!-- Pricing and Refund Policy are hidden in the Play app (app.js,
+       data-hide-in-play). The terms stay, refunds section included. -->
   <div class="site-foot-links">
-    <a href="pricing.html">Pricing</a>
+    <a href="pricing.html" data-hide-in-play>Pricing</a>
     <a href="terms.html" data-legal-link="terms">Terms of Service</a>
     <a href="privacy.html" data-legal-link="privacy">Privacy Policy</a>
-    <a href="terms.html#refunds" data-legal-link="refunds">Refund Policy</a>
+    <a href="terms.html#refunds" data-legal-link="refunds" data-hide-in-play>Refund Policy</a>
     <a href="#" data-support-mailto data-support-subject="Pie Timers">Contact support</a>
   </div>
 </footer>

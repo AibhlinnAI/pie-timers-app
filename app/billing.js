@@ -161,7 +161,15 @@
      message, a link to this pricing section, or a coupon reference
      anywhere reachable from the Play-wrapped build. If a Play-specific
      build variant is ever introduced, gate this whole panel out of that variant
-     rather than editing its copy. */
+     rather than editing its copy.
+
+     That wrapper now exists, as the same site rather than a separate
+     build, and app.js recognises it by its referrer (CT.inPlayApp).
+     There every offer is gated out rather than reworded, and as a
+     backstop the two functions below that reach Paddle refuse to run,
+     so a control missed in the markup still cannot open checkout or
+     the customer portal. Outside the Play app nothing here changes. */
+  var PLAY_APP_REFUSAL = 'That is not available in the Android app.';
 
   /* ─────────────────────────── Paddle ─────────────────────────── */
 
@@ -221,6 +229,7 @@
   }
 
   function openCheckout(cadence, discountCode) {
+    if (CT.inPlayApp) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
     var user = CT.auth.getUser();
@@ -277,6 +286,7 @@
      buyer terms and refund policy instead of us reimplementing a
      second copy. */
   function openManagePortal() {
+    if (CT.inPlayApp) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
     var user = CT.auth.getUser();
