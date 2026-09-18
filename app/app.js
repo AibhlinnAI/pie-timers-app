@@ -44,8 +44,9 @@
      None of it does anything after the day, but other code reads AGENDA,
      so deleting this block alone breaks every first run. Remove together:
      this block, the firstRunSeed() line in load() with firstRunSeed() and
-     agendaAppointments(), and hasAgenda() with the agenda lines in
-     dayConfig() (its weekly lookup stays). */
+     agendaAppointments(), hasAgenda() with the agenda lines in dayConfig()
+     (its weekly lookup stays), and the Agenda link section with its
+     openAgendaLink() call at the end of boot. */
   var AGENDA = {
     id: 'sa-adhd-2026',
     date: '2026-09-19',
@@ -2081,6 +2082,57 @@
     toastTimer = setTimeout(function () { el.classList.remove('is-visible'); }, 3200);
   }
 
+  /* ─────────────────────────── Agenda link ───────────────────────────
+     ?agenda=sa-adhd-2026 adds the conference agenda to a copy that already
+     has saved state, which a first-run seed never touches. Existing
+     appointments stay; the agenda's own ids are replaced rather than added
+     again, so opening the link twice still leaves one of each. */
+
+  function openAgendaLink() {
+    var params = new URLSearchParams(location.search);
+    if (!params.has('agenda')) return;
+    // An unknown id, or this one once the day has passed, is stripped and
+    // otherwise ignored: no merge, no save, no toast.
+    var preset = params.get('agenda') === AGENDA.id && isoDate(new Date()) <= AGENDA.date
+      ? AGENDA : null;
+
+    function finish() {
+      if (preset) applyAgenda(preset);
+      // Stripped only once merged, so a reload retries if the pull stalls.
+      params.delete('agenda');
+      var query = params.toString();
+      history.replaceState(null, '', location.pathname + (query ? '?' + query : '') + location.hash);
+    }
+
+    /* Sync is last write wins over the whole document, so merging into a
+       stale copy and stamping it would overwrite newer edits from another
+       device. Adopt the server's copy first, then merge into that. */
+    if (preset && CT.config.isConfigured && CT.auth.isSignedIn()) {
+      CT.sync.pull(true).then(finish, finish);
+    } else {
+      finish();
+    }
+  }
+
+  function applyAgenda(preset) {
+    var ids = {};
+    preset.items.forEach(function (item) { ids[item.id] = true; });
+    state.appointments = normaliseAppointments(state.appointments.filter(function (a) {
+      return !ids[a.id];
+    }).concat(agendaAppointments(preset)));
+
+    // Only the appointments change. dayConfig() moves the pies on the day
+    // itself, so the weekly schedule stays exactly as it was.
+    save();
+    buildAppointmentList();
+    render();
+
+    var day = appointmentDate({ date: preset.date, time: 0 })
+      .toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
+    toast('Conference agenda added. On ' + day + ' the pies run ' +
+          formatClock(preset.start) + ' to ' + formatClock(preset.end) + '.');
+  }
+
   /* ─────────────────────────── Focus view ───────────────────────────
      One pie in its own window, meant to sit snapped beside real work.
 
@@ -2912,4 +2964,7 @@
 
   // sync.init() consumes the URL fragment, so this must follow that call.
   finishGoogleConnect();
+
+  // Last, so CT.app is in place for the pull and the sign-in hash is gone.
+  openAgendaLink();
 })();
