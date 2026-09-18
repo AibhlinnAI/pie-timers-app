@@ -1,5 +1,7 @@
 # Pie Timers | Tester Recruitment + SA ADHD Conference
 
+> **Note, 18 September 2026:** Part 1 now follows the 18 September decisions, and the current wording is on app/foundation.html. Foundation locks the **AibhlínnAI Premium** price (A$2.90 a month or A$19 a year) for as long as the subscription stays active and AibhlínnAI offers a Premium subscription. It has **100 places, open to the public**, and closes when all 100 are taken or at the start of **1 November 2026** (Adelaide time), whichever comes first. People you asked personally to test have their own arrangement and do not take a Foundation place, so the one-to-one messages leave Foundation out. Say Foundation is a paid subscription with a locked price, and never describe it by contrast with paying nothing.
+
 Built for phone use. Part 1 is copy and paste. Part 2 is for Saturday 19 September.
 
 ---
@@ -8,12 +10,12 @@ Built for phone use. Part 1 is copy and paste. Part 2 is for Saturday 19 Septemb
 
 Different job from the elevator pitch. That one asks someone to understand. This one asks them to **do** something, and that is a bigger ask.
 
-**Every version below states four things, because leaving any of them out creates a dead end or a bad surprise:**
+**Every version below states two things, because leaving either out creates a dead end or a bad surprise:**
 
 1. It is **Android, through Google Play closed testing**. iPhone users go to the web app.
-2. Foundation means **your price is locked, not that it is free**. It is a paid subscription.
-3. The cap is **up to 100**.
-4. Saying no is easy and costs nothing.
+2. Saying no is easy and costs nothing.
+
+**The group posts in 1b also state Foundation:** a **paid subscription with a locked price**, A$2.90 a month or A$19 a year, with **100 places** that close at the start of 1 November 2026 (Adelaide time) or when all 100 are taken. The one-to-one messages in 1a leave it out.
 
 ---
 
@@ -29,6 +31,8 @@ Different job from the elevator pitch. That one asks someone to understand. This
 
 For friends, family and people you actually know. The relationship matters more than the roster, so every one of these gives them a way out that needs no explanation.
 
+People you ask personally have their own arrangement and do not take a Foundation place, so these messages leave Foundation out.
+
 ### Variant A: warm and plain
 
 > Hey [name], no obligation at all and a straight no is completely fine.
@@ -36,8 +40,6 @@ For friends, family and people you actually know. The relationship matters more 
 > I've built an app called Pie Timers. It shows time as a wedge that shrinks, so "how much longer" is something you can see instead of work out. I'm after a few testers before it goes live.
 >
 > It's Android only for the testing part, through Google Play. If you're on iPhone there's a web version instead.
->
-> Testers become Foundation members: you pay the launch price and it never goes up for you. Not free, just locked. Up to 100 spots.
 >
 > Want the link, or shall I leave you to it? Either is genuinely fine.
 
@@ -49,8 +51,6 @@ For friends, family and people you actually know. The relationship matters more 
 >
 > I need testers before launch. Android via Google Play, or a web version if you're on iPhone.
 >
-> Testers become Foundation members: price locked at the launch price, permanently. It's not free, it just never goes up. Up to 100 of them.
->
 > Say the word and I'll send the link. Say nothing and I'll assume you're busy.
 
 ### Variant C: shortest
@@ -58,8 +58,6 @@ For friends, family and people you actually know. The relationship matters more 
 > Hi [name]. Building an app, need testers, zero pressure and no reply needed if it's not for you.
 >
 > Pie Timers: a countdown you can see rather than read. Android, through Google Play closed testing. iPhone people get the web version.
->
-> Testers become Foundation members, which locks your price at the launch price permanently. It's a subscription, not a freebie. Up to 100 spots.
 >
 > Link if you want it?
 
@@ -73,6 +71,8 @@ Cycling, youth sport, ND communities, AI and productivity circles. You are a par
 
 **The three moves that keep you a participant:** flag it as yours in the first line, invite the mods to remove it, and promise it is your only post about it. Then keep that promise.
 
+**Before you post these, decide one thing the page does not answer yet:** what an Android tester gets if Pie Timers reaches Google Play after 1 November, or after the 100th place has gone.
+
 ### Variant A: cycling
 
 > Mods, delete if this isn't allowed.
@@ -81,7 +81,7 @@ Cycling, youth sport, ND communities, AI and productivity circles. You are a par
 >
 > I'm after testers before it goes live. Android, through Google Play closed testing. There's a web version if you're on iPhone.
 >
-> Testers become Foundation members, capped at 100. Your price locks at the launch price and never rises. To be clear, it's a paid subscription rather than a free ride. The price just never moves.
+> Testers with no previous connection to me can subscribe at the Foundation price once Pie Timers is live on Google Play: A$2.90 a month or A$19 a year. To be clear, it's a paid subscription. The price stays locked for as long as you stay subscribed and AibhlínnAI offers Premium. 100 places, closing at the start of 1 November or sooner if they fill.
 >
 > Happy to send the link to anyone interested. Won't post about it again.
 
@@ -93,7 +93,7 @@ Cycling, youth sport, ND communities, AI and productivity circles. You are a par
 >
 > Looking for testers before launch. Android via Google Play closed testing, web version for iPhone.
 >
-> Testers become Foundation members, up to 100 of them, which locks your price at the launch price permanently. It is a paid subscription, not free. The price just never goes up.
+> Testers with no previous connection to me can subscribe at the Foundation price once Pie Timers is live on Google Play. It is a paid subscription, A$2.90 a month or A$19 a year, and the price stays locked for as long as you stay subscribed and AibhlínnAI offers Premium. 100 places, closing at the start of 1 November or sooner if they fill.
 >
 > Comment or DM if you want in. That's my one post about it.
 
@@ -105,7 +105,7 @@ Cycling, youth sport, ND communities, AI and productivity circles. You are a par
 >
 > After testers before it launches. Android through Google Play; iPhone users get a web version.
 >
-> Testers get a Foundation spot, capped at 100. Your price locks at the launch price and never rises. Paid subscription, not a giveaway, just permanently frozen.
+> Testers with no previous connection to me can subscribe at the Foundation price once it's live on Google Play. Paid subscription, A$2.90 a month or A$19 a year, locked for as long as you stay subscribed and AibhlínnAI offers Premium. 100 places, closing at the start of 1 November or sooner if they fill.
 >
 > Shout if you want the link.
 

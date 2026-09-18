@@ -176,6 +176,8 @@ The consolation is practical: **you do not need them.** You need twelve testers 
 
 ## 3. 🏅 Foundation tier for testers, across both platforms
 
+> **Superseded 18 September 2026; the current wording is app/foundation.html.** Your 18 September decisions replace the Foundation terms in this section. Foundation now locks the **AibhlínnAI Premium** price (A$2.90 a month or A$19 a year) for as long as the subscription stays active and AibhlínnAI offers a Premium subscription. It has **100 places, open to the public**: Android testers with no previous connection to you, who can subscribe at the Foundation price once Pie Timers is live on Google Play, and the first people to subscribe outside any testing. It closes when all 100 are taken or at the start of **1 November 2026** (Adelaide time), whichever comes first. People you asked personally to test have their own arrangement and do not take a Foundation place. Where this section says otherwise (tester-only intake, a lock for life, any platform Pie Timers runs on, Pie Timers only), the page wins.
+
 **Platform reality:** Pie Timers ships on two rails. Web at pietimers.aibhlinn.ai, billed through Paddle, with Supabase and magic-link sign-in. Android in closed testing on Google Play, which would bill through Google Play Billing. Plus the Windows screensaver, which already reads `identity.product_entitlements` and nothing else.
 
 **The decisions, as settled:**
@@ -236,7 +238,7 @@ Giving internal accounts a distinct flag rather than a Foundation grant is what 
 ### What it includes
 
 - **A permanently locked price**, on any platform Pie Timers runs on.
-- Access to the paid tier of **Pie Timers specifically**.
+- Access to **AibhlínnAI Premium**, for as long as AibhlínnAI offers a Premium subscription. (Updated 18 September 2026: no longer scoped to Pie Timers.)
 - A permanent member number.
 - Opt-in credit by first name or handle on an in-app credits screen.
 - A "Foundation" badge visible in the app.
@@ -245,7 +247,7 @@ Giving internal accounts a distinct flag rather than a Foundation grant is what 
 
 ### What it must not include
 
-- Access to future AibhlínnAI products. Scope this to Pie Timers in writing, now. This is the boundary that keeps the promise bounded.
+- A lock that outlives the subscription. Updated 18 September 2026: Foundation is no longer scoped to Pie Timers. It covers AibhlínnAI Premium while the subscription stays active, and anyone whose subscription is cancelled or lapses rejoins at the price then. That is now the boundary that keeps the promise bounded.
 - Transferable or inheritable status. Tied to a person.
 - Roadmap control. Input yes, votes no.
 - The phrase "priority support", which implies a service level you cannot staff.
@@ -398,15 +400,17 @@ Attach that checklist to a recurring annual Todoist task so it surfaces even in 
 
 ### 📣 What to say publicly, worded so it cannot be over-read
 
-> **Foundation members: your price is locked for life.**
+*Superseded 18 September 2026; the current wording is app/foundation.html. The block below was rewritten that day to match the page. If the two ever differ, the page wins.*
+
+> **Foundation members: your price is locked.**
 >
-> The first 100 people to test Pie Timers become Foundation members. **You pay the launch price, and that price never rises for you.** Not for inflation, not for cost of living, not for app store fees. One hundred subscriptions, numbered, and that is the lot.
+> Foundation members lock the price of AibhlínnAI Premium at A$2.90 a month or A$19 a year, for as long as their subscription stays active and AibhlínnAI offers a Premium subscription. There are 100 places, open to the public. Foundation closes when all 100 are taken or at the start of 1 November 2026 (Adelaide time), whichever comes first.
 >
-> - **It is a subscription, not a free account.** You pay the launch price, permanently, at that price.
-> - It covers Pie Timers on any platform we support, including if you move between the web app and Google Play. Sign in with the same email and it follows you.
-> - It holds for as long as your subscription stays active. If it lapses and you resubscribe, you rejoin at the current price.
-> - It covers Pie Timers only, not other AibhlínnAI products.
-> - If AibhlínnAI is ever sold or wound up, we will tell you rather than quietly change it.
+> - **It is a paid subscription.** You pay the same price as anyone who subscribes at launch. The difference is that yours stays there.
+> - **It is tied to your account, not your device.** Sign in with the same email address on another device and your subscription comes with you.
+> - **It holds while you stay subscribed.** If your subscription is cancelled or lapses, rejoining is at the price at that time.
+> - **It covers AibhlínnAI Premium,** for as long as AibhlínnAI offers a Premium subscription.
+> - **You hear from us first.** If AibhlínnAI is ever sold or wound up, we will email you before anything changes.
 
 Each line closes a specific over-reading: **that Foundation means free**, platform migration, lapse and return, product scope, and change of entity. Publish all five or the promise means whatever the reader wants it to mean.
 
