@@ -45,7 +45,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>3 August 2026</strong> &middot;
+    Last updated: <strong>18 September 2026</strong> &middot;
     <a href="pricing.html">Pricing</a> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <a href="terms.html#refunds">Refund Policy</a> &middot;
@@ -54,7 +54,8 @@
 
   <h2>The short version</h2>
   <ul>
-    <li>Without an account, nothing leaves your device. Ever.</li>
+    <li>Without an account, nothing leaves your device unless you leave your
+    email on the Android tester form.</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
     <li>We do not sell your data, and there are no analytics, trackers or
@@ -73,8 +74,10 @@
   <p>The app works fully offline. Your schedule, appointments and settings are
   stored only in your browser's local storage on that device. We cannot see them,
   and no request carrying them is ever sent anywhere.</p>
-  <p>There is no sign-up wall, no email capture, and no tracking on the free
-  version.</p>
+  <p>There is no sign-up wall and no tracking on the free version. The only
+  email we collect without an account is one you choose to leave on the
+  Android tester form. We use it to add you to Google Play's testing list,
+  which shares it with Google, and to email you the install link.</p>
 
   <h2>3. If you create an account</h2>
   <p>We then store:</p>
@@ -116,20 +119,23 @@
   <p>Account data is stored with <strong>Supabase</strong> in the
   <strong>ap-southeast-2 (Sydney)</strong> region. Your schedule, appointments,
   settings and calendar data stay in Australia.</p>
-  <p>Two exceptions, so this is not misleading. Sign-in emails are sent through
+  <p>Three exceptions, so this is not misleading. Sign-in emails are sent through
   Resend, and your email address passes through their systems overseas to
   deliver them. If you pay, Paddle handles the transaction and holds your billing
-  details under their own policy, also overseas. Neither of them receives your
-  schedule, your appointments or your calendar.</p>
+  details under their own policy, also overseas. If you join the Android tester
+  list, we add your email address to Google Play's testing list, which Google
+  holds overseas. None of them receives your schedule, your appointments or your
+  calendar.</p>
 
   <h2>6. Who else touches your data</h2>
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in section 3 and 4</td><td>Database, sign-in and server functions</td></tr>
-      <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in link</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, and your email if you join the Android tester list</td><td>Database, sign-in and server functions</td></tr>
+      <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in code</td></tr>
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
+      <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
       <tr><td>Cloudflare</td><td>An anonymised bot-check signal</td><td>Stopping the sign-in form being abused to email strangers</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
     </tbody>
@@ -149,6 +155,8 @@
     <li><strong>Calendar events</strong> — a rolling window; older than a day is
     deleted automatically.</li>
     <li><strong>Sign-in attempt hashes</strong> — one day.</li>
+    <li><strong>Tester sign-up emails</strong>: until Android testing ends, or
+    until you ask us to remove yours.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
     for as long as Australian tax law requires.</li>
   </ul>
