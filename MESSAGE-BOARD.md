@@ -159,6 +159,43 @@ other instruction that day had been SQL for that same editor. Say explicitly
 which window a command belongs in — terminal or SQL editor — rather than relying
 on the code fence to imply it.
 
+## Rescued two branches from a temp folder another session left behind
+
+A previous Code session (`8239ddf2-…`) worked in a scratchpad clone under
+`%TEMP%` with three linked worktrees. Four branches lived only there. Windows
+clears that directory on its own schedule, so the work was one cleanup away from
+gone. Both branches carrying unique commits are now pushed into the **H: repo**:
+
+- **`play-readiness`** @ `0c0fde7` — the Play Store work. Three commits past
+  `6bc7338`: keep prices and every route to paying out of the Play app; match
+  the privacy policy to the Data safety answers and add account deletion; bump
+  the service worker cache for the Play app gate.
+- **`launch-eve-fixes`** @ `2588fc8` — **nearly lost.** The instruction named
+  only `play-readiness`, but this branch has two commits that `play-readiness`
+  does *not* contain: `4198695` "Add the Foundation members page, unlinked" and
+  `2588fc8` "Mention Foundation in the tester invite, and keep the invite out of
+  the Play app". Pushing only the named branch would have dropped both.
+
+`conference-agenda` and the clone's `main` needed nothing — both are fully
+contained in `play-readiness`. Verified with `merge-base --is-ancestor`, not
+assumed.
+
+**These went to `origin`, which in that clone is the H: repo — not GitHub.** The
+clone has *two* remotes, `origin` (H:) and `github` (the public repo), so the
+remote had to be named explicitly. Confirmed afterwards: GitHub still has zero
+matching branches. Nothing reached CI or the live site.
+
+**⚠️ Before anyone merges `play-readiness` into `main`, read this.** It branched
+at `6bc7338`, *before* the 20 Sep offer rewrite, so it still carries the old
+19 Oct / 60-day copy. It touches five files that `main` also changed today:
+`DEPLOY.md`, `app/foundation.html`, `app/pricing.html`, `app/terms.html` and
+`app/sw.js`. Resolving those conflicts by taking the branch's side would
+silently revert the entire fixed-finish-line offer. **Take `main`'s wording for
+anything about dates, trials or first charges, and the branch's side only for
+the Play-specific changes.**
+
+The temp clone is now redundant and safe to let Windows clear.
+
 ## Still open — pick these up
 
 1. **The stale comment at `schema-access-codes.sql:41`** is still there, per the
