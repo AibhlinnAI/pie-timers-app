@@ -388,8 +388,8 @@ given a synthetic event. The only way to exercise the live path is a real
 purchase, refunded afterwards.
 
 **Which price you get decides what this test proves.** `billing.js` hands
-anyone still inside their account trial (30 days for an account made before
-19 Oct 2026, 14 days after) the *trial* price, so that
+anyone still inside their account trial (runs to 1 Nov 2026 for an account made
+before 18 Oct 2026, 14 days from signup after) the *trial* price, so that
 purchase authorises the card and takes **nothing** today — there is no charge
 to refund, and the status stays `trialing`. Only a lapsed account takes the
 plain price and pays on the spot. Run both, in this order, on a throwaway
@@ -407,14 +407,15 @@ Test A — still in trial, takes no money, exercises the most code:
       `can_use_calendar`, `can_use_screensaver`. Note that `grant_trial` may
       already have written here, so check `source` and the timestamps rather
       than just counting rows.
-- [ ] Confirm `next_billed_at` in Paddle sits at exactly day 60 from account
-      creation for an account made before 19 Oct 2026 (`FREE_DAYS_LAUNCH` in
-      `paddle-webhook`), or day 30 for one made after
-      (`FREE_DAYS_FROM_SIGNUP`). A throwaway account made today is inside the
-      launch window, so expect day 60. This is the only check that exercises
-      `deferFirstCharge`, and therefore the only proof `PADDLE_API_KEY` is set —
-      without that key the function logs a warning and silently leaves Paddle's
-      own date.
+- [ ] Confirm `next_billed_at` in Paddle sits on **1 Dec 2026** if you are
+      buying before 1 Nov 2026 (`LAUNCH_OFFER_END` / `LAUNCH_FIRST_CHARGE` in
+      `paddle-webhook`), or day 30 from account creation if you are buying
+      after (`FREE_DAYS_FROM_SIGNUP`). Note this branch is keyed on **the
+      moment of purchase**, not the account's creation date — so a throwaway
+      account made today and bought today expects 1 Dec. This is the only check
+      that exercises `deferFirstCharge`, and therefore the only proof
+      `PADDLE_API_KEY` is set — without that key the function logs a warning and
+      silently leaves Paddle's own date.
 
 Test B — the money path. Expire the same account's trial first:
 
@@ -433,7 +434,8 @@ this is the one you must watch happen.
 
 Note that a fresh account is already entitled: `grant_trial` (in
 `schema-access-codes.sql`) gives every new user a trial (`public.trial_length()`:
-30 days before 19 Oct 2026, 14 after), and the upgrade panel only reappears in
+runs to 1 Nov 2026 before 18 Oct 2026, 14 days from signup after), and the
+upgrade panel only reappears in
 the final 4 days. To reach checkout before then, call
 `CT.billing.openCheckout('monthly')` from the console rather than editing data.
 

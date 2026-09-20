@@ -23,30 +23,43 @@ create extension if not exists pg_cron;
 -- Granted by a trigger on account creation rather than by anything
 -- the client can call, so it cannot be requested twice or forged.
 --
--- Two lengths. Anyone who registers during the launch window gets a
--- month; everyone after gets a fortnight. A month is long enough to
--- live with the app through a full billing cycle of your own life,
--- which is the point of a launch cohort; a fortnight is long enough
+-- Two shapes, not two lengths. Anyone who registers during launch
+-- month runs to a fixed finish line, 1 November; everyone after gets a
+-- rolling fortnight from the day they sign up. A finish line is the
+-- better instrument for a launch cohort -- the whole group arrives at
+-- the decision together, on the day Foundation closes, rather than
+-- trickling past it one account at a time. A fortnight is long enough
 -- to decide, and the price it leads to is A$2.90.
 --
--- The window is a single constant below. Until it is set, every
--- account gets the shorter trial -- deliberately the safe direction to
--- fail, since the alternative is quietly giving away months.
+-- The boundary is a single constant below. Set it to null and every
+-- account gets the rolling fortnight -- deliberately the safe
+-- direction to fail, since the alternative is quietly giving away
+-- months.
 
 create or replace function public.trial_length()
 returns interval
 language sql
 stable
 as $$
-  -- Launch month: Pie Timers goes public on 19 Sep 2026, at the ADHD
-  -- conference in Adelaide. Everyone signing up in the 30 days from then
-  -- gets 30 days rather than the standard 14. Adelaide time (+10:30,
-  -- ACDT -- daylight saving starts 4 Oct, so the cutoff is inside it).
-  -- Set this back to null after the window closes; nothing else changes.
+  -- Launch month is October 2026. Make an account before 18 Oct and
+  -- Premium runs to the end of the month, however early you arrived;
+  -- from 18 Oct the standard fortnight resumes.
+  --
+  -- The two rules meet without a step, which is the point of choosing
+  -- 18 Oct: 18 Oct plus a fortnight is 1 Nov, exactly where the finish
+  -- line already sits. Nobody gains or loses a day by signing up on one
+  -- side of the boundary rather than the other.
+  --
+  -- grant_trial() adds this to now(), so returning the remaining time
+  -- to 1 Nov lands the whole cohort on the same instant. Adelaide time
+  -- (+10:30, ACDT -- daylight saving starts 4 Oct, so both instants are
+  -- inside it).
+  --
+  -- Set the boundary to null after launch month; nothing else changes.
   select case
-    when (timestamptz '2026-10-19 00:00:00+10:30') is not null
-         and now() < (timestamptz '2026-10-19 00:00:00+10:30')
-      then interval '30 days'
+    when (timestamptz '2026-10-18 00:00:00+10:30') is not null
+         and now() < (timestamptz '2026-10-18 00:00:00+10:30')
+      then (timestamptz '2026-11-01 00:00:00+10:30') - now()
     else interval '14 days'
   end;
 $$;

@@ -64,7 +64,9 @@ select u.email, s.status, s.plan, s.current_period_end
  order by s.created_at desc limit 5;
 ```
 
-Expect `trialing` / `trial` and a date 14 days out.
+Expect `trialing` / `trial` and a date 14 days out — or, for an account
+made during launch month before 18 Oct 2026, `2026-11-01 00:00+10:30`
+exactly. `select public.trial_length();` says which rule is live.
 
 ## Scheduled jobs
 

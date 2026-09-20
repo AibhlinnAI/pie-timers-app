@@ -85,35 +85,49 @@ async function rest(path: string, init: RequestInit = {}) {
    number of days after the account was created, whenever they happen
    to buy.
 
-   That number is 30 normally, and 60 for anyone who signed up inside
-   the launch window -- the same cohort public.trial_length() gives a
-   30-day trial rather than 14. Keyed on the account's creation date,
-   not the purchase date, so everyone who signed up during launch gets
-   the same answer no matter when they decide, and nobody can gain days
-   by timing the click.
+   That number is 30 normally. Launch month replaces the rule rather
+   than lengthening it: subscribe before 1 November and the first charge
+   falls on 1 December, whoever you are and whenever you signed up.
 
-   LAUNCH_WINDOW_END must match the timestamp inside
-   public.trial_length() in supabase/schema-access-codes.sql. Two copies
+   A fixed date, not a count of days, and keyed on the moment of
+   purchase rather than the account's creation date. Both departures
+   from the old rule are deliberate. The offer as promised is a date --
+   "free Premium until 30 November" -- and the honest implementation of
+   a promise phrased as a date is a date. Keying on purchase is safe
+   here in a way it was not before, because the answer is the same for
+   everyone inside the window: there is no click to time and no days to
+   gain. It also means a tester whose account predates launch month is
+   treated like anyone else who buys during it, which is the promise.
+
+   LAUNCH_OFFER_END and LAUNCH_FIRST_CHARGE must match the dates inside
+   public.trial_length() in supabase/schema-access-codes.sql and the
+   copy on pricing.html, foundation.html and terms.html. Several copies
    of one date is not ideal; the alternative is a round trip to Postgres
    on every subscription.created, and a date that is wrong in one place
    is visible immediately as a wrong billing date rather than silently.
-   If either moves, move both.
+   If one moves, move all of them.
 
    Paddle has no way to say this at checkout -- a trial length lives on
    the price and is the same for everyone -- so the date is corrected
    here, once, when the subscription first appears. next_billed_at moves
-   to account start + the free window, with proration_billing_mode
+   to the end of the free window, with proration_billing_mode
    do_not_bill so moving the date does not itself raise an invoice.
 
    Applies ONLY to a subscription that arrived on a trial price, which
    the payload states outright as status trialing. Earlier this was
    inferred from the target date still being in the future, which held
-   only while the free window and the trial length were both 30. At 60
-   that inference breaks: someone who signs up in launch month, lets the
-   30-day trial lapse and subscribes on day 35 pays the full price today
-   -- and would have had their next charge dragged back to day 60,
-   paying for a month and receiving 25 days. Ask the payload; never
-   infer.
+   only while the free window and the trial length matched. Once they
+   diverge the inference breaks: someone who lets their trial lapse and
+   subscribes afterwards pays the full price today, and would have had
+   their next charge dragged back to a date they have already partly
+   spent -- paying for a month and receiving less. Ask the payload;
+   never infer.
+
+   That exclusion is also the one place launch month does not reach. A
+   lapsed trial that is revived by a purchase in October is charged on
+   the day, not on 1 December, because the money has already moved and
+   Paddle cannot unmove it from here. Refunding into the offer is a
+   support decision, not one this function should make silently.
 
    Requires PADDLE_API_KEY. Without that key the subscription still
    works and the person is simply billed on Paddle's own schedule, so a
@@ -125,12 +139,15 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
   : "https://api.paddle.com";
 
 const FREE_DAYS_FROM_SIGNUP = 30;
-const FREE_DAYS_LAUNCH = 60;
-/* Adelaide time, matching public.trial_length(). */
-const LAUNCH_WINDOW_END = Date.parse("2026-10-19T00:00:00+10:30");
+/* Adelaide time. Subscribe before LAUNCH_OFFER_END -- the instant
+   Foundation closes and public.trial_length() stops being generous --
+   and the first charge falls on LAUNCH_FIRST_CHARGE. */
+const LAUNCH_OFFER_END = Date.parse("2026-11-01T00:00:00+10:30");
+const LAUNCH_FIRST_CHARGE = Date.parse("2026-12-01T00:00:00+10:30");
 
-function freeDaysFor(createdAt: string): number {
-  return Date.parse(createdAt) < LAUNCH_WINDOW_END ? FREE_DAYS_LAUNCH : FREE_DAYS_FROM_SIGNUP;
+function firstChargeAt(createdAt: string, now: number): Date {
+  if (now < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);
+  return new Date(Date.parse(createdAt) + FREE_DAYS_FROM_SIGNUP * 86400000);
 }
 
 async function accountCreatedAt(userId: string): Promise<string | null> {
@@ -158,17 +175,17 @@ async function deferFirstCharge(userId: string, subscriptionId: string, currentN
   const createdAt = await accountCreatedAt(userId);
   if (!createdAt) return;
 
-  const target = new Date(new Date(createdAt).getTime() + freeDaysFor(createdAt) * 86400000);
+  const now = Date.now();
+  const target = firstChargeAt(createdAt, now);
   /* Already past the free window -- nothing to defer to. */
-  if (target.getTime() <= Date.now()) return;
+  if (target.getTime() <= now) return;
 
   /* Otherwise pin to the end of the free window exactly, in whichever
      direction. The trial price gives everyone the same fixed run from
      the day they buy, so an early buyer falls short of the window and a
-     late one overshoots; only the account start date knows where the
-     window actually ends. Pulling a date earlier can only ever bring
-     one back to that boundary, never to today, because of the check
-     above. */
+     late one overshoots; Paddle's own date never knows where the window
+     actually ends. Pulling a date earlier can only ever bring one back
+     to that boundary, never to today, because of the check above. */
   if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return;
 
   const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
