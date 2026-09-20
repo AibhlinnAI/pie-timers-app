@@ -5,8 +5,12 @@
 -- Design: there is NO public launch promo code. Everyone gets a
 -- trial automatically on sign-up, which does the same job with
 -- nothing to leak, guess, or resell. How long it runs is set in
--- one place, trial_length() below: 30 days for accounts made
--- before 19 Oct 2026, 14 days after.
+-- one place, trial_length() below. It is a fixed finish line, not
+-- a rolling window: an account made before 18 Oct 2026 00:00
+-- +10:30 runs to 1 Nov 2026 00:00 +10:30 however early it
+-- arrived, and from 18 Oct the standard 14 days from signup
+-- applies. The two rules meet without a step, because 18 Oct plus
+-- 14 days is 1 Nov.
 --
 -- Access codes remain only for friends and family, and are
 -- hardened accordingly: single-use, random, optionally bound to

@@ -188,16 +188,93 @@
      rest of the visit. load() reads this on the next line, so it has to
      stay above it. If the referrer is ever missing, inAppWindow() still
      keeps the seed out of the app's own window. */
-  var IN_PLAY_APP = (function () {
+  var PLAY_SIGNAL = (function () {
     var KEY = 'countdown-timers/play-app';
+    /* Only the referrer is trusted enough to PERSIST. The wrapper sets it
+       on the launch navigation and it cannot be typed, pasted or shared.
+
+       The #in-app marker is a hint for ONE pageview, carrying the answer
+       across a navigation that would otherwise lose it. It is never
+       written to storage, and it is stripped from the address bar below.
+       If it were persisted, a URL someone pasted into Chrome — or a
+       tester shared — would put that whole tab into consumption-only
+       mode and take an ordinary customer out of the purchase and
+       cancellation flow for the rest of their session. */
     var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var marked = (location.hash || '').slice(1) === 'in-app';
+    var stored = false;
     try {
       if (fromApp) sessionStorage.setItem(KEY, '1');
-      return fromApp || sessionStorage.getItem(KEY) === '1';
-    } catch (e) {
-      return fromApp;
+      stored = sessionStorage.getItem(KEY) === '1';
+    } catch (e) { /* storage blocked: referrer and marker are all there is */ }
+
+    /* The Digital Goods API is exposed to an app installed FROM A STORE.
+       On Android that means the Play-installed TWA and not a Chrome-
+       installed PWA, so it identifies the Play app even when the
+       referrer, the marker and storage have all been lost -- the
+       notification cold start, for one. The Android test matters: on
+       ChromeOS the same API reaches store-installed PWAs, and this app
+       holds deliberately that an installed web app is still the web and
+       keeps its prices (see inAppWindow below). */
+    var fromStore = /Android/.test(navigator.userAgent || '')
+      && typeof window.getDigitalGoodsService === 'function';
+
+    /* Out of the address bar, so it is never bookmarked, shared or
+       restored, and so an in-page anchor does not silently replace it.
+
+       The cost: with storage blocked, a history entry reached by a
+       stamped link keeps no signal once this runs, so a pull-to-refresh
+       or a tab discard would re-render it ungated. fromStore is what
+       covers that on Android, which is the only place it matters. */
+    if (marked && window.history && history.replaceState) {
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) { /* not worth failing the boot over */ }
     }
+
+    return {
+      inApp: fromApp || stored || marked || fromStore,
+      /* Signals that cannot be pasted, shared or bookmarked. The marker
+         is deliberately excluded: it is how a stray URL gets in, and
+         acting on it beyond this one pageview is what turns a mistake
+         into a stuck browser session. */
+      trusted: fromApp || stored || fromStore
+    };
   }());
+
+  var IN_PLAY_APP = PLAY_SIGNAL.inApp;
+
+  /* Carry the flag across same-origin navigations in the URL itself.
+     sessionStorage is the right scope -- it is per browsing context, so
+     it never leaks into the user's ordinary Chrome tabs the way
+     localStorage would, and a TWA renders in that same Chrome profile.
+     But it does not survive a context the app did not open: a fresh
+     window, or storage the user has blocked. The marker does, because it
+     travels in the href.
+
+     Only same-origin links, and only ones that do not already carry a
+     fragment -- an anchor like terms.html#refunds keeps its own, and is
+     hidden in the Play app anyway.
+
+     TRUSTED signals only, never the marker itself. If a pasted or shared
+     #in-app URL could install this, it would re-stamp every link the
+     person clicked and follow them through the whole site, with no
+     prices and checkout answering "That is not available in the Android
+     app" -- in Chrome. Excluding the marker is what makes it true that
+     a stray one costs exactly one pageview. */
+  if (PLAY_SIGNAL.trusted) {
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var url;
+      try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+      if (url.origin !== location.origin || url.hash) return;
+      /* A link to this very page is an in-page navigation; adding a
+         fragment would turn it into one and stop it reloading. */
+      if (url.pathname === location.pathname && url.search === location.search) return;
+      a.setAttribute('href', url.pathname + url.search + '#in-app');
+    }, true);
+  }
 
   /* The Play app is also consumption-only. Google Play's Payments policy
      allows no prices and no route to paying outside Play Billing in an
@@ -2357,7 +2434,11 @@
     openFocusBtn.addEventListener('click', function () {
       // Tall and narrow by default, which is the shape the window ends up in
       // when snapped down the side of a screen.
-      var opened = window.open('index.html?focus=1', 'pieTimersFocus',
+      /* The one same-origin navigation this app makes itself. The new
+         window's referrer is this https page, not android-app://, and
+         its sessionStorage may be blocked — so without the marker the
+         Focus window opens ungated inside the Play app. */
+      var opened = window.open('index.html?focus=1' + (IN_PLAY_APP ? '#in-app' : ''), 'pieTimersFocus',
                                'width=360,height=560');
       if (!opened) toast('Your browser blocked the pop-up. Allow pop-ups for this site.');
     });

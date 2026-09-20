@@ -169,17 +169,67 @@
   /* Inside the Google Play app, which may show no route to paying outside
      Play Billing, the links marked data-hide-in-play are hidden. The same
      check as IN_PLAY_APP in app.js, and first in the page's scripts so it
-     never waits on a download. */
+     never waits on a download.
+
+     This page FAILS CLOSED and app.js deliberately does not. The referrer
+     names the Play app only on the launch navigation, so a legal page
+     reached by tapping a footer link has nothing but sessionStorage and
+     the #in-app marker to go on — and if storage is blocked and the
+     marker was lost there is no signal at all. Hiding a Pricing link from
+     a web reader who blocks site data costs almost nothing; the same link
+     sits in the footer they came from. Showing it inside the Play app is
+     a Payments policy breach. So when we cannot tell, we hide.
+
+     pricing.html and foundation.html keep the opposite default on
+     purpose: they are whole pages, no in-app link reaches them once these
+     links are hidden, and bouncing a paying customer off the pricing page
+     would be the worse failure. */
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var marked = (location.hash || '').slice(1) === 'in-app';
+    var stored = false;
+    var canTell = false;
     try {
-      if (inPlayApp) sessionStorage.setItem(KEY, '1');
-      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
-    } catch (e) { /* storage blocked: the referrer alone decides */ }
-    if (!inPlayApp) return;
+      /* Only the referrer persists. A pasted or shared #in-app URL must
+         cost one pageview, never a whole session — see app.js. */
+      if (fromApp) sessionStorage.setItem(KEY, '1');
+      stored = sessionStorage.getItem(KEY) === '1';
+      canTell = true;
+    } catch (e) { /* storage blocked: nothing survives the navigation */ }
+
+    if (marked && window.history && history.replaceState) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+    }
+
+    if (!(fromApp || stored || marked) && canTell) return;
+
     var links = document.querySelectorAll('[data-hide-in-play]');
     for (var i = 0; i < links.length; i++) links[i].hidden = true;
+
+    /* This page does not load app.js, so it has to carry the marker
+       onward itself. Without this, "Back to the app" lands on an
+       index.html with no referrer, no marker and no storage — and the
+       prices, the Pricing link and live Paddle checkout all come back,
+       inside the Play app. The return journey is the leak.
+
+       Stamping needs a POSITIVE signal, which hiding above deliberately
+       does not. A web reader with site data blocked reaches the hide
+       branch through !canTell, with nothing saying Play — and if that
+       also stamped, "Back to the app" would hand them an index.html
+       that hides its own prices and answers checkout with "That is not
+       available in the Android app", in Chrome. Fail closed about what
+       you SHOW; never fail closed about what you PROPAGATE. */
+    if (fromApp || stored || marked) {
+      var out = document.querySelectorAll('a[href]');
+      for (var j = 0; j < out.length; j++) {
+        var href = out[j].getAttribute('href');
+        if (!href || href.charAt(0) === '#') continue;
+        if (/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(href)) continue;  // mailto:, https:, tel:
+        if (href.indexOf('#') !== -1) continue;                 // keeps its own anchor
+        out[j].setAttribute('href', href + '#in-app');
+      }
+    }
   })();
 </script>
 <script src="config.js"></script>

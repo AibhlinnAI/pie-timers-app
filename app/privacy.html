@@ -254,17 +254,50 @@
   /* Inside the Google Play app, which may show no route to paying outside
      Play Billing, the links marked data-hide-in-play are hidden. The same
      check as IN_PLAY_APP in app.js, and first in the page's scripts so it
-     never waits on a download. */
+     never waits on a download.
+
+     This page FAILS CLOSED, for the reasons set out at the same point in
+     terms.html: reached by a footer link, the referrer no longer names the
+     Play app, so when neither sessionStorage nor the #in-app marker can
+     answer, hiding the offer is the cheap mistake and showing it is the
+     policy breach. */
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var marked = (location.hash || '').slice(1) === 'in-app';
+    var stored = false;
+    var canTell = false;
     try {
-      if (inPlayApp) sessionStorage.setItem(KEY, '1');
-      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
-    } catch (e) { /* storage blocked: the referrer alone decides */ }
-    if (!inPlayApp) return;
+      /* Only the referrer persists — see the same block in terms.html. */
+      if (fromApp) sessionStorage.setItem(KEY, '1');
+      stored = sessionStorage.getItem(KEY) === '1';
+      canTell = true;
+    } catch (e) { /* storage blocked: nothing survives the navigation */ }
+
+    if (marked && window.history && history.replaceState) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+    }
+
+    if (!(fromApp || stored || marked) && canTell) return;
+
     var links = document.querySelectorAll('[data-hide-in-play]');
     for (var i = 0; i < links.length; i++) links[i].hidden = true;
+
+    /* Carry the marker onward: this page does not load app.js, and the
+       return journey to index.html is where the leak reopens. Stamping
+       requires a POSITIVE signal, unlike the hiding above — see the
+       same block in terms.html for why a web reader with site data
+       blocked must not be stamped. */
+    if (fromApp || stored || marked) {
+      var out = document.querySelectorAll('a[href]');
+      for (var j = 0; j < out.length; j++) {
+        var href = out[j].getAttribute('href');
+        if (!href || href.charAt(0) === '#') continue;
+        if (/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(href)) continue;
+        if (href.indexOf('#') !== -1) continue;
+        out[j].setAttribute('href', href + '#in-app');
+      }
+    }
   })();
 </script>
 <script src="config.js"></script>

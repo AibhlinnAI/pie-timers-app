@@ -171,6 +171,40 @@
      the customer portal. Outside the Play app nothing here changes. */
   var PLAY_APP_REFUSAL = 'That is not available in the Android app.';
 
+  /* Until 20 Sep 2026 the two refusals below read CT.inPlayApp, so if
+     app.js got the answer wrong the markup gating and the refusal were
+     wrong together and the "backstop" described above added nothing.
+
+     The one genuinely independent signal is getDigitalGoodsService: it
+     is exposed to an app installed FROM A STORE, so it catches a Play
+     app that has lost the referrer, the marker and storage all at once.
+     Note it is NOT "no installed PWA has it" -- on ChromeOS a
+     store-installed PWA is exposed to it too, which is why app.js pairs
+     it with an Android test before using it to hide prices. Here it only
+     refuses a click, so the looser form is acceptable; if that ever
+     changes, take app.js's paired version.
+
+     The remaining checks are the same signals app.js reads, re-evaluated
+     at click time rather than at load. That is a real difference and not
+     independence, and is described here as what it is rather than what
+     would be more flattering.
+
+     The storage catch returns false ON PURPOSE. Refusing here would take
+     a WEB customer with site data blocked out of checkout and out of the
+     cancellation portal, which is worse than the leak it would close --
+     and getDigitalGoodsService already covers the Play case it leaves. */
+  function inPlayAppNow() {
+    if (window.CT && window.CT.inPlayApp) return true;
+    if (typeof window.getDigitalGoodsService === 'function') return true;
+    if (/^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')) return true;
+    if ((location.hash || '').slice(1) === 'in-app') return true;
+    try {
+      return sessionStorage.getItem('countdown-timers/play-app') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
   /* ─────────────────────────── Paddle ─────────────────────────── */
 
   var paddleReady = null;
@@ -229,7 +263,7 @@
   }
 
   function openCheckout(cadence, discountCode) {
-    if (CT.inPlayApp) return Promise.reject(new Error(PLAY_APP_REFUSAL));
+    if (inPlayAppNow()) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
     var user = CT.auth.getUser();
@@ -286,7 +320,7 @@
      buyer terms and refund policy instead of us reimplementing a
      second copy. */
   function openManagePortal() {
-    if (CT.inPlayApp) return Promise.reject(new Error(PLAY_APP_REFUSAL));
+    if (inPlayAppNow()) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
     var user = CT.auth.getUser();

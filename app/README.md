@@ -573,13 +573,20 @@ plain HTTP:
 - `cdn.paddle.com` — checkout, only when `paddle.clientToken` is set
 
 With neither configured, the app still starts, runs and works offline exactly as
-as always.
+always.
 
 ## Data & privacy
 
 Signed out, everything stays in `localStorage` under `countdown-timers/v1` and
-nothing leaves the device. Signed in, your schedule and settings are stored in your
-own Supabase project — no third party is involved.
+nothing leaves the device. Signed in, your schedule and settings are stored in
+the project's own Supabase instance rather than being pooled with anyone else's.
+
+That is a statement about **where the rows live, not about how few companies are
+involved**. Supabase is a processor, and so are the others named in the
+[privacy policy](privacy.html). That policy is the authoritative list; this file
+is a developer's README and must never be read as a narrower privacy promise
+than the policy makes, nor as a longer one — do not name processors here that
+the policy does not name, because its list is declared complete.
 
 Row-level security means the public anon key can only ever reach the signed-in
 user's own rows. The `notification_log` table has no client insert policy at all;

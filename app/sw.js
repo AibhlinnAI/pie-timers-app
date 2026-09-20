@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v99';
+var CACHE = 'countdown-timers-v100';
 
 var SHELL = [
   './',
@@ -155,6 +155,23 @@ self.addEventListener('notificationclick', function (event) {
       for (var i = 0; i < list.length; i++) {
         if ('focus' in list[i]) return list[i].focus();
       }
+      /* openWindow creates a fresh top-level browsing context: no
+         Referer, empty sessionStorage. Inside the Play app that is the
+         one journey where the consumption-only gate has nothing to read.
+
+         This worker deliberately does NOT stamp an "#in-app" marker on
+         the target to compensate. One worker serves the Play app and
+         every ordinary Chrome tab on this origin and cannot tell them
+         apart, so stamping here would put WEB customers into
+         consumption-only mode — no prices, and no route to the
+         cancellation portal — for a whole browsing context, which is a
+         worse failure than the leak it would close.
+
+         TO CLOSE IT PROPERLY: stamp at notification-creation time, where
+         the flag is actually known (notify.js has CT.inPlayApp; the push
+         edge function would need to send the same field, defaulting to
+         false). That waits on a device test of whether this window comes
+         back as the TWA or as a plain Chrome tab. */
       if (clients.openWindow) return clients.openWindow(target);
       return null;
     })

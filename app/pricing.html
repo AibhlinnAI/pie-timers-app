@@ -13,16 +13,23 @@
 <script>
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var marked = (location.hash || '').slice(1) === 'in-app';
+    var stored = false;
     try {
-      if (inPlayApp) sessionStorage.setItem(KEY, '1');
-      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
-    } catch (e) { /* storage blocked: the referrer alone decides */ }
-    if (!inPlayApp) return;
+      /* Only the referrer persists — a pasted #in-app URL must cost one
+         pageview, never a whole session. See app.js. */
+      if (fromApp) sessionStorage.setItem(KEY, '1');
+      stored = sessionStorage.getItem(KEY) === '1';
+    } catch (e) { /* storage blocked: referrer and marker are all there is */ }
+    if (!(fromApp || stored || marked)) return;
     window.CT = window.CT || {};
     window.CT.inPlayApp = true;
     document.documentElement.style.display = 'none';
-    location.replace('index.html');
+    /* Carry the marker through. When storage is blocked the setItem above
+       threw, so without this the redirect throws away a correct detection
+       and index.html reopens with prices showing. */
+    location.replace('index.html#in-app');
   }());
 </script>
 <title>Pricing — Pie Timers</title>
