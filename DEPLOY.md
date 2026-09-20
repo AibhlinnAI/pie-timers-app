@@ -497,12 +497,12 @@ would:
 - Dedupe on Pub/Sub's `messageId`, the same idempotency shape as
   `claimEvent` in `paddle-webhook`.
 
-**Anti-steering, already true today and worth keeping true deliberately:**
-nothing in the app links to Paddle, mentions a price, or references the web
-checkout from inside what would become the Play-wrapped build — see the
-comment above `initPaddle()` in `app/billing.js`. If a Play build variant
-is ever introduced, gate the whole upgrade panel out of that variant rather than
-editing its copy.
+**Anti-steering, in place and worth keeping deliberately:** the Play app
+is consumption-only. The site recognises it by its referrer
+(`CT.inPlayApp`, from `IN_PLAY_APP` in `app/app.js`) and hides every
+price, checkout, customer portal and pricing link there, and `billing.js`
+refuses to open Paddle in it. See `ARCHITECTURE.md` §5. Anything new that
+sells needs the same gate, gated out rather than reworded.
 
 ## Redeploying
 

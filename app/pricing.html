@@ -3,6 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Never shown inside the Google Play app, which may carry no prices and
+     no route to paying outside Play Billing. The same check as IN_PLAY_APP
+     in app.js: the Play wrapper opens the site with its package as the
+     referrer, and the visit remembers that in sessionStorage. A Play visit
+     that lands here goes straight back to the app, before anything is
+     drawn. Referrer only, never display mode, so an installed web app
+     still gets this page. -->
+<script>
+  (function () {
+    var KEY = 'countdown-timers/play-app';
+    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    try {
+      if (inPlayApp) sessionStorage.setItem(KEY, '1');
+      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
+    } catch (e) { /* storage blocked: the referrer alone decides */ }
+    if (!inPlayApp) return;
+    window.CT = window.CT || {};
+    window.CT.inPlayApp = true;
+    document.documentElement.style.display = 'none';
+    location.replace('index.html');
+  }());
+</script>
 <title>Pricing — Pie Timers</title>
 <meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed.">
 <meta name="theme-color" content="#1C1024">
@@ -137,6 +159,8 @@
 (function () {
   'use strict';
   var CT = window.CT;
+  // Leaving for the app (see the top of <head>): wire nothing, fetch nothing.
+  if (CT.inPlayApp) return;
   var $ = function (id) { return document.getElementById(id); };
 
   /* Mirrors app.js's renderPlan() price fields exactly, on purpose --

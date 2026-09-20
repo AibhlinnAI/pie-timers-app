@@ -43,7 +43,7 @@
 <main class="legal">
   <p class="legal-meta">
     Last updated: <strong>20 September 2026</strong> &middot;
-    <a href="pricing.html">Pricing</a> &middot;
+    <span data-hide-in-play><a href="pricing.html">Pricing</a> &middot;</span>
     <a href="privacy.html">Privacy Policy</a> &middot;
     <a href="index.html">Back to the app</a>
   </p>
@@ -165,6 +165,23 @@
   <p class="legal-foot"><a href="index.html">Back to Pie Timers</a></p>
 </main>
 
+<script>
+  /* Inside the Google Play app, which may show no route to paying outside
+     Play Billing, the links marked data-hide-in-play are hidden. The same
+     check as IN_PLAY_APP in app.js, and first in the page's scripts so it
+     never waits on a download. */
+  (function () {
+    var KEY = 'countdown-timers/play-app';
+    var inPlayApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    try {
+      if (inPlayApp) sessionStorage.setItem(KEY, '1');
+      inPlayApp = inPlayApp || sessionStorage.getItem(KEY) === '1';
+    } catch (e) { /* storage blocked: the referrer alone decides */ }
+    if (!inPlayApp) return;
+    var links = document.querySelectorAll('[data-hide-in-play]');
+    for (var i = 0; i < links.length; i++) links[i].hidden = true;
+  })();
+</script>
 <script src="config.js"></script>
 <script>
   /* One source of truth for the address — config.js. */
