@@ -114,15 +114,27 @@ the refund window, the privacy response time and the correct new copy; the
 "60 days" in `terms.html:142` is the service wind-down promise). The
 `supabase/` diff carries nothing secret-shaped.
 
-**Deliberately left uncommitted — Mal's call, not a session's.** `CLAUDE.md`,
-`MESSAGE-BOARD.md`, `docs/Tester-Tour-WhatsApp.md`, `docs/conference/`,
-`docs/play-listing/`, and three images in `identity/`. Two reasons to think
-before adding them: the repo is **public**, so the tester tour and the Play
-listing pack become readable by anyone; and the deploy copies **all** of
-`identity/` onto the live site, so `Feature Graphic_Pie Timers.jpg` and
-`Letterhead_Pie Timers.jpg` would be publicly served. No tester personal data
-was found in any of them — only `support@aibhlinn.ai` — so this is a
-disclosure-of-strategy question, not a privacy one.
+**This file and `CLAUDE.md` are now in the repo**, as commit **`8f809b8`** —
+Mal's decision, asked and answered. Before that they existed only in the Drive
+folder, so a fresh clone had no board at all. Consequence worth knowing: **the
+board is now a tracked file.** Editing it leaves the repo dirty, so commit it
+when you finish, the same as any other change. It is not served to the site —
+the deploy publishes only `app/` and `identity/`, and
+`https://pietimers.aibhlinn.ai/MESSAGE-BOARD.md` returns 404. Verified.
+
+The same commit corrected two things in `CLAUDE.md`: `DEPLOY.md` added to the
+list of places the launch dates live, and the "not the deployed state" note
+widened from SQL to cover edge functions, with the verifying command for each.
+
+**Still deliberately uncommitted — Mal's call, not a session's.**
+`docs/Tester-Tour-WhatsApp.md`, `docs/conference/`, `docs/play-listing/`, and
+three images in `identity/`. Two reasons to think before adding them: the repo
+is **public**, so the tester tour and the Play listing pack become readable by
+anyone; and the deploy copies **all** of `identity/` onto the live site, so
+`Feature Graphic_Pie Timers.jpg` and `Letterhead_Pie Timers.jpg` would be
+publicly served. No tester personal data was found in any of them — only
+`support@aibhlinn.ai` — so this is a disclosure-of-strategy question, not a
+privacy one.
 
 ## `paddle-webhook` was stale too, and is now redeployed
 
@@ -153,8 +165,9 @@ on the code fence to imply it.
    entry two below. Unchanged.
 2. **Add `DEPLOY.md` to the list of places the launch dates live** in
    `CLAUDE.md`. It was missed, and that is why it went stale.
-3. **Decide on the untracked files** listed under "Committed and deployed"
-   above. Unchanged since this run.
+3. **Decide on the remaining untracked files** — the tester tour, the
+   conference QR, the Play listing pack and the three `identity/` images. See
+   "Committed and deployed" above for why they were not added.
 
 **Lesson for the next session, stated plainly:** the entry below flagged the SQL
 as unrun, and the flag was all that happened — a board note saying something is
