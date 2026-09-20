@@ -285,11 +285,12 @@ no monthly churn, no failed-card dunning, and far less admin for the user. But t
 $15.80 discount is a genuine cost to you, not a free lever, so don't deepen that
 casually.
 
-**Against the goal:** at ~$17.55 net per annual subscriber, covering Claude Max at
-roughly $100–200/month (~$1,200–2,400/year) needs about **69–137 active
-subscribers**. That's meaningfully more than the $24 price needed — a deliberate
-trade: lower revenue per person, in exchange for the price being less of a barrier
-to the people this app is built for.
+**Why the price is this low:** the annual price sits deliberately below what a
+pure cost-recovery figure would be. That is the trade: lower revenue per person,
+in exchange for the price being less of a barrier to the people this app is
+built for. The running costs, and the subscriber count that covers them, are
+tracked outside this repo — this file is served publicly at
+pietimers.aibhlinn.ai/README.md, so business figures do not belong in it.
 
 **Nobody is locked out of their own data.** If a plan lapses, automatic sync stops
 but "Sync now" still downloads the schedule, and Settings → Export still works.
