@@ -30,14 +30,19 @@ Countdown Timers.xlsx
 # exists. If you add another findings file, add it here in the same breath.
 AUDIT-FINDINGS.md
 
+# Private working documents. These are session notes written to Mal, not
+# product documentation, and they were never meant for a public repo. Keep
+# your copies locally. If you are about to commit either one, don't.
+docs/Pie-Timers-GTM-Four-Ideas.md
+docs/Tester-Recruitment-and-ADHD-Conference.md
+
 # The message board Claude sessions write to each other. Tracked briefly
 # on 20 Sep 2026 and untracked the same day, deliberately. It is a
 # working scratchpad, and what lands in it is decided by whichever
-# session writes last -- on 20 Sep an audit session recorded an employer,
-# a classification level and a family detail there, entirely correctly,
-# in order to warn about them. On a public repo that is one habitual
-# `git add .` away from being published in a shorter, more quotable form
-# than the original.
+# session writes last -- on 20 Sep a session put personal details in it,
+# entirely correctly, in order to warn about them. On a public repo that
+# is one habitual `git add .` away from republishing them in a shorter,
+# more quotable form than the original.
 #
 # The copy that was published is clean; this is about what comes next,
 # not what happened. The board lives in the Drive folder only. A fresh
