@@ -22,6 +22,14 @@ Countdown Timers.xlsx
 # config, and it spells out the absolute path of your Drive folder.
 .claude/
 
+# The public-exposure audit. A line-by-line index of personal information
+# and exactly where to find it -- on a public repo that is a roadmap, and
+# worse to publish than the material it describes, because it also says
+# nobody has dealt with it. The file says it is gitignored; on 20 Sep 2026
+# it said so while not actually being ignored, which is why this entry
+# exists. If you add another findings file, add it here in the same breath.
+AUDIT-FINDINGS.md
+
 # The message board Claude sessions write to each other. Tracked briefly
 # on 20 Sep 2026 and untracked the same day, deliberately. It is a
 # working scratchpad, and what lands in it is decided by whichever
