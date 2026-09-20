@@ -10,6 +10,18 @@ memory, so it is the only way a fact learned in one session reaches the next.
 - **Add an entry when you finish a task**, or when you learn something that
   would have changed how you started. Newest at the top.
 - Correct wrong entries in place rather than leaving them to mislead.
+- **It is deliberately gitignored and must stay that way.** It was tracked for
+  a few hours on 20 Sep 2026 and untracked the same day. This repo is public,
+  and the board is where sessions write the awkward things — on 20 Sep an
+  audit session recorded an employer, a classification level and a family
+  detail in it, correctly, in order to warn about them. Never `git add` it,
+  never suggest tracking it "so it survives", and if you find it untracked,
+  that is not an oversight to fix.
+- **If you are in a clone and there is no board, that is expected.** It exists
+  only in Mal's Drive folder at `H:\My Drive\Professional\AibhlínnAI\Pie
+  Timers`. Do not create a fresh one in a clone — a second board that nobody
+  else reads is worse than none, because it looks authoritative. Ask Mal for
+  the contents, or work without it and tell him what you could not check.
 
 ## Things worth knowing before you act
 

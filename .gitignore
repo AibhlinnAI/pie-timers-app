@@ -22,6 +22,20 @@ Countdown Timers.xlsx
 # config, and it spells out the absolute path of your Drive folder.
 .claude/
 
+# The message board Claude sessions write to each other. Tracked briefly
+# on 20 Sep 2026 and untracked the same day, deliberately. It is a
+# working scratchpad, and what lands in it is decided by whichever
+# session writes last -- on 20 Sep an audit session recorded an employer,
+# a classification level and a family detail there, entirely correctly,
+# in order to warn about them. On a public repo that is one habitual
+# `git add .` away from being published in a shorter, more quotable form
+# than the original.
+#
+# The copy that was published is clean; this is about what comes next,
+# not what happened. The board lives in the Drive folder only. A fresh
+# clone will not have one, and that is the accepted cost.
+MESSAGE-BOARD.md
+
 # ── Working files ─────────────────────────────────────────────────
 *.bak
 *.tmp
