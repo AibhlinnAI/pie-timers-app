@@ -306,7 +306,11 @@ button,select{ font:inherit; }
 .item.past{ opacity:.45; }
 .item.on{ background:var(--today-bg); border-color:var(--orange); border-left-color:var(--accent); box-shadow:var(--shadow); }
 .item.on .when, .item.on .kind{ color:var(--orange-text); }
-.item.next .name::after{ content:" · next"; font-weight:600; font-size:.78rem; color:var(--ink-muted); }
+/* The badge rides the kind line, not the title. On the title it broke
+   between the dot and the word on a long one — "Conference Kickoff /
+   Keynote Session ·" then "next" alone underneath. The kind line is two
+   or three short words and has room. */
+.item.next .kind::after{ content:" · next"; font-weight:700; color:var(--orange-text); }
 
 /* ───────────────────── Venue display mode ───────────────────── */
 
