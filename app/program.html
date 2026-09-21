@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  /* Theme before paint. The app stores it inside its own state blob, so this
+     reads that rather than a separate key — someone who set the app to light
+     should not get a black flash from a page that is part of the same product.
+     Everything here is wrapped: storage can be blocked, and a programme that
+     fails to paint is worse than one that paints in the wrong theme. */
+  (function () {
+    try {
+      var raw = localStorage.getItem('countdown-timers/v1');
+      var s = raw ? (JSON.parse(raw) || {}).settings || {} : {};
+      var theme = s.theme;
+      if (theme === 'system') {
+        theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      if (s.calmMode) document.documentElement.setAttribute('data-calm', '1');
+    } catch (e) { /* dark is the default; nothing to do */ }
+    /* ?theme= wins, so a venue screen can be set without touching the app. */
+    try {
+      var q = new URLSearchParams(location.search).get('theme');
+      if (q === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      if (q === 'dark') document.documentElement.removeAttribute('data-theme');
+    } catch (e) { /* ignore */ }
+  }());
+</script>
+<title>Programme — Pie Timers</title>
+<meta name="description" content="A conference programme as pies. Watch the session you are in run down, and see what is next.">
+<meta name="theme-color" content="#1C1024">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="program.css">
+</head>
+<body class="pg">
+
+<a class="skip-link" href="#timeline">Skip to the programme</a>
+
+<div class="pg-shell" id="shell">
+
+  <header class="pg-head">
+    <div class="pg-brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="#32493C"/>
+        <path d="M16 16 24.39 8.73A11.1 11.1 0 1 1 16 4.9z" fill="#FF8A00"/>
+      </svg>
+      <div class="pg-titles">
+        <h1 id="evName">Loading the programme…</h1>
+        <p id="evVenue">&nbsp;</p>
+      </div>
+    </div>
+    <div class="pg-clock">
+      <div class="pg-clock-time" id="clockTime">--:--</div>
+      <div class="pg-clock-date" id="clockDate">&nbsp;</div>
+      <div class="pg-clock-zone" id="clockZone">&nbsp;</div>
+    </div>
+  </header>
+
+  <p class="pg-banner" id="banner" hidden></p>
+
+  <nav class="pg-days" id="dayTabs" aria-label="Days"></nav>
+
+  <main class="pg-main">
+
+    <section class="pg-now" id="nowCard" aria-live="polite">
+      <div class="pg-dial-wrap">
+        <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="nowDialLabel">
+          <title id="nowDialLabel">How much of the current session is left</title>
+          <circle class="dial-base" cx="80" cy="80" r="70"/>
+          <g class="dial-ticks" id="nowTicks"></g>
+          <path class="dial-pie" id="nowPie" d=""/>
+          <g class="dial-ticks dial-ticks--over" id="nowTicksOver"></g>
+          <circle class="dial-rim" cx="80" cy="80" r="70"/>
+        </svg>
+      </div>
+      <div class="pg-now-text">
+        <p class="pg-kicker" id="nowKicker">&nbsp;</p>
+        <h2 class="pg-now-title" id="nowTitle">—</h2>
+        <p class="pg-now-window" id="nowWindow">&nbsp;</p>
+        <p class="pg-now-left" id="nowLeft">&nbsp;</p>
+        <p class="pg-next" id="nowNext">&nbsp;</p>
+      </div>
+    </section>
+
+    <section class="pg-list" aria-labelledby="listHeading">
+      <h2 class="pg-list-heading" id="listHeading">The day</h2>
+      <ol class="pg-timeline" id="timeline"></ol>
+    </section>
+
+  </main>
+
+  <footer class="pg-foot">
+    <p class="pg-disclaimer" id="disclaimer">&nbsp;</p>
+    <p class="pg-actions">
+      <a class="pg-btn pg-btn--primary" id="addBtn" href="#">Follow this on my own phone</a>
+      <a class="pg-btn" id="displayBtn" href="#">Venue display</a>
+      <a class="pg-btn" id="delegateBtn" href="#" hidden>Leave the display</a>
+    </p>
+    <p class="pg-promise">Pie Timers · No ads. No tracking. No selling your data. Ever.
+      <span id="sourceWrap" hidden> · Programme from <a id="sourceLink" href="#" rel="noopener">the organiser</a>.</span>
+    </p>
+  </footer>
+
+</div>
+
+<!-- Preview clock. Hidden unless ?demo=1, because a control that can move the
+     time is a liability on a screen in a real venue. -->
+<div class="pg-controls" id="controls" hidden>
+  <button type="button" class="pg-ctl" id="playBtn" aria-pressed="true">Pause</button>
+  <label class="pg-ctl-speed">Speed
+    <select id="speedSel">
+      <option value="1">real time</option>
+      <option value="60">1 min / sec</option>
+      <option value="120" selected>2 min / sec</option>
+      <option value="600">10 min / sec</option>
+    </select>
+  </label>
+  <input type="range" id="scrub" min="0" max="1439" step="1" value="510"
+         aria-label="Move through the day">
+  <output class="pg-ctl-out" id="scrubOut">--:--</output>
+  <button type="button" class="pg-ctl" id="liveBtn">Back to the real time</button>
+</div>
+
+<script src="program.js"></script>
+</body>
+</html>

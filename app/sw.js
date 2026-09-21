@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v101';
+var CACHE = 'countdown-timers-v102';
 
 var SHELL = [
   './',
@@ -96,7 +96,13 @@ self.addEventListener('fetch', function (event) {
           return response;
         })
         .catch(function () {
-          return caches.match(request).then(function (hit) {
+          /* ignoreSearch, because the pages that carry a query string are
+             exactly the ones this fallback exists for: program.html?e=<id>
+             is cached under whatever query it was first opened with, and a
+             venue screen reloading on dead wifi as ?e=nwc26&display=1 must
+             not be handed index.html because the cached copy happened to
+             say ?e=nwc26. The page reads its own query either way. */
+          return caches.match(request, { ignoreSearch: true }).then(function (hit) {
             return hit || caches.match('index.html');
           });
         })

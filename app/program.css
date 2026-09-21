@@ -1,0 +1,392 @@
+/* ============================================================
+   Programme viewer.
+
+   Layout only. Every colour, the typeface and the pie itself come from
+   styles.css, which this page loads first — so a programme screen is
+   visibly the same product as the app, and a palette change lands in
+   both without anyone remembering this file exists.
+
+   Two modes off one sheet:
+     .pg            a phone in a lanyard, read at arm's length
+     .pg-display    a screen in a foyer, read at ten metres
+   ============================================================ */
+
+.pg{ min-height:100vh; }
+
+.pg-shell{
+  max-width:1100px;
+  margin:0 auto;
+  padding:clamp(12px,3vw,28px) clamp(14px,4vw,32px) 40px;
+  display:flex;
+  flex-direction:column;
+  gap:clamp(12px,2.4vw,22px);
+  min-height:100vh;
+}
+
+/* ───────────────────────── Header ───────────────────────── */
+
+.pg-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:20px; flex-wrap:wrap;
+  padding:clamp(14px,2.4vw,20px) clamp(16px,3vw,24px);
+  border-radius:var(--radius);
+  background:linear-gradient(115deg, var(--header-from) 0%, var(--header-mid) 58%, var(--header-to) 100%);
+  color:var(--on-dark);
+  box-shadow:var(--shadow);
+}
+
+.pg-brand{ display:flex; align-items:center; gap:14px; min-width:0; }
+.pg-brand .mark{ width:44px; height:44px; flex:none; }
+.pg-titles{ min-width:0; }
+.pg-titles h1{
+  font-size:clamp(1.05rem,2.4vw,1.5rem);
+  line-height:1.2;
+}
+.pg-titles p{ margin:4px 0 0; font-size:.85rem; opacity:.82; }
+
+.pg-clock{ text-align:right; flex:none; }
+.pg-clock-time{
+  font-family:var(--numeric);
+  font-size:clamp(1.5rem,3.4vw,2.1rem);
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+}
+.pg-clock-date{ font-size:.82rem; opacity:.85; margin-top:4px; }
+.pg-clock-zone{ font-size:.72rem; opacity:.62; margin-top:2px; }
+
+/* ───────────────────────── Banner ─────────────────────────
+   One line, high on the page, for the two things a reader could
+   otherwise get wrong: that the clock is simulated, or that the day on
+   screen is not today. Amber because it wants reading, not because
+   anything is broken. */
+
+.pg-banner{
+  margin:0;
+  padding:10px 14px;
+  border-radius:var(--radius-sm);
+  background:var(--amber-tint);
+  color:var(--orange-text);
+  border:1px solid var(--field-input-border);
+  font-size:.85rem; font-weight:600;
+}
+
+/* ───────────────────────── Day tabs ───────────────────────── */
+
+.pg-days{ display:flex; gap:8px; flex-wrap:wrap; }
+
+.pg-day{
+  display:flex; flex-direction:column; gap:1px;
+  padding:8px 14px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--line);
+  background:var(--card);
+  color:var(--ink-muted);
+  text-decoration:none;
+  min-width:96px;
+}
+.pg-day:hover{ border-color:var(--field-border); }
+.pg-day-dow{ font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; }
+.pg-day-num{ font-size:1rem; font-weight:700; color:var(--ink); }
+.pg-day-label{ font-size:.72rem; }
+
+.pg-day.is-current{
+  border-color:var(--orange);
+  background:var(--today-bg);
+  color:var(--orange-text);
+}
+.pg-day.is-current .pg-day-num{ color:var(--orange-text); }
+/* A dot, not a colour change — "today" and "the day you are looking at"
+   are different facts and both need to be readable at once. */
+.pg-day.is-today .pg-day-dow::after{ content:" ●"; color:var(--orange); }
+
+/* ───────────────────────── Now card ───────────────────────── */
+
+.pg-main{ display:grid; gap:clamp(12px,2.4vw,22px); }
+
+.pg-now{
+  display:flex; align-items:center; gap:clamp(16px,3vw,32px);
+  padding:clamp(16px,3vw,28px);
+  border-radius:var(--radius);
+  background:var(--card);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  /* Set per item from JS; the fallback keeps an unstyled state readable. */
+  --accent:var(--forest);
+  --accent-fill:var(--forest);
+}
+
+.pg-now::before{
+  content:""; align-self:stretch; width:5px; flex:none;
+  border-radius:99px; background:var(--accent);
+}
+
+.pg-dial-wrap{ width:clamp(140px,22vw,200px); aspect-ratio:1; flex:none; }
+.pg-dial-wrap .dial{ width:100%; height:100%; display:block; }
+
+.pg-now-text{ min-width:0; flex:1; }
+
+.pg-kicker{
+  margin:0; font-size:.74rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:.09em;
+  color:var(--accent);
+}
+.pg-now-title{
+  margin:6px 0 0;
+  font-size:clamp(1.25rem,3vw,1.9rem);
+  line-height:1.18;
+}
+.pg-now-window{ margin:8px 0 0; font-size:.9rem; color:var(--ink-muted); }
+.pg-now-left{
+  margin:10px 0 0;
+  font-family:var(--numeric);
+  font-size:clamp(1.1rem,2.4vw,1.5rem);
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  color:var(--ink);
+}
+.pg-next{ margin:12px 0 0; font-size:.86rem; color:var(--ink-muted); }
+
+.pg-now.is-urgent{ --accent:var(--urgent); --accent-fill:var(--urgent); }
+.pg-now.is-urgent .pg-now-left{ color:var(--urgent-text); }
+.pg-now.is-idle,
+.pg-now.is-done{ --accent:var(--off); --accent-fill:var(--off); }
+.pg-now.is-idle .dial-base,
+.pg-now.is-done .dial-base{ fill:var(--off-plate); }
+
+/* ───────────────────────── The day list ───────────────────────── */
+
+.pg-list-heading{
+  margin:0 0 10px;
+  font-size:.78rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:.09em;
+  color:var(--ink-muted);
+}
+
+.pg-timeline{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:6px;
+}
+
+.pg-item{
+  display:flex; gap:14px; align-items:baseline;
+  padding:11px 14px;
+  border-radius:var(--radius-sm);
+  background:var(--card);
+  border:1px solid var(--line);
+  border-left:4px solid var(--accent, var(--line));
+}
+
+.pg-item-time{
+  font-family:var(--numeric);
+  font-variant-numeric:tabular-nums;
+  font-weight:700; font-size:.88rem;
+  color:var(--ink-muted);
+  flex:none; min-width:11ch;
+}
+.pg-item-body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.pg-item-title{ font-weight:600; }
+.pg-item-kind{ font-size:.74rem; color:var(--ink-muted); }
+
+/* Done is dimmed rather than struck through: at a glance the shape of the
+   remaining day is what matters, and a page of strikethrough reads as
+   cancelled rather than finished. */
+.pg-item.is-past{ opacity:.45; }
+
+.pg-item.is-now{
+  background:var(--today-bg);
+  border-color:var(--orange);
+  border-left-color:var(--accent);
+  box-shadow:var(--shadow);
+}
+.pg-item.is-now .pg-item-time,
+.pg-item.is-now .pg-item-kind{ color:var(--orange-text); }
+
+.pg-item.is-next{ border-color:var(--field-border); }
+.pg-item.is-next .pg-item-title::after{
+  content:" · next"; font-weight:600; color:var(--ink-muted); font-size:.78rem;
+}
+
+/* ───────────────────────── Footer ───────────────────────── */
+
+.pg-foot{ margin-top:auto; padding-top:8px; }
+
+.pg-disclaimer{
+  margin:0 0 14px;
+  font-size:.82rem; color:var(--ink-muted);
+  max-width:64ch;
+}
+
+.pg-actions{ margin:0 0 14px; display:flex; gap:10px; flex-wrap:wrap; }
+
+.pg-btn{
+  display:inline-block;
+  padding:10px 18px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--field-border);
+  background:var(--card);
+  color:var(--ink);
+  font-weight:600; font-size:.9rem;
+  text-decoration:none;
+}
+.pg-btn:hover{ border-color:var(--forest); }
+.pg-btn--primary{
+  background:var(--forest); border-color:var(--forest); color:var(--btn-primary-fg);
+}
+
+.pg-promise{ margin:0; font-size:.76rem; color:var(--ink-muted); }
+.pg-promise a{ color:inherit; }
+
+/* ───────────────────────── Preview controls ─────────────────────────
+   Fixed to the bottom, deliberately plain, and only ever present with
+   ?demo=1 — a control that can move the clock has no business on a
+   screen in a real venue. */
+
+.pg-controls{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:10px clamp(12px,3vw,24px);
+  background:var(--card);
+  border-top:1px solid var(--line);
+  box-shadow:var(--shadow-lg);
+  font-size:.84rem;
+}
+body.pg-demo .pg-shell{ padding-bottom:96px; }
+
+.pg-ctl{
+  padding:7px 14px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--field-border);
+  background:var(--card); color:var(--ink);
+  font-weight:600; cursor:pointer;
+}
+.pg-ctl:hover{ border-color:var(--forest); }
+.pg-ctl-speed{ display:flex; align-items:center; gap:6px; color:var(--ink-muted); }
+.pg-ctl-speed select{
+  font:inherit; padding:6px 8px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--field-border);
+  background:var(--card); color:var(--ink);
+}
+.pg-controls #scrub{ flex:1; min-width:160px; accent-color:var(--orange); }
+.pg-ctl-out{
+  font-family:var(--numeric); font-variant-numeric:tabular-nums;
+  font-weight:700; min-width:8ch; text-align:right;
+}
+
+/* ═════════════════════════ Display mode ═════════════════════════
+   Same document, read from across a room. Everything gets bigger, the
+   two panels sit side by side so the current session never scrolls out
+   of view, and the day list becomes the only thing that moves. */
+
+body.pg-display .pg-shell{
+  max-width:none;
+  height:100vh;
+  padding:clamp(16px,2vw,32px);
+  gap:clamp(10px,1.6vw,20px);
+}
+
+body.pg-display .pg-main{
+  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  align-items:stretch;
+  flex:1;
+  min-height:0;
+}
+
+/* The pie is sized from the viewport, not from leftover space.
+
+   Two earlier attempts tried to let it take whatever was left — flex
+   shrink, then a 1fr grid row. Both collapsed it to a coin, because the
+   height of a flex item inside a flex item inside 100vh is not definite
+   enough for either mechanism to divide, and both fall back to content
+   size, which for an aspect-ratio box with no width is nearly nothing.
+
+   A vh figure is not clever but it is right every time, and it is
+   measured against the one thing that actually varies. Keep the two
+   cases separate: the preview carries a banner, a footer and a control
+   bar that the real screen does not, worth about 180px, and sizing both
+   from one number starves one or overflows the other. */
+body.pg-display .pg-now{
+  flex-direction:column;
+  justify-content:center;
+  text-align:center;
+  gap:clamp(10px,1.6vw,20px);
+  min-height:0;
+  overflow:hidden;
+}
+body.pg-display .pg-now::before{
+  align-self:center; width:min(220px,40%); height:5px; flex:none;
+}
+body.pg-display .pg-dial-wrap{ width:min(34vh,340px); flex:none; align-self:center; }
+body.pg-display .pg-kicker{ font-size:clamp(.9rem,1.3vw,1.1rem); }
+body.pg-display .pg-now-title{
+  font-size:clamp(1.6rem,3vw,2.9rem);
+  /* Three lines is the longest title in any programme we have seen at
+     this size. Past that, clipping beats shoving the countdown off the
+     bottom of the screen — the time left is the point. */
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+  overflow:hidden;
+}
+body.pg-display .pg-now-window{ font-size:clamp(.95rem,1.4vw,1.25rem); }
+body.pg-display .pg-now-left{ font-size:clamp(1.5rem,2.6vw,2.4rem); }
+body.pg-display .pg-next{ font-size:clamp(.95rem,1.4vw,1.25rem); }
+
+body.pg-display .pg-list{ display:flex; flex-direction:column; min-height:0; }
+body.pg-display .pg-timeline{
+  overflow:hidden;              /* the pan is the only scrolling */
+  flex:1; min-height:0;
+  scrollbar-width:none;
+}
+body.pg-display .pg-timeline::-webkit-scrollbar{ display:none; }
+body.pg-display .pg-item{ padding:clamp(10px,1.4vh,18px) 18px; }
+body.pg-display .pg-item-time{ font-size:clamp(.95rem,1.4vw,1.25rem); min-width:13ch; }
+body.pg-display .pg-item-title{ font-size:clamp(1rem,1.6vw,1.45rem); }
+body.pg-display .pg-item-kind{ font-size:clamp(.78rem,1vw,.95rem); }
+
+/* Nobody is standing at a foyer screen to press these. */
+body.pg-display .pg-foot,
+body.pg-display .pg-days{ display:none; }
+/* ...unless it is a preview, where the whole point is being able to drive
+   it. Its own row at the bottom of the column, not floating over the
+   panels — margin-top:auto would push it onto them once the main area is
+   already claiming every spare pixel. */
+body.pg-display.pg-demo .pg-foot{
+  display:block; margin-top:0; flex:none; padding-top:0;
+}
+/* The shorthand above resets what body.pg-demo .pg-shell set, so the room
+   for the fixed control bar has to be put back here. */
+body.pg-display.pg-demo .pg-shell{ padding-bottom:84px; }
+body.pg-display.pg-demo .pg-actions{ margin-bottom:0; }
+body.pg-display.pg-demo .pg-disclaimer,
+body.pg-display.pg-demo .pg-promise{ display:none; }
+
+/* The preview of the display is a genuinely smaller room. A banner, a
+   footer and the control bar take about 180px that the screen in the
+   foyer does not spend, so the panel is scaled to what is left rather
+   than clipped at the bottom — and the reader loses the "then" line,
+   which on a preview is exactly the line they are checking. Full screen
+   (F11) drops the browser's own chrome and brings back some of it. */
+body.pg-display.pg-demo .pg-dial-wrap{ width:min(17vh,180px); }
+body.pg-display.pg-demo .pg-now-title{ font-size:clamp(1.2rem,2vw,1.9rem); -webkit-line-clamp:2; }
+body.pg-display.pg-demo .pg-kicker{ font-size:.8rem; }
+body.pg-display.pg-demo .pg-now-window{ font-size:.95rem; }
+body.pg-display.pg-demo .pg-now-left{ font-size:clamp(1.2rem,1.8vw,1.7rem); }
+body.pg-display.pg-demo .pg-next{ font-size:.95rem; }
+
+@media (max-width:900px){
+  body.pg-display .pg-main{ grid-template-columns:1fr; }
+  body.pg-display .pg-shell{ height:auto; min-height:100vh; }
+  body.pg-display .pg-timeline{ overflow:visible; }
+}
+
+/* ───────────────────────── Phones ───────────────────────── */
+
+@media (max-width:600px){
+  .pg-now{ flex-direction:column; align-items:stretch; text-align:center; }
+  .pg-now::before{ align-self:center; width:120px; height:5px; }
+  .pg-dial-wrap{ margin:0 auto; }
+  .pg-head{ flex-direction:column; }
+  .pg-clock{ text-align:left; }
+  .pg-item{ flex-direction:column; gap:2px; align-items:stretch; }
+  .pg-item-time{ min-width:0; }
+}

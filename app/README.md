@@ -240,6 +240,51 @@ The timer maths is duplicated in `app.js` and in the edge function. Those two mu
 stay in step or the push will fire at a different moment than the in-app alert —
 there is a comment marking this in both files.
 
+## Event programmes
+
+A published programme — a conference, a festival — is **data, not code**. Each one
+is a JSON file in `app/presets/`, listed in `app/presets/index.json`, and
+`app/presets/README.md` is the format. Adding one is a file and a `CACHE` bump in
+`sw.js`; there is no JavaScript to change, and nothing about any particular event
+appears anywhere else in the app.
+
+That is the point of the design. The first conference this app carried — the
+South Australia ADHD Conference, September 2026 — lived as a hardcoded object at
+the top of `app.js`, under a comment listing the *seven* places you had to delete
+from to remove it. A second event added the same way would have doubled that
+comment. It is now `presets/sa-adhd-2026.json` and reads through the same path as
+everything after it.
+
+Two surfaces read a preset, and they share nothing but the file:
+
+- **`index.html?preset=<id>`** — the app. Each session becomes an ordinary
+  appointment, so it syncs, alerts, and can be deleted one at a time like anything
+  the person typed themselves. On each day of the event the three pies follow the
+  programme's hours instead of that weekday's own. Opening the link twice replaces
+  rather than duplicates, because every appointment is named
+  `<preset>-<date>-<nn>`. Deleting the last session of a day hands that day back to
+  the person's own week — that is the only "turn it off" there needs to be.
+- **`program.html?e=<id>`** — a standalone page that loads **no other app module**:
+  no sign-in, no sync, no billing, no service-worker registration. Someone can open
+  it on a borrowed phone and leave nothing behind. Add `&display=1` for a venue
+  screen: two panels, big type, the day list panning itself, and a screen wake lock
+  where the browser allows one.
+
+**What does not sync is the reshaped day.** The appointments go to the server like
+any other; the conference *hours* stay in `localStorage` under
+`countdown-timers/presets/v1`, because sending them would mean a new column on a
+live table. A second device that syncs the sessions shows them correctly and keeps
+its own weekday hours until it opens the link too.
+
+A preview clock is built in — `&demo=1` runs the programme at a chosen speed, and
+`&at=2026-09-28T11:15` pins an instant — because the usual reason to look at a
+programme page is *before* the event, when a correct page is a motionless one. Both
+put a banner on the page saying the clock is simulated. Neither is reachable
+without asking for it, so no screen in a real venue can be showing one.
+
+No analytics were added for any of this, and none will be. See
+`ARCHITECTURE.md` §3.
+
 ## Plans and pricing
 
 **Free forever, on one device:** the pies, the weekly schedule, the calculator and
@@ -533,6 +578,10 @@ app/
   sync.js               pull/push, conflict resolution, offline queue
   notify.js             permissions, service worker, push subscription
   app.js                schedule model, timer maths, render loop
+  program.html          one event's programme, for a phone or a venue screen
+  program.js            the programme viewer -- loads no other app module
+  program.css           layout for both of its modes; colours come from styles.css
+  presets/              published programmes as data; presets/README.md is the format
   sw.js                 offline cache + push delivery
   manifest.webmanifest  PWA install metadata
   icon.svg              app icon (vector, "any" purpose)

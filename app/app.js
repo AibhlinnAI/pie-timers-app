@@ -34,56 +34,33 @@
     Sunday:    { working: false, start: 540, lunch: 750, end: 1020 }
   };
 
-  /* One day only: the South Australia ADHD Conference in Adelaide on
-     Saturday 19 September 2026, as published by its organiser. Pie Timers
-     is not part of the event; this only lets a phone in the room read the
-     programme as pies. Times are wall-clock like every other appointment,
-     so a phone on Adelaide time counts to the printed agenda. The ids are
-     fixed so no session can ever be added twice.
+  /* ── Event presets ──
+     A published programme — a conference, a festival — loaded from
+     app/presets/<id>.json by ?preset=<id>, never compiled into this file.
+     app/presets/README.md is the format, and adding an event is a JSON
+     file plus a cache bump, with no change here.
 
-     Who gets it: only a first visit in a browser tab, on the day itself,
-     on a phone set to Adelaide time, starts with the sessions, which is
-     what the shirt QR is for. A first visit on any other day, on another
-     clock, inside the Play app or in any installed app window gets the
-     plain defaults; the testers use the Play app with their own weeks.
-     Saved state is never seeded, and on the day dayConfig() changes the
-     hours only for someone already holding a session. The ?agenda link
-     adds the sessions on purpose, anywhere, the Play app included.
+     This replaced a hardcoded South Australia ADHD Conference agenda that
+     lived at the top of this file with a comment listing the seven places
+     you had to delete from to remove it. That comment was the argument
+     for this. The agenda itself survives as presets/sa-adhd-2026.json.
 
-     None of it does anything after the day, but other code reads AGENDA,
-     so deleting this block alone breaks every first run. Remove together:
-     this block, the firstRunSeed() line in load() with firstRunSeed(),
-     inAppWindow() and agendaAppointments(), hasAgenda() with the agenda
-     lines in dayConfig() (its weekly lookup stays), the apptAgendaNote
-     lines in renderAppointment() with that <p> in index.html, and the
-     Agenda link section with its openAgendaLink() call at the end of
-     boot. IN_PLAY_APP above load() stays, because it also keeps prices
-     out of the Play app. */
-  var AGENDA = {
-    id: 'sa-adhd-2026',
-    date: '2026-09-19',
-    /* Date.getTimezoneOffset() on Adelaide time that day, UTC+9:30:
-       daylight saving there only starts on 4 October. */
-    tzOffset: -570,
-    /* Doors and registration rather than the first talk at 10:00, so the
-       pies are already moving while people look around the stalls. 16:00
-       is the published finish; the 15:50 close is its own appointment. */
-    start: 510, lunch: 750, end: 960,    // 8:30 / 12:30 / 16:00
-    items: [
-      { id: 'sa-adhd-2026-01', time: 510, title: 'Registration opens, exhibits open' },
-      { id: 'sa-adhd-2026-02', time: 600, title: 'Welcome and introduction' },
-      { id: 'sa-adhd-2026-03', time: 605, title: 'Dr Lamb: Supporting neurodivergent young people and families' },
-      { id: 'sa-adhd-2026-04', time: 645, title: 'Break and exhibitors' },
-      { id: 'sa-adhd-2026-05', time: 665, title: 'Kate Donohue: ADHD and multi-neurodivergence' },
-      { id: 'sa-adhd-2026-06', time: 710, title: 'Sandy Booysen: Gut health, diet and micronutrients' },
-      { id: 'sa-adhd-2026-07', time: 750, title: 'Main break (lunch not provided)' },
-      { id: 'sa-adhd-2026-08', time: 800, title: 'Michelle Lewis: ADHD self-awareness at school and home' },
-      { id: 'sa-adhd-2026-09', time: 845, title: 'Sarah Hoff: Breath and body tools for everyday stress' },
-      { id: 'sa-adhd-2026-10', time: 890, title: 'Break and exhibitors' },
-      { id: 'sa-adhd-2026-11', time: 910, title: 'Dr Aleem Khan: ADHD unmasked, first signs to lifelong care' },
-      { id: 'sa-adhd-2026-12', time: 950, title: 'Thank you and close' }
-    ]
-  };
+     Sessions become ordinary appointments, so they sync, alert and can be
+     deleted one at a time like anything else the person typed. What does
+     NOT sync is the day's *hours* — the three pies that run the
+     conference day instead of the person's own week. Those are kept here,
+     device-local, because sending them to the server would mean a new
+     column on a live table. The appointments are what travel; a second
+     device re-opens the link, or simply shows the sessions without the
+     reshaped day.
+
+     PRESET_KEY holds { <id>: <preset as fetched> }. It is read
+     synchronously at boot so dayConfig() never has to wait on a fetch in
+     the middle of a render. */
+  var PRESET_KEY = 'countdown-timers/presets/v1';
+  /* An id off the query string becomes a path segment, so nothing but an
+     id shape is ever allowed to become one. */
+  var PRESET_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
   var DEFAULT_SETTINGS = {
     clock24: false,
@@ -181,13 +158,14 @@
 
   var MILESTONES = [30, 15, 10, 5]; // minutes remaining
 
-  /* The Play app is a Trusted Web Activity over this same site, and it is
-     where the testers keep their own weeks, so the first-run agenda seed
-     must never reach it. The wrapper opens the site with its package as
-     the referrer, on the launch page only, so that is remembered for the
-     rest of the visit. load() reads this on the next line, so it has to
-     stay above it. If the referrer is ever missing, inAppWindow() still
-     keeps the seed out of the app's own window. */
+  /* The Play app is a Trusted Web Activity over this same site. The
+     wrapper opens the site with its package as the referrer, on the
+     launch page only, so that is remembered for the rest of the visit.
+
+     This used to have a second job: keeping a date-gated first-run
+     conference seed out of the testers' app. That seed is gone — an
+     event now arrives only through ?preset=, deliberately, on any surface
+     — and what is left is the anti-steering gate below. */
   var PLAY_SIGNAL = (function () {
     var KEY = 'countdown-timers/play-app';
     /* Only the referrer is trusted enough to PERSIST. The wrapper sets it
@@ -215,7 +193,7 @@
        notification cold start, for one. The Android test matters: on
        ChromeOS the same API reaches store-installed PWAs, and this app
        holds deliberately that an installed web app is still the web and
-       keeps its prices (see inAppWindow below). */
+       keeps its prices. */
     var fromStore = /Android/.test(navigator.userAgent || '')
       && typeof window.getDigitalGoodsService === 'function';
 
@@ -287,8 +265,8 @@
      send the visit back here, and privacy.html and terms.html hide
      their links to pricing and refunds.
 
-     Only this flag decides it, never inAppWindow(). An installed web app
-     or an iPhone home screen icon is still the web, and keeps its
+     Only this flag decides it, never the display mode. An installed web
+     app or an iPhone home screen icon is still the web, and keeps its
      prices. */
   CT.inPlayApp = IN_PLAY_APP;
   var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription.';
@@ -324,7 +302,7 @@
     } catch (e) {
       return normalise({});
     }
-    if (raw === null) return normalise(firstRunSeed());
+    if (raw === null) return normalise({});
 
     var saved = {};
     try {
@@ -335,47 +313,81 @@
     return normalise(saved);
   }
 
-  /* Someone scanning in at the conference opens a live agenda without
-     setting anything up: its sessions as appointments, and dayConfig()
-     running the pies on its hours. Only on the day, only on Adelaide's
-     clock and only in a browser tab, so a first visit before or after it,
-     on a phone set to another time zone, or in the Play app gets the plain
-     defaults. The day is the phone's own calendar date, as isoDate() reads
-     it everywhere, and the offset check makes that Adelaide's date too.
-     On any other clock the wall-clock sessions would count to the wrong
-     times, so those phones are not seeded at all. Nothing is saved or
-     stamped here, same as any other first run. */
-  function firstRunSeed() {
-    var now = new Date();
-    if (IN_PLAY_APP || inAppWindow() || isoDate(now) !== AGENDA.date ||
-        now.getTimezoneOffset() !== AGENDA.tzOffset) return {};
-    return { appointments: agendaAppointments(AGENDA) };
-  }
-
-  /* The fallback for a Play app launch that arrives without its referrer.
-     A Trusted Web Activity runs in its own app window, which Chrome reports
-     to the page as a standalone or fullscreen display mode, while the shirt
-     QR always opens a browser tab. So when unsure, a first run in any app
-     window counts as the Play app, and so does one where the check itself
-     fails. */
-  function inAppWindow() {
+  /* ── Preset cache ──
+     Read once, synchronously, because dayConfig() runs inside the render
+     loop and must never be waiting on a fetch. Anything unreadable is
+     simply nothing: a corrupt cache costs the conference hours, not the
+     person's own week. */
+  var presets = (function () {
+    var out = {};
     try {
-      if (window.navigator.standalone === true) return true;
-      return ['standalone', 'fullscreen', 'minimal-ui'].some(function (mode) {
-        return window.matchMedia('(display-mode: ' + mode + ')').matches;
-      });
+      var raw = localStorage.getItem(PRESET_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object') {
+        Object.keys(parsed).forEach(function (id) {
+          var p = normalisePreset(parsed[id]);
+          if (p) out[id] = p;
+        });
+      }
+    } catch (e) { /* no presets, then */ }
+    return out;
+  }());
+
+  function rememberPreset(preset) {
+    presets[preset.id] = preset;
+    try {
+      localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
     } catch (e) {
-      return true;
+      /* Storage full or blocked. The appointments still saved, so the
+         sessions are there; only the reshaped day is lost. Not worth a
+         message of its own. */
     }
   }
 
-  function agendaAppointments(preset) {
-    return preset.items.map(function (item) {
-      return { id: item.id, title: item.title, date: preset.date, time: item.time };
-    });
+  /* Every appointment a preset creates is named after it, which is what
+     makes re-opening a link replace rather than duplicate, and what lets
+     the two functions below recognise its sessions later. */
+  function presetItemId(preset, date, n) {
+    return preset.id + '-' + date + '-' + (n < 10 ? '0' + n : n);
   }
 
-  /* Today's hours as the pies read them. On the conference day, for anyone
+  function presetAppointments(preset) {
+    var out = [];
+    preset.days.forEach(function (day) {
+      day.items.forEach(function (item) {
+        out.push({
+          id: presetItemId(preset, day.date, item.n),
+          title: item.title,
+          date: day.date,
+          time: item.time
+        });
+      });
+    });
+    return out;
+  }
+
+  /* The preset day covering a date, for someone who still holds at least
+     one of its sessions. Deleting the last one hands the day back to the
+     person's own week, which is the only "turn this off" anyone asked
+     for. */
+  function presetDayFor(date) {
+    var ids = Object.keys(presets);
+    for (var i = 0; i < ids.length; i++) {
+      var preset = presets[ids[i]];
+      for (var d = 0; d < preset.days.length; d++) {
+        var day = preset.days[d];
+        if (day.date !== date) continue;
+        var prefix = preset.id + '-' + date + '-';
+        var held = state.appointments.some(function (a) {
+          return a.id.indexOf(prefix) === 0;
+        });
+        if (held) return { preset: preset, day: day };
+      }
+    }
+    return null;
+  }
+
+  /* Today's hours as the pies read them. On a conference day, for anyone
      holding its sessions, they follow the programme rather than the weekly
      schedule. The schedule itself is never written, so the Schedule tab,
      server reminders and every later Saturday keep the person's own hours,
@@ -383,16 +395,72 @@
      still comes from the schedule through lunchLabel() and endLabel(). */
   function dayConfig(now) {
     var cfg = state.schedule[dayNameOf(now)];
-    if (isoDate(now) !== AGENDA.date || !hasAgenda()) return cfg;
+    var found = presetDayFor(isoDate(now));
+    if (!found) return cfg;
     return Object.assign({}, cfg, {
-      working: true, start: AGENDA.start, lunch: AGENDA.lunch, end: AGENDA.end
+      working: true, start: found.day.start, lunch: found.day.lunch, end: found.day.end
     });
   }
 
-  function hasAgenda() {
-    return state.appointments.some(function (a) {
-      return a.id.indexOf(AGENDA.id + '-') === 0;
+  /* Which preset an appointment belongs to, or null for one the person
+     typed. Read by renderAppointment() so the note under a session is the
+     organiser's own disclaimer rather than a sentence hardcoded here. */
+  function presetOf(appointment) {
+    if (!appointment || appointment.source === 'calendar') return null;
+    var ids = Object.keys(presets);
+    for (var i = 0; i < ids.length; i++) {
+      if (appointment.id.indexOf(ids[i] + '-') === 0) return presets[ids[i]];
+    }
+    return null;
+  }
+
+  /* ── Validating a preset ──
+     A preset is a file on our own origin, but it is also the thing a
+     future session edits at speed the night before an event, and by the
+     time it reaches here it may have been round a browser's storage as
+     well. Nothing below this function trusts a field it did not set.
+
+     The end times app/presets/README.md describes are deliberately NOT
+     resolved here. An appointment has no end — it is a moment to count
+     down to — so the app only ever needs `time`. The programme page does
+     that work for its own display. */
+  function normalisePreset(data) {
+    if (!data || typeof data !== 'object') return null;
+    if (typeof data.id !== 'string' || !PRESET_ID.test(data.id)) return null;
+    if (!Array.isArray(data.days)) return null;
+
+    var out = {
+      id: data.id,
+      name: typeof data.name === 'string' ? data.name.slice(0, 120) : 'Programme',
+      disclaimer: typeof data.disclaimer === 'string' ? data.disclaimer.slice(0, 400) : '',
+      days: []
+    };
+
+    data.days.forEach(function (day) {
+      if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day.date) || !Array.isArray(day.items)) return;
+
+      var items = day.items.filter(function (it) {
+        return it && isMinute(it.time) &&
+               typeof it.title === 'string' && it.title.trim();
+      }).map(function (it, i) {
+        return {
+          n: typeof it.n === 'number' && it.n > 0 && it.n < 1000 ? Math.floor(it.n) : i + 1,
+          time: it.time,
+          title: it.title.trim().slice(0, 80)
+        };
+      });
+      if (!items.length) return;
+
+      out.days.push({
+        date: day.date,
+        start: isMinute(day.start) ? day.start : items[0].time,
+        lunch: isMinute(day.lunch) ? day.lunch : null,
+        end: isMinute(day.end) ? day.end : items[items.length - 1].time,
+        items: items
+      });
     });
+
+    return out.days.length ? out : null;
   }
 
   /* Validate anything arriving from storage or the server before trusting any of that. */
@@ -975,11 +1043,15 @@
       return;
     }
 
-    // The conference sessions are copied from the organiser's page, not
-    // confirmed by them, so say so while one of them is the next thing up.
-    // Only manual entries carry agenda ids; a calendar uid never counts.
-    $('apptAgendaNote').hidden = !(appointment.source === 'manual' &&
-      appointment.id.indexOf(AGENDA.id + '-') === 0);
+    // A preset's sessions are copied from the organiser's programme, not
+    // confirmed by them, so say so while one of them is the next thing up
+    // — in the organiser's own words, from the preset, rather than a
+    // sentence about conferences hardcoded here. Only manual entries carry
+    // preset ids; a calendar uid never counts.
+    var owner = appointment.source === 'manual' ? presetOf(appointment) : null;
+    var note = $('apptAgendaNote');
+    note.hidden = !(owner && owner.disclaimer);
+    if (!note.hidden) note.textContent = owner.disclaimer;
 
     var when = new Date(appointment.at);
     var sameDay = isoDate(when) === isoDate(now);
@@ -2331,55 +2403,87 @@
     toastTimer = setTimeout(function () { el.classList.remove('is-visible'); }, 3200);
   }
 
-  /* ─────────────────────────── Agenda link ───────────────────────────
-     ?agenda=sa-adhd-2026 adds the conference agenda to a copy that already
-     has saved state, which a first-run seed never touches. Existing
-     appointments stay; the agenda's own ids are replaced rather than added
-     again, so opening the link twice still leaves one of each. */
+  /* ─────────────────────────── Preset link ───────────────────────────
+     ?preset=nwc26 loads app/presets/nwc26.json and adds its sessions as
+     appointments. Existing appointments stay; the preset's own ids are
+     replaced rather than added again, so opening the link twice still
+     leaves one of each, and re-opening it after the organiser changed a
+     time updates rather than duplicates.
 
-  function openAgendaLink() {
+     ?agenda= is the old spelling of the same thing. It stays because it
+     is printed on a conference shirt.
+
+     This works on a first run and on a phone that has been in use for a
+     year, identically, which is why there is no longer a first-run seed
+     with a date and a time zone to get wrong. */
+
+  function openPresetLink() {
     var params = new URLSearchParams(location.search);
-    if (!params.has('agenda')) return;
-    // An unknown id, or this one once the day has passed, is stripped and
-    // otherwise ignored: no merge, no save, no toast.
-    var preset = params.get('agenda') === AGENDA.id && isoDate(new Date()) <= AGENDA.date
-      ? AGENDA : null;
+    var key = params.has('preset') ? 'preset' : params.has('agenda') ? 'agenda' : null;
+    if (!key) return;
 
-    function finish() {
-      if (preset) applyAgenda(preset);
+    var id = params.get(key) || '';
+
+    function strip() {
       // Stripped only once merged, so a reload retries if the pull stalls.
-      params.delete('agenda');
+      params.delete(key);
       var query = params.toString();
       history.replaceState(null, '', location.pathname + (query ? '?' + query : '') + location.hash);
     }
 
-    /* Sync is last write wins over the whole document, so merging into a
-       stale copy and stamping it would overwrite newer edits from another
-       device. Adopt the server's copy first, then merge into that. */
-    if (preset && CT.config.isConfigured && CT.auth.isSignedIn()) {
-      CT.sync.pull(true).then(finish, finish);
-    } else {
-      finish();
-    }
+    // An id that is not an id shape never becomes a path segment.
+    if (!PRESET_ID.test(id)) { strip(); return; }
+
+    fetch('presets/' + id + '.json', { credentials: 'omit' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var preset = data ? normalisePreset(data) : null;
+        // The file names itself; a mismatch means a preset was copied and
+        // not renamed, and its ids would collide with the original's.
+        if (!preset || preset.id !== id) { strip(); return; }
+
+        /* Sync is last write wins over the whole document, so merging into
+           a stale copy and stamping it would overwrite newer edits from
+           another device. Adopt the server's copy first, then merge. */
+        function finish() { applyPreset(preset); strip(); }
+        if (CT.config.isConfigured && CT.auth.isSignedIn()) {
+          CT.sync.pull(true).then(finish, finish);
+        } else {
+          finish();
+        }
+      })
+      // No network, or no such preset. Nothing is merged, nothing is said,
+      // and the parameter is left on the URL so a reload tries again.
+      .catch(function () { /* leave the link alone */ });
   }
 
-  function applyAgenda(preset) {
+  function applyPreset(preset) {
+    var mine = presetAppointments(preset);
     var ids = {};
-    preset.items.forEach(function (item) { ids[item.id] = true; });
+    mine.forEach(function (a) { ids[a.id] = true; });
+
     state.appointments = normaliseAppointments(state.appointments.filter(function (a) {
       return !ids[a.id];
-    }).concat(agendaAppointments(preset)));
+    }).concat(mine));
 
-    // Only the appointments change. dayConfig() moves the pies on the day
-    // itself, so the weekly schedule stays exactly as it was.
+    // The hours the conference days run on. Remembered before save() so a
+    // render triggered by the save already has them.
+    rememberPreset(preset);
+
+    // Only the appointments change in the synced document. dayConfig()
+    // moves the pies on each preset day, so the weekly schedule stays
+    // exactly as it was.
     save();
     buildAppointmentList();
     render();
 
-    var day = appointmentDate({ date: preset.date, time: 0 })
+    var first = preset.days[0];
+    var day = appointmentDate({ date: first.date, time: 0 })
       .toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
-    toast('Unofficial conference agenda added. On ' + day + ' the pies run ' +
-          formatClock(preset.start) + ' to ' + formatClock(preset.end) + '.');
+    var days = preset.days.length;
+    toast(mine.length + ' sessions added from ' + preset.name + '. ' +
+          (days > 1 ? 'From ' + day + ', over ' + days + ' days, ' : 'On ' + day + ' ') +
+          'the pies follow the programme.');
   }
 
   /* ─────────────────────────── Focus view ───────────────────────────
@@ -3231,5 +3335,5 @@
   finishGoogleConnect();
 
   // Last, so CT.app is in place for the pull and the sign-in hash is gone.
-  openAgendaLink();
+  openPresetLink();
 })();

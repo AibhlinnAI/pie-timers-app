@@ -1,0 +1,65 @@
+{
+  "id": "nwc26",
+  "schemaVersion": 1,
+  "revision": "2026-09-22",
+  "name": "Neurodivergence Wellbeing Conference 2026",
+  "shortName": "NWC26",
+  "venue": "RACV Royal Pines Resort, Gold Coast",
+  "timeZone": "Australia/Brisbane",
+  "utcOffsetMinutes": 600,
+  "official": false,
+  "source": {
+    "label": "anzmh.asn.au/nwc",
+    "url": "https://anzmh.asn.au/nwc"
+  },
+  "disclaimer": "Unofficial. Times are approximate, taken from the published program, and can change on the day. The room is the authority, not this screen.",
+  "days": [
+    {
+      "date": "2026-09-27",
+      "label": "Welcome",
+      "start": 1020,
+      "lunch": null,
+      "end": 1140,
+      "items": [
+        { "n": 1, "time": 1020, "end": 1140, "kind": "social",
+          "title": "The Gold Coast Glow — Sunset Picnic & Welcome Gathering" }
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "label": "Day one",
+      "start": 510,
+      "lunch": 750,
+      "end": 1020,
+      "items": [
+        { "n": 1, "time": 510,  "kind": "keynote", "title": "Conference Kickoff / Keynote Session" },
+        { "n": 2, "time": 630,  "kind": "break",   "title": "Morning Tea" },
+        { "n": 3, "time": 660,  "kind": "session", "title": "Community Presenters" },
+        { "n": 4, "time": 750,  "kind": "meal",    "title": "Lunch" },
+        { "n": 5, "time": 810,  "kind": "session", "title": "Community Presenters" },
+        { "n": 6, "time": 900,  "kind": "break",   "title": "Afternoon Tea" },
+        { "n": 7, "time": 930,  "kind": "keynote", "title": "Keynote Session" },
+        { "n": 8, "time": 1020, "kind": "social",  "open": true,
+          "title": "The NWC Evening Social — A Space to Connect" }
+      ]
+    },
+    {
+      "date": "2026-09-29",
+      "label": "Day two",
+      "start": 510,
+      "lunch": 720,
+      "end": 990,
+      "items": [
+        { "n": 1, "time": 510, "kind": "keynote", "title": "Keynote Session" },
+        { "n": 2, "time": 600, "kind": "break",   "title": "Morning Tea" },
+        { "n": 3, "time": 630, "kind": "session", "title": "Workshops" },
+        { "n": 4, "time": 720, "kind": "meal",    "title": "Lunch" },
+        { "n": 5, "time": 780, "kind": "session", "title": "Community Presenters" },
+        { "n": 6, "time": 870, "kind": "break",   "title": "Afternoon Tea" },
+        { "n": 7, "time": 900, "kind": "keynote", "title": "Keynote Session" },
+        { "n": 8, "time": 990, "kind": "close",   "moment": true,
+          "title": "Conference Close" }
+      ]
+    }
+  ]
+}

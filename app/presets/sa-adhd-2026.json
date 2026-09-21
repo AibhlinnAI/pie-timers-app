@@ -1,0 +1,39 @@
+{
+  "id": "sa-adhd-2026",
+  "schemaVersion": 1,
+  "revision": "2026-09-19",
+  "name": "South Australia ADHD Conference 2026",
+  "shortName": "SA ADHD 2026",
+  "venue": "Adelaide",
+  "timeZone": "Australia/Adelaide",
+  "utcOffsetMinutes": 570,
+  "official": false,
+  "source": {
+    "label": "the organiser's published program",
+    "url": ""
+  },
+  "disclaimer": "Unofficial agenda from the organiser's program. Times can change on the day.",
+  "days": [
+    {
+      "date": "2026-09-19",
+      "label": "Conference day",
+      "start": 510,
+      "lunch": 750,
+      "end": 960,
+      "items": [
+        { "n": 1,  "time": 510, "kind": "session", "title": "Registration opens, exhibits open" },
+        { "n": 2,  "time": 600, "kind": "session", "title": "Welcome and introduction" },
+        { "n": 3,  "time": 605, "kind": "keynote", "title": "Dr Lamb: Supporting neurodivergent young people and families" },
+        { "n": 4,  "time": 645, "kind": "break",   "title": "Break and exhibitors" },
+        { "n": 5,  "time": 665, "kind": "session", "title": "Kate Donohue: ADHD and multi-neurodivergence" },
+        { "n": 6,  "time": 710, "kind": "session", "title": "Sandy Booysen: Gut health, diet and micronutrients" },
+        { "n": 7,  "time": 750, "kind": "meal",    "title": "Main break (lunch not provided)" },
+        { "n": 8,  "time": 800, "kind": "session", "title": "Michelle Lewis: ADHD self-awareness at school and home" },
+        { "n": 9,  "time": 845, "kind": "session", "title": "Sarah Hoff: Breath and body tools for everyday stress" },
+        { "n": 10, "time": 890, "kind": "break",   "title": "Break and exhibitors" },
+        { "n": 11, "time": 910, "kind": "keynote", "title": "Dr Aleem Khan: ADHD unmasked, first signs to lifelong care" },
+        { "n": 12, "time": 950, "kind": "close",   "moment": true, "title": "Thank you and close" }
+      ]
+    }
+  ]
+}

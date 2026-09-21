@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "presets": [
+    {
+      "id": "nwc26",
+      "name": "Neurodivergence Wellbeing Conference 2026",
+      "shortName": "NWC26",
+      "venue": "RACV Royal Pines Resort, Gold Coast",
+      "firstDate": "2026-09-27",
+      "lastDate": "2026-09-29",
+      "file": "nwc26.json"
+    },
+    {
+      "id": "sa-adhd-2026",
+      "name": "South Australia ADHD Conference 2026",
+      "shortName": "SA ADHD 2026",
+      "venue": "Adelaide",
+      "firstDate": "2026-09-19",
+      "lastDate": "2026-09-19",
+      "file": "sa-adhd-2026.json"
+    }
+  ]
+}
