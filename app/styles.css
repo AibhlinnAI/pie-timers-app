@@ -322,6 +322,18 @@
    element toggled from JS would stay visible without this. */
 [hidden]{ display:none !important; }
 
+/* Set on <html> by a tiny script in each page's <head>, before anything
+   paints. The end-of-body gates and app.js remain the authority on what is
+   hidden in the Play app; this only stops an offer or a price being drawn
+   for a frame or two while those scripts are still on their way.
+
+   It is additive on purpose. If the head script never runs, the page falls
+   back to exactly today's behaviour — content visible, hidden a moment
+   later — rather than to permanently hidden. Twice now a fix pointed at
+   Play has broken the web instead, and a failure that costs a frame beats
+   one that costs a customer their Pricing link. */
+.play-app [data-hide-in-play]{ display:none !important; }
+
 html{ -webkit-text-size-adjust:100%; }
 
 /* Present for screen readers, invisible on screen. Not display:none, which

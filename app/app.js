@@ -909,12 +909,53 @@
     return minutes > 0 && remainingSec <= minutes * 60;
   }
 
+  /* This names the SPAN OF THE PIE, not the time left. A full pie is one
+     whole unit and this says which unit.
+
+     It used to say "over 24 hours", which reads as a claim about the
+     remaining time and then contradicts the line under it: the store
+     screenshot showed "4:29:58 · over 24 hours" directly above "School
+     pickup | 4 hours 29 minutes away". Both were correct and together they
+     looked broken. Naming the countdown instead removes the reading that
+     caused it, so every tier is now "<unit> countdown". */
   function tierCaption(timer) {
     if (timer.tier === 'days') {
-      var days = Math.round(timer.scaleMin / 1440);
-      return days === 1 ? 'over 1 day' : 'over ' + days + ' days';
+      return Math.round(timer.scaleMin / 1440) + ' day countdown';
     }
-    return timer.tier === 'hours' ? 'over 24 hours' : 'within the hour';
+    return timer.tier === 'hours' ? '24 hour countdown' : '1 hour countdown';
+  }
+
+  /* The appointment meter reads in whatever unit the pie is currently
+     drawn in, so the bar and the numbers under it always describe the
+     same span: whole days while the pie is days, hours once it restarts
+     as 24, minutes once it restarts as 60. Reading "392 min" off a pie
+     that means three days would be true and useless.
+
+     The pair always sums to the scale, so the two numbers and the bar can
+     never tell different stories. Hours and minutes are whole; days carry
+     one decimal ONLY when the value is not whole, because a day is too
+     coarse a step otherwise -- three quarters of a day into a two-day pie
+     rounds to "Elapsed 1 day, Remaining 1 day" beside a quarter-filled
+     bar. "0.8 days" costs one character and removes the contradiction,
+     while the common cases still read "Remaining 3 days". */
+  function tierMeter(timer) {
+    var remainingMin = timer.remainingSec / 60;
+    var elapsedMin = Math.max(timer.scaleMin - remainingMin, 0);
+    var days = timer.tier === 'days';
+    var per = days ? 1440 : (timer.tier === 'hours' ? 60 : 1);
+    var word = days ? 'day' : (timer.tier === 'hours' ? 'hour' : 'min');
+    var step = days ? 10 : 1;                       // tenths for days, whole otherwise
+    var span = Math.round(timer.scaleMin / per);
+    var elapsed = Math.min(Math.max(Math.round(elapsedMin / per * step), 0), span * step) / step;
+    var remaining = span - elapsed;
+    function show(n) { return Number(n.toFixed(1)) + ''; }
+    function unit(n) { return word === 'min' ? 'min' : word + (n === 1 ? '' : 's'); }
+    return {
+      elapsed: show(elapsed),
+      remaining: show(remaining),
+      elapsedUnit: unit(elapsed),
+      remainingUnit: unit(remaining)
+    };
   }
 
   function renderAppointment(now, todayKey) {
@@ -946,6 +987,13 @@
     $('apptChip').textContent = formatClock(when.getHours() * 60 + when.getMinutes());
     $('apptPie').setAttribute('d', wedgePath(1 - timer.progress));
     renderNotchPair('appt', timer.scaleMin, timer.forcedInterval);
+
+    var meter = tierMeter(timer);
+    $('apptBar').style.width = (timer.progress * 100).toFixed(1) + '%';
+    $('apptElapsed').textContent = meter.elapsed;
+    $('apptElapsedUnit').textContent = meter.elapsedUnit;
+    $('apptRemaining').textContent = meter.remaining;
+    $('apptRemainingUnit').textContent = meter.remainingUnit;
     $('apptBig').textContent = formatCompact(timer.remainingSec);
     $('apptSmall').textContent = (sameDay
       ? 'until ' + appointment.title
@@ -1729,7 +1777,12 @@
     var button = $('calendarAdd');
 
     if (!url) { calendarMessage('Paste your calendar address first.', true); return; }
-    if (!/^(https?:\/\/|webcal:\/\/)/i.test(url)) {
+    /* https:// only. A feed fetched over http:// sends the whole calendar,
+       and the feed URL itself -- which is a bearer secret -- in the clear on
+       every refresh, so Data safety could not honestly answer "encrypted in
+       transit: yes" while this accepted http. webcal:// still works: the
+       server rewrites it to https:// before its own check. */
+    if (!/^(https:\/\/|webcal:\/\/)/i.test(url)) {
       calendarMessage('That should start with https:// or webcal://', true);
       return;
     }

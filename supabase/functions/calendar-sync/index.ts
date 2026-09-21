@@ -54,7 +54,13 @@ function assertSafeUrl(raw: string): URL {
     throw new Error("That does not look like a valid URL.");
   }
 
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
+  /* https:// only, and the webcal:// rewrite above has already run, so a
+     webcal link still passes. Plain http was accepted until 21 Sep 2026,
+     which put the whole calendar and the feed URL -- a bearer secret -- on
+     the wire in clear text every refresh, and made "encrypted in transit:
+     yes" an answer Data safety could not stand behind. The message below
+     already named only the two schemes that work. */
+  if (url.protocol !== "https:") {
     throw new Error("Calendar links must start with https:// or webcal://");
   }
 

@@ -3,6 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  /* Pre-paint Play gate — the same block as terms.html, and fail-closed for
+     the same reason set out there. The full gate at the end of this file
+     stays the authority and still stamps outbound links. */
+  (function () {
+    var play = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || (location.hash || '').slice(1) === 'in-app';
+    var canTell = false;
+    try {
+      play = play || sessionStorage.getItem('countdown-timers/play-app') === '1';
+      canTell = true;
+    } catch (e) { /* storage blocked: nothing here can prove this is a browser */ }
+    if (play || !canTell) document.documentElement.classList.add('play-app');
+  }());
+</script>
 <title>Privacy Policy — Pie Timers</title>
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">

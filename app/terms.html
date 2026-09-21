@@ -3,6 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  /* Pre-paint Play gate. The full gate at the end of this file is still the
+     authority and still stamps outbound links; this only stops the offer
+     sentence and the Pricing link painting before it runs — they sit about
+     seventy lines above it.
+
+     This page FAILS CLOSED, unlike index.html: reached by a footer link the
+     referrer no longer names the Play app, so when storage cannot answer
+     either, hiding the offer is the cheap mistake and showing it inside the
+     Play app is the Payments-policy one. */
+  (function () {
+    var play = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || (location.hash || '').slice(1) === 'in-app';
+    var canTell = false;
+    try {
+      play = play || sessionStorage.getItem('countdown-timers/play-app') === '1';
+      canTell = true;
+    } catch (e) { /* storage blocked: nothing here can prove this is a browser */ }
+    if (play || !canTell) document.documentElement.classList.add('play-app');
+  }());
+</script>
 <title>Terms of Service — Pie Timers</title>
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -89,10 +110,16 @@
   after you signed up. During a launch or promotional period it may instead fall on
   a fixed date announced with that offer, the same date for everyone who subscribes
   within it. Either way, subscribing early never costs you free time you would
-  otherwise have had. The offer running now: subscribe before
+  otherwise have had. <span data-hide-in-play>The offer running now: subscribe before
   <strong>1 November 2026</strong> and your first payment is taken on
-  <strong>1 December 2026</strong>.</p>
-  <p>Checkout may show an earlier first-payment date than the one you are actually
+  <strong>1 December 2026</strong>.</span></p>
+  <!-- Both of these are hidden in the Play app. Google's Payments policy
+       covers "messaging" and "calls to action", not only buttons, and a dated
+       invitation to subscribe is messaging. The paragraph below is about
+       Paddle checkout, which no Play customer can reach. The rule that keeps
+       the rest of this section visible is that a Play reader still needs the
+       terms they agreed to — including refunds — so only the selling goes. -->
+  <p data-hide-in-play>Checkout may show an earlier first-payment date than the one you are actually
   charged on. We move that date back, in your favour, shortly after you subscribe. If
   the date shown in your Paddle account ever looks wrong, write to us before paying
   anything and we will sort the difference out.</p>

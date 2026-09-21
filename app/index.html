@@ -3,6 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  /* Pre-paint Play gate. app.js is still the authority; this only stops the
+     footer Pricing and Refund links painting for a frame before it loads.
+
+     POSITIVE SIGNALS ONLY. This page must fail OPEN: an ordinary web visit
+     keeps its prices, so "cannot tell" does nothing here. The legal pages
+     make the opposite choice for the opposite reason, and say so there.
+
+     It writes nothing and changes no URL — app.js owns sessionStorage and
+     the history.replaceState that strips the marker. */
+  (function () {
+    try {
+      var play = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+        || (location.hash || '').slice(1) === 'in-app';
+      if (!play) {
+        try { play = sessionStorage.getItem('countdown-timers/play-app') === '1'; } catch (e) { /* blocked */ }
+      }
+      if (play) document.documentElement.classList.add('play-app');
+    } catch (e) { /* never hold up the boot for this */ }
+  }());
+</script>
 <title>Pie Timers</title>
 <meta name="description" content="Watch your day as a pie. Some days you eat the pie. Some days the pie eats you.">
 <meta name="theme-color" content="#1C1024">
@@ -241,6 +262,17 @@
           <div class="dial-readout">
             <div class="dial-big" id="apptBig">—</div>
             <div class="dial-small" id="apptSmall">&nbsp;</div>
+          </div>
+
+          <!-- Same meter as the two day timers, but its unit follows the pie's
+               own scale: days while the pie is days, hours inside the last 24,
+               minutes inside the last one. The unit spans are set from JS. -->
+          <div class="meter">
+            <div class="meter-bar"><span id="apptBar" style="width:0%"></span></div>
+            <div class="meter-legend">
+              <span><i class="dot dot-elapsed"></i>Elapsed <b id="apptElapsed">0</b> <span id="apptElapsedUnit">min</span></span>
+              <span><i class="dot dot-remaining"></i>Remaining <b id="apptRemaining">0</b> <span id="apptRemainingUnit">min</span></span>
+            </div>
           </div>
 
           <p class="status" id="apptStatus">&nbsp;</p>
