@@ -188,6 +188,16 @@ html{ -webkit-text-size-adjust:100%; }
 
 *,*::before,*::after{ box-sizing:border-box; }
 
+/* The browser's own [hidden] rule is a bare attribute selector, so ANY
+   class rule setting display beats it. `.known{display:grid}` and
+   `.timeline{display:flex}` both did, which made `el.hidden = true` a
+   no-op: with a run sheet loaded, the timeline and the "no running order
+   has been published" card rendered one above the other, the page
+   contradicting itself in public. Found by review, not by the test - the
+   test had asked whether `.hidden` was true, which it was, rather than
+   whether the thing was on screen. Ask for the pixels. */
+[hidden]{ display:none !important; }
+
 body{
   margin:0;
   font-family:var(--font);
@@ -279,7 +289,10 @@ button,select{ font:inherit; }
 }
 .bar input[type=range]{ flex:1; min-width:140px; accent-color:var(--orange); }
 .bar output{ font-variant-numeric:tabular-nums; font-weight:700; min-width:8ch; text-align:right; }
-:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; }
+/* --orange-text, not --orange. #FF8A00 on a white card is 2.36:1, under
+   the 3:1 floor a focus indicator has to clear; the deep amber is 7:1 in
+   light and the pale amber is well clear in dark. */
+:focus-visible{ outline:2px solid var(--orange-text); outline-offset:2px; }
 
 /* A real clock cannot be scrubbed, paused or sped up, so in live mode the
    controls that pretend otherwise are not rendered. The view toggle stays,
@@ -339,7 +352,10 @@ button,select{ font:inherit; }
 .meter-bar{
   height:9px; border-radius:999px; overflow:hidden; margin-bottom:9px;
   background:var(--accent-fill);              /* what is left */
-  border:1px solid var(--pie-edge); border-color:rgba(0,0,0,.18);
+  /* A real border, not a wash of black: at rgba(0,0,0,.18) the bar had no
+     edge that reached 3:1 against the card in the light theme, and it is
+     the one new graphic on the page. */
+  border:1px solid var(--field-border);
 }
 .meter-bar span{
   display:block; height:100%; border-radius:999px 0 0 999px;
@@ -405,8 +421,10 @@ button,select{ font:inherit; }
   background:var(--amber-tint); border:1px solid var(--amber-line);
   color:var(--orange-text); font-size:.85rem; font-weight:600;
 }
-.known .none b{ display:block; }
-.known .none span{ font-weight:600; opacity:.85; }
+.known .none b{ display:block; font-weight:700; }
+/* Weight carries the hierarchy, not opacity. opacity:.85 took this
+   paragraph to 4.42:1 in the light theme - under AA - for no gain. */
+.known .none span{ font-weight:600; }
 
 /* ───────────────────── Venue display mode ───────────────────── */
 
@@ -557,13 +575,24 @@ button,select{ font:inherit; }
           <dt>Where</dt><dd>Woodville Town Hall, 74–76 Woodville Road, Woodville SA 5011</dd>
           <dt>Cost</dt><dd>Free</dd>
           <dt>Getting in</dt><dd>Drop in any time — it runs as one open four-hour block</dd>
-          <dt>Run with</dt><dd>The City of Charles Sturt</dd>
+          <!-- "Listed by", not "Run with". The council publishes the
+               listing, which is where every fact on this card comes from.
+               Crediting them as the organiser while the actual organiser
+               is named nowhere - she has agreed to nothing and naming her
+               on an unofficial page would imply she had - got the
+               attribution wrong in both directions at once. -->
+          <dt>Listed by</dt><dd>The City of Charles Sturt</dd>
         </dl>
         <p class="none">
           <b>No running order has been published.</b>
-          <span>So this page does not show one. The pie above times the whole
-          four hours. If a programme is published, every item appears here with
-          its own pie and the whole-day pie stays exactly where it is.</span>
+          <!-- Not "the pie above times the whole four hours": in the foyer
+               view the pie is beside this card rather than above it, and
+               before 10am it is counting down to the doors rather than
+               timing the expo. A sentence true in one view at one time of
+               day is a sentence to rewrite, not to caveat. -->
+          <span>So this page does not show one, and the pie follows the day as
+          a whole instead. If a programme is published, every item appears here
+          with its own times and the whole-day pie stays exactly where it is.</span>
         </p>
       </div>
     </section>
@@ -575,10 +604,17 @@ button,select{ font:inherit; }
       a glance without anyone reading a number. This page is the Neurodivergent
       Entrepreneurs Expo — Tuesday 29 September 2026, 10am to 2pm at Woodville
       Town Hall — running as one four-hour pie, with the time already spent and
-      the time still to come shown together underneath it. The clock is
+      the time still to come shown together underneath it.
+      <!-- This clause is the only sentence on the page that describes the
+           clock, so it has to change when the clock does. Left static it
+           told a ?live=1 reader the time was simulated and to press a
+           Pause button that live mode does not render — the page
+           contradicting itself three inches below the strip that had just
+           said "Live". announce() rewrites it. -->
+      <span id="footClock">The clock is
       simulated so the day can be watched now rather than on the day itself:
       press <strong>Pause</strong> and drag the slider to land anywhere between
-      the doors opening and the close.</p>
+      the doors opening and the close.</span></p>
 
     <p>The two views are the same data. <strong>A visitor's phone</strong> is what
       someone at the expo follows. <strong>The foyer screen</strong> is what a
@@ -606,9 +642,17 @@ button,select{ font:inherit; }
         launched.</p>
     </div>
 
+    <!-- The earlier demos end this line with "closing the tab leaves no trace
+         of your having opened it". That is a claim about the browser, not
+         about this page, and it is not one this page can make: anyone who has
+         opened the Pie Timers app on this domain has its service worker
+         registered at the site root, and it caches the response to any
+         navigation here. This page still stores nothing itself, which is what
+         the rest of the sentence says and what it can stand behind. -->
     <p class="promise">Pie Timers from AibhlínnAI · No ads. No tracking. No selling
       your data. Ever. This page sets no cookie, stores nothing and sends nothing
-      anywhere — closing the tab leaves no trace of your having opened it.</p>
+      anywhere: every number on it is worked out in your own browser from the
+      two times printed above.</p>
   </section>
 
 </div>
@@ -698,6 +742,13 @@ button,select{ font:inherit; }
   var CX = 80, CY = 80, R = 70, MIN = 60000;
   var $ = function (id) { return document.getElementById(id); };
 
+  /* Write only on change. The now-card is an aria-live region and paint()
+     runs five times a second; assigning textContent replaces the text
+     node whether or not the string differs, so a screen reader was being
+     handed the whole card five times a second and the polite queue could
+     never drain. Most of those writes are the same string. */
+  function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
+
   /* Resolve each finish from the next item, the way a printed programme
      reads. A no-op while `items` is empty, and correct the moment it is
      not. A kind that is not in the map falls back rather than throwing —
@@ -717,7 +768,11 @@ button,select{ font:inherit; }
   /* ─────────────────────────── The clock ─────────────────────────── */
 
   /* Four ways the page can be driven, and every one of them says which on
-     screen. `at` beats `live` beats `demo`, most specific first. */
+     screen. `at` beats `live` beats `demo`, most specific first — and the
+     code below has to enforce that rather than just claim it. The first
+     draft applied `at` and then let `live` overwrite the anchor on every
+     tick, so the documented order was exactly backwards and `?at=11:30&
+     live=1` silently ignored the instant it was asked for. */
   var mode = (function () {
     var q;
     try { q = new URLSearchParams(location.search); } catch (e) { q = null; }
@@ -731,10 +786,12 @@ button,select{ font:inherit; }
         if (h >= 0 && h <= 23) at = h * 60 + mm;
       }
     }
+    var frozen = at !== null;
+    var live = !frozen && get('live') === '1';
     return {
       at: at,
-      live: get('live') === '1',
-      fast: get('demo') === '1',
+      live: live,
+      fast: !frozen && !live && get('demo') === '1',
       venue: get('display') === '1' || get('view') === 'venue'
     };
   }());
@@ -760,7 +817,29 @@ button,select{ font:inherit; }
   }
   if (mode.live) demo.running = false;   // nothing to run; the world runs it
 
-  function liveAnchor() { return Date.now() + PRESET.utcOffsetMinutes * MIN; }
+  /* ── The live clock needs a real time zone, not the event's constant ──
+     PRESET.utcOffsetMinutes is 570 because THIS event is on 29 September,
+     which is clear of the boundary. Using it for `?live=1` made the page
+     claim to be showing "the real Adelaide clock" while being an hour out
+     for every date from 4 October onward — a page asserting the one thing
+     it had got wrong. South Australia is +10:30 from 02:00 on the first
+     Sunday in October to 03:00 on the first Sunday in April, and +09:30
+     the rest of the year. Both changeovers land on the same UTC instant,
+     16:30 the day before, which is why the two lines below look alike. */
+  function firstSunday(year, monthIndex) {
+    var first = Date.UTC(year, monthIndex, 1);
+    return first + ((7 - new Date(first).getUTCDay()) % 7) * 1440 * MIN;
+  }
+  function saOffsetAt(utcMs) {
+    var y = new Date(utcMs).getUTCFullYear();
+    var dstStarts = firstSunday(y, 9) + 2 * 60 * MIN - 570 * MIN;   // 02:00 ACST
+    var dstEnds   = firstSunday(y, 3) + 3 * 60 * MIN - 630 * MIN;   // 03:00 ACDT
+    return (utcMs >= dstStarts || utcMs < dstEnds) ? 630 : 570;
+  }
+  /* The offset actually in force right now, which is the event's own on
+     the day and may not be on any other day. */
+  function liveOffset() { return saOffsetAt(Date.now()); }
+  function liveAnchor() { return Date.now() + liveOffset() * MIN; }
   if (mode.live) demo.anchor = liveAnchor();
 
   function now() { return new Date(demo.anchor); }
@@ -889,18 +968,32 @@ button,select{ font:inherit; }
     else if (demo.running) demo.anchor += (real - demo.last) * demo.scale;
     demo.last = real;
 
+    /* Left running, the clock would slide past the close, then past
+       midnight, onto a date the programme knows nothing about — a demo
+       somebody left open on a desk would be sitting on "Already over"
+       inside two minutes. Loop it back to the run-up instead. */
+    if (demo.running && !mode.live) {
+      var d0 = PRESET.days[0];
+      if (demo.anchor > instant(d0.date, d0.end + 20)) {
+        demo.anchor = instant(d0.date, d0.start - 30);
+      }
+    }
+
     var n = now(), today = dateOf(n), mins = minutesOf(n);
     var day = pickDay(today), state = locate(day, today, mins);
 
-    $('clockTime').textContent = clock(mins);
-    $('clockDate').textContent = n.toLocaleDateString('en-AU',
-      { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-    $('clockZone').textContent = PRESET.timeZone + ' · ' + zoneLabel(PRESET.utcOffsetMinutes);
-    $('scrubOut').textContent = clock(mins);
+    setText($('clockTime'), clock(mins));
+    setText($('clockDate'), n.toLocaleDateString('en-AU',
+      { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }));
+    setText($('clockZone'), PRESET.timeZone + ' · ' +
+      zoneLabel(mode.live ? liveOffset() : PRESET.utcOffsetMinutes));
+    setText($('scrubOut'), clock(mins));
 
-    if (demo.running && !mode.live) {
+    if (!mode.live) {
       var s = $('scrub'), v = Math.round(mins);
-      if (v >= +s.min && v <= +s.max) s.value = String(v);
+      /* Spoken as a time, not as "690". */
+      s.setAttribute('aria-valuetext', clock(mins));
+      if (demo.running && v >= +s.min && v <= +s.max) s.value = String(v);
     }
 
     paintNow(day, today, mins, state);
@@ -918,12 +1011,16 @@ button,select{ font:inherit; }
     }
     function set(cls, kicker, title, window_, left, then) {
       card.className = 'now' + (cls ? ' ' + cls : '');
-      $('kicker').textContent = kicker;
-      $('title').textContent = title;
-      $('window').textContent = window_;
-      $('left').textContent = left;
-      $('then').textContent = then;
+      setText($('kicker'), kicker);
+      setText($('title'), title);
+      setText($('window'), window_);
+      setText($('left'), left);
+      setText($('then'), then);
     }
+    /* The dial's accessible name has to follow what the dial is counting.
+       Fixed at "how much of the expo is left" it was wrong for the whole
+       hour before the doors, when the wedge is a countdown to the start. */
+    function dialSays(s) { setText($('dialLabel'), s); }
     /* Elapsed and remaining come from ONE rounded number so they always
        sum to the scale: remaining is rounded up in the reader's favour,
        and spent is whatever is left over. The bar is drawn from the same
@@ -945,6 +1042,7 @@ button,select{ font:inherit; }
       meter(false);
       set('idle', dayWord(day), PRESET.name, where, '',
         day.date > today ? 'Still to come.' : 'Already over.');
+      dialSays('The expo is not running today');
       setPie(null, 0);
       return;
     }
@@ -963,6 +1061,7 @@ button,select{ font:inherit; }
         where + ' · ' + PRESET.venue.split(',')[0],
         'Doors open in ' + words(until),
         'Free, and you can arrive whenever suits.');
+      dialSays('How long until the doors open');
       setPie(DAY_KIND, clamp(until / runUp), runUp);
       return;
     }
@@ -974,8 +1073,9 @@ button,select{ font:inherit; }
       var urgent = leftMin <= 10;
       accent(urgent ? URGENT_KIND : DAY_KIND);
       set(urgent ? 'urgent' : '', 'On now · ' + DAY_KIND.word,
-        'The expo is open', where, words(leftMin) + ' left', running(day, state, mins));
+        'The expo is open', where, words(leftMin) + ' left', running(day, state));
       meter(true, spentMin, total);
+      dialSays('How much of the expo is left');
       setPie(urgent ? URGENT_KIND : DAY_KIND, clamp((day.end - mins) / total), total);
       return;
     }
@@ -985,13 +1085,14 @@ button,select{ font:inherit; }
     set('done', dayWord(day), 'That is the expo.',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '',
       'Four hours of neurodivergent-led business. Safe travels.');
+    dialSays('The expo has finished');
     setPie(null, 0);
   }
 
   /* The line under the meter. With no programme it says the one thing a
      visitor needs; with a programme it says what is on and what is next,
      without ever taking the hero away from the whole-day pie. */
-  function running(day, state, mins) {
+  function running(day, state) {
     var bits = [];
     if (state.cur >= 0) {
       var it = day.items[state.cur];
@@ -1003,11 +1104,6 @@ button,select{ font:inherit; }
     }
     if (bits.length) return bits.join(' ');
     return 'Free, drop in any time. The doors close at ' + clock(day.end) + '.';
-  }
-
-  /* Whose session it is, falling back to what kind of thing it is. */
-  function who(it) {
-    return it && it.speaker ? it.speaker : KINDS[it.kind].word;
   }
 
   /* The list and the "what is known" card are alternatives, not layers:
@@ -1095,10 +1191,15 @@ button,select{ font:inherit; }
      can be opened, or somebody screenshots it and believes it. ── */
   function announce() {
     var unofficial = ' Nothing here is an official programme.';
-    var n = $('note');
+    var n = $('note'), f = $('footClock');
     if (mode.live) {
       n.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
-        ' clock, ' + zoneLabel(PRESET.utcOffsetMinutes) + '.' + unofficial;
+        ' clock, ' + zoneLabel(liveOffset()) + '.' + unofficial;
+      /* The footer describes the clock too, so it has to move with it. */
+      f.textContent = 'This page is running on the real Adelaide clock, so it ' +
+        'shows the expo as it actually stands. The preview controls are not ' +
+        'shown while it is live, because a real clock cannot be paused or ' +
+        'dragged.';
       return;
     }
     if (mode.at !== null) {
@@ -1106,6 +1207,9 @@ button,select{ font:inherit; }
         new Date(DAY0).toLocaleDateString('en-AU',
           { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) +
         '. This is not the real time.' + unofficial;
+      f.textContent = 'The clock is frozen at ' + clock(mode.at) + ' so this ' +
+        'moment of the day can be looked at. Press Play, or drag the slider, ' +
+        'to move anywhere between the doors opening and the close.';
       return;
     }
     if (mode.fast) {
