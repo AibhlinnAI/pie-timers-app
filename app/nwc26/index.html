@@ -454,9 +454,16 @@ body.venue .days{ display:none; }
       on screen. The two socials are appointments rather than sessions — a start
       time and then the evening.</p>
 
+    <!-- This line used to end "closing the tab leaves no trace of your having
+         opened it". That is a claim about the browser, not about this page, and
+         it is not one this page can make: anyone who has opened the Pie Timers
+         app on this domain has its service worker registered at the site root,
+         and app/sw.js caches the response to any navigation here. What this
+         page itself stores is still nothing, which is what the rest of the
+         sentence says and what it can stand behind. -->
     <p class="promise">Pie Timers from AibhlínnAI · No ads. No tracking. No selling
       your data. Ever. This page sets no cookie, stores nothing and sends nothing
-      anywhere — closing the tab leaves no trace of your having opened it.</p>
+      anywhere: every countdown on it is worked out in your own browser.</p>
   </section>
 
 </div>
