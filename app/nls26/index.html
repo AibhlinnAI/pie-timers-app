@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neurodiversity Leadership Summit 2026 — Pie Timers</title>
-<meta name="description" content="The two conference days of the Neurodiversity Leadership Summit 2026, 11 and 12 November at Crowne Plaza Sydney Darling Harbour, with every session timed. An unofficial demonstration of Pie Timers, on a simulated clock.">
+<meta name="description" content="The two conference days of the Neurodiversity Leadership Summit 2026, 11 and 12 November at Crowne Plaza Sydney Darling Harbour, as a running pie. An unofficial demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -286,6 +286,10 @@ button,select{ font:inherit; }
   font-weight:600; cursor:pointer;
 }
 .seg button[aria-pressed="true"]{ background:var(--forest); color:var(--btn-fg); }
+/* The pill clips its children, and both buttons sit flush against an
+   edge, so a focus ring drawn OUTSIDE the button is cut away to nothing.
+   Draw it inside. */
+.seg :focus-visible{ outline-offset:-2px; }
 .btn{
   padding:7px 14px; border-radius:var(--radius-sm);
   border:1px solid var(--field-border); background:var(--card);
@@ -608,7 +612,7 @@ button,select{ font:inherit; }
         programme or invent a time to reconcile them, this page prints all three
         items as published and runs no countdown across them. Everything from
         12:00pm onward times normally.</li>
-      <li>Times are Sydney time, <strong>UTC+11</strong>. New South Wales daylight
+      <li>Times are Sydney time, <strong id="footZone">UTC+11:00</strong>. New South Wales daylight
         saving starts on the first Sunday in October — the 4th in 2026 — so both
         conference days fall inside it.</li>
       <li>This page covers the <strong>two conference days only</strong>. The
@@ -843,11 +847,16 @@ button,select{ font:inherit; }
       while (i < day.items.length && day.items[i].unclear) { members.push(day.items[i]); i++; }
       var starts = members.map(function (m) { return m.time; });
       var after = day.items[i];
+      var earliest = members.reduce(function (a, b) { return b.time < a.time ? b : a; });
       flow.push({
         unclear: true, kind: 'session', members: members,
         firstIndex: first, lastIndex: i - 1,
         time: Math.min.apply(null, starts),
         end: after ? after.time : day.end,
+        /* Named after whoever the block actually opens with, so the
+           previous card's "Then 9:30am · ..." says something useful
+           rather than the bare word "Session". */
+        speaker: earliest.speaker || null,
         title: 'Morning sessions'
       });
     }
@@ -1120,7 +1129,7 @@ button,select{ font:inherit; }
     paintNow(day, today, mins, state);
 
     var key = day.date + '|' + state.phase + '|' + state.index + '|' + Math.floor(mins);
-    if (force || key !== lastKey) { lastKey = key; buildList(day, today, mins); }
+    if (force || key !== lastKey) { lastKey = key; buildList(day, today, mins, state); }
   }
 
   /* Whose session it is, falling back to what kind of thing it is. A
@@ -1163,10 +1172,17 @@ button,select{ font:inherit; }
     }
 
     if (state.phase === 'other') {
+      /* "runs to 4:40pm" was a finish this programme does not publish —
+         4:40pm is where the networking drinks START. Say what is actually
+         known: when the day opens, how many items, and that the last one
+         is open-ended. */
+      var last = day.items[day.items.length - 1];
       accent(null); flag('');
       set('idle', dayWord(day), day.items[0].title,
         'Starts ' + clock(day.items[0].time) + ' · ' + day.items.length +
-        (day.items.length === 1 ? ' item' : ' items') + ' · runs to ' + clock(day.end),
+        (day.items.length === 1 ? ' item' : ' items') + ' · ' +
+        (last.open ? 'last item ' + clock(last.time) + ' onwards'
+                   : 'runs to ' + clock(day.end)),
         '', day.date > today ? 'Still to come.' : 'Already over.');
       dialSays('This day is not running today');
       setPie(null, 0);
@@ -1174,11 +1190,22 @@ button,select{ font:inherit; }
     }
 
     if (state.phase === 'before') {
+      /* The run-up counts down to the DAY, not to its first item. It used
+         to put the title "Welcome to Country" over a draining pie and
+         "10 minutes until it starts" — a countdown hung on the one item
+         the brief says must carry no timer pressure, and the exact state
+         the day tabs land you on. The countdown is still useful, so it
+         stays; what it is pointed at is the day opening. */
       var until = state.next.time - mins, runUp = Math.min(60, state.next.time);
       accent(KINDS[state.next.kind]); flag('');
-      set('', 'Starting soon', state.next.title,
-        clock(state.next.time) + ' · ' + who(state.next),
-        words(until) + ' until it starts', 'Doors are the venue’s, not ours to publish.');
+      /* Non-breaking space before the day number: `text-wrap:balance` on
+         the h2 broke "Conference Day 1 starts at 9am" after "Day" at
+         foyer size, orphaning the "1" onto a line of its own at 36px. */
+      set('', 'Starting soon',
+        day.label.replace(/ (\d+)$/, ' $1') + ' starts at ' + clock(state.next.time),
+        PRESET.venue.split(',')[0],
+        'Starts in ' + words(until),
+        'First up: ' + state.next.title + '.');
       dialSays('How long until the day starts');
       setPie(KINDS[state.next.kind], clamp(until / runUp), runUp);
       return;
@@ -1216,9 +1243,9 @@ button,select{ font:inherit; }
       flag('');
 
       if (it.moment) {
-        set('', 'On now · ' + who(it), it.title, clock(it.time), '', then);
+        set('untimed', 'On now · ' + who(it), it.title, clock(it.time), '', then);
         dialSays('A moment in the programme, not a block');
-        setPie(KINDS[it.kind], 0);
+        setPie(null, 0);
       } else if (it.period) {
         /* A Welcome to Country. It has a finish, so the range is real,
            but there is nothing here anybody should be counting down.
@@ -1283,11 +1310,23 @@ button,select{ font:inherit; }
   /* The list renders `day.items` in PUBLISHED order — the promise this
      page makes — and decides what is on now by time rather than by index,
      so it never has to agree with `flow` about a number. */
-  function buildList(day, today, mins) {
+  function buildList(day, today, mins, state) {
     setText($('listhead'), dayWord(day));
     var list = $('timeline');
     list.textContent = '';
     var live = day.date === today;
+
+    /* The "· next" badge is taken from the SAME flow entry the card's
+       "Then ..." line uses, so the two can never disagree. Working it out
+       independently — the earliest row with a later start — badged the
+       12:00pm session from 9:10am onwards, because it skipped the whole
+       unclear run, while the card said "Then 9:30am". When the next flow
+       entry is the unclear block, the badge goes on its earliest member. */
+    var nextRow = null;
+    if (live && state && state.next) {
+      nextRow = state.next.unclear ? state.next.members.reduce(
+        function (a, b) { return b.time < a.time ? b : a; }) : state.next;
+    }
 
     /* The single window the unclear run occupies, so all three of its
        rows light up together rather than one at a time on times that do
@@ -1304,11 +1343,25 @@ button,select{ font:inherit; }
         if (it.unclear && block) {
           if (mins >= block.time && mins < block.end) li.classList.add('on');
           else if (mins >= block.end) li.classList.add('past');
+          /* The block's earliest member still takes the "next" badge
+             before the block opens — otherwise the card says "Then
+             9:30am · Tia Squire" from 9:10 and nothing in the list is
+             marked at all. */
+          else if (it === nextRow) li.classList.add('next');
         } else {
-          var end = it.moment ? it.time + 1 : (it.end === null ? day.end : it.end);
+          /* An item with no published finish runs until the date changes.
+             Substituting `day.end` here was wrong precisely when an open
+             item STARTS at day.end — which is Day 1's networking drinks,
+             time 1000 and day.end 1000. `mins < end` was unsatisfiable, so
+             from 4:40pm the row went straight to `past` at 45% opacity
+             while the card beside it said "On now · 4:40pm onwards". The
+             page contradicted itself for the rest of the evening, on the
+             one row the footnote singles out as the honest special case.
+             Found by review; five separate lenses landed on this line. */
+          var end = it.moment ? it.time + 1 : (it.end === null ? 1440 : it.end);
           if (mins >= it.time && mins < end) li.classList.add('on');
           else if (mins >= end) li.classList.add('past');
-          else if (isNext(day, mins, it)) li.classList.add('next');
+          else if (it === nextRow) li.classList.add('next');
         }
       }
       if (it.unclear) li.classList.add('unsure');
@@ -1332,18 +1385,6 @@ button,select{ font:inherit; }
         '</span></span>';
       list.appendChild(li);
     });
-  }
-
-  /* The next thing to start, by the clock, skipping anything inside the
-     unclear run — nothing in there is a countdown target. */
-  function isNext(day, mins, it) {
-    var best = null;
-    day.items.forEach(function (o) {
-      if (o.unclear) return;
-      if (o.time <= mins) return;
-      if (!best || o.time < best.time) best = o;
-    });
-    return best === it;
   }
 
   /* ─────────────────────────── Controls ─────────────────────────── */
@@ -1447,6 +1488,12 @@ button,select{ font:inherit; }
   /* ─────────────────────────── Start ─────────────────────────── */
 
   scrubRange();
+
+  /* Printed from the number, like the header, so the footnote and the
+     header cannot drift apart. This one states the offset in force on the
+     conference days themselves, which is the event's own constant rather
+     than whatever is in force the day somebody opens the page. */
+  setText($('footZone'), zoneLabel(PRESET.utcOffsetMinutes));
 
   if (mode.live) {
     document.documentElement.classList.add('live');
