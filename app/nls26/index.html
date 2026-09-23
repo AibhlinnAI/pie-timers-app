@@ -455,6 +455,31 @@ button,select{ font:inherit; }
 .venue .item .name{ font-size:clamp(.95rem,1.25vw,1.1rem); }
 .venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 
+/* ── The foyer list scrolls itself ──
+   Thirteen rows do not fit a venue screen, and from about 3pm the row
+   that is ON NOW is the ninth or later — below the fold, on a screen
+   nobody is standing at. So on the foyer screen the LIST gets its own
+   scroll box and follows the live row; see the tail of buildList().
+
+   Deliberately `max-height` on the list alone rather than `height:100vh`
+   on the whole page. Constraining the page would put the footer — which
+   carries the "this is an unofficial page" disclaimer — out of reach on
+   the one view most likely to be photographed. The page still scrolls;
+   only the list has an inner box.
+
+   The 62vh here is only a pre-script fallback. sizeList() replaces it
+   with the room actually left below the list's own top edge — see the
+   comment there for why a fixed fraction was wrong. */
+.venue .timeline{
+  max-height:62vh;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  /* Room for the .on row's box-shadow, which the scroll box would
+     otherwise shave off at the left and right edges. */
+  padding-inline:3px;
+  margin-inline:-3px;
+}
+
 /* ───────────────────────── Footnotes ───────────────────────── */
 
 /* Full width like every other card, so the page keeps one left and right
@@ -1385,6 +1410,69 @@ button,select{ font:inherit; }
         '</span></span>';
       list.appendChild(li);
     });
+
+    follow(list);
+  }
+
+  /* ── Keep the live row in view, on the foyer screen only ──
+     A venue display is unattended: there is nobody there to scroll it, so
+     from mid-afternoon the row that is on now sat below the fold while the
+     screen showed the morning. The delegate view is deliberately NOT
+     touched — moving the page under someone who is reading it is worse
+     than making them scroll, and worse again for the audience this event
+     is about.
+
+     The box's own scrollTop is set rather than scrollIntoView(), because
+     scrollIntoView walks every scrollable ancestor and would drag the
+     whole page — taking the now-panel, which IS the foyer screen, off the
+     top. Instant, not smooth: this re-runs on every minute change and a
+     glide each time would be movement for its own sake. */
+  /* ── How tall the foyer list may be ──
+     A fixed fraction of the viewport is the obvious thing and it is
+     wrong: the list does not start at the top of the screen. Anchored at
+     62vh from its OWN top — which is already a few hundred pixels down,
+     under the header, the preview strip and the controls — the bottom
+     third of the scroll box sat below the fold. A row centred in that box
+     was centred off the screen, so the last rows of the day were still
+     unreachable and the box had eaten two visible rows for nothing.
+     Measure the room that is actually left instead. */
+  function sizeList(list) {
+    if (!document.documentElement.classList.contains('venue')) {
+      list.style.maxHeight = '';
+      return;
+    }
+    var top = Math.max(0, list.getBoundingClientRect().top);
+    list.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 14)) + 'px';
+  }
+
+  function follow(list) {
+    sizeList(list);
+    if (!document.documentElement.classList.contains('venue')) return;
+    var on = list.querySelectorAll('.item.on');
+    var target = on.length ? on : list.querySelectorAll('.item.next');
+    if (!target.length) { list.scrollTop = 0; return; }
+
+    /* Two passes, and the second one is not belt-and-braces. sizeList()
+       has just changed the box's own height, so a delta measured in the
+       same tick lands about thirty pixels short — which is invisible in
+       the middle of the day and is exactly the gap that left the LAST
+       row of thirteen hanging below the fold, because there the scroll
+       needed to reach its maximum and stopped just under it. Re-measuring
+       and applying again converges. The browser clamps the final value,
+       so the last row settles flush at the bottom rather than centred,
+       which is the best any list can do for its own last row.
+
+       The unclear block is three rows at once, so the whole run is
+       centred rather than its first row. */
+    for (var pass = 0; pass < 2; pass++) {
+      var first = target[0].getBoundingClientRect();
+      var last = target[target.length - 1].getBoundingClientRect();
+      var box = list.getBoundingClientRect();
+      var span = last.bottom - first.top;
+      var delta = (first.top - box.top) - (box.height - span) / 2;
+      if (Math.abs(delta) < 1) break;
+      list.scrollTop += delta;
+    }
   }
 
   /* ─────────────────────────── Controls ─────────────────────────── */
@@ -1449,6 +1537,12 @@ button,select{ font:inherit; }
   $('viewVenue').addEventListener('click', function () { setView(true); });
   $('viewDelegate').addEventListener('click', function () { setView(false); });
 
+  /* A venue screen gets rotated, re-resolutioned and plugged into a
+     different projector, and the list's height is measured from the
+     viewport — so it has to be measured again when the viewport moves.
+     paint(true) forces a rebuild, which re-runs sizeList and follow. */
+  window.addEventListener('resize', function () { paint(true); });
+
   /* ── Say which clock this is, in words, above the fold. A page whose
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
@@ -1509,6 +1603,22 @@ button,select{ font:inherit; }
 
   announce();
   paint(true);
+
+  /* ── Lay out again once the typeface has actually arrived ──
+     Instrument Sans is `font-display:swap`, so the first layout happens
+     in the fallback face and the rows are about thirty pixels shorter in
+     total than they end up. Nothing re-ran after the swap: buildList only
+     rebuilds when the minute changes, and on a frozen `?at=` preview the
+     minute never changes. The visible consequence was the foyer list
+     scrolling to a position computed against a shorter list — close
+     enough to look right in the middle of the day, and thirty-one pixels
+     short of the bottom, which is exactly what left the LAST row of
+     thirteen hanging below the fold all evening.
+     Guarded, because `document.fonts` is not everywhere. */
+  if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+    document.fonts.ready.then(function () { paint(true); });
+  }
+
   setInterval(paint, 200);
 }());
 </script>
