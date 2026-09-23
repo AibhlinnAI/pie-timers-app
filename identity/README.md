@@ -11,10 +11,11 @@ depend on this folder and nothing inside `app/`.
 | --- | --- | --- |
 | `identity.js` | Signing in, holding a session, signing out | Supabase Auth (GoTrue) only |
 | `entitlements.js` | Whether an account can do X in product Y | `identity.js` for a session |
-| `identity-ui.js` | A sign-in button + anchored panel | `identity.js` only |
+| `identity-ui.js` | A sign-in button + anchored panel | `identity.js`; uses `email-typos.js` if loaded |
 | `identity-ui.css` | How that button/panel look | Host app's own `--ink`/`--card`/`--line`/`--accent` variables |
+| `email-typos.js` | "Did you mean …@gmail.com?" for a mistyped address | Nothing |
 
-None of the four files hardcode `pie-timers`, `countdown`, or any other
+None of the five files hardcode `pie-timers`, `countdown`, or any other
 product name in executable logic — the string appears only in comments and
 doc examples, illustrating how a caller would use them. The one place that is
 allowed to exist as an actual value is a product's own bridge file — see
@@ -46,6 +47,11 @@ Aibhlinn.entitlements.refresh()         // force-refetch after a checkout/grant
 Aibhlinn.identityUI.mount({
   target, openLabel, openHref, productName, showSuiteContext
 })
+
+// email-typos.js -- load it before the first send and the panel asks
+// "did you mean …?" on its own. It only ever suggests; nothing is changed
+// without the person's tap. Cases: tools/check-email-typos.js.
+Aibhlinn.emailTypos.suggest(address)   // the corrected address, or null
 ```
 
 A product never imports Pie Timers' code to use any of the above — that is

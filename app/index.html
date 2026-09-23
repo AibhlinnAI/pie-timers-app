@@ -111,6 +111,16 @@
         </label>
         <button class="btn btn-primary" type="submit" id="testerSubmit">Join the list</button>
       </form>
+      <!-- Asked when the address looks like a slip of a common provider
+           (gmail.comj, hotmial.com). See emailTypoGate in app.js. -->
+      <div class="notice notice--info email-typo" id="testerEmailTypo" role="group"
+           aria-labelledby="testerEmailTypoText" tabindex="-1" hidden>
+        <p id="testerEmailTypoText">Did you mean <strong data-typo-address></strong>?</p>
+        <div class="email-typo-actions">
+          <button class="btn btn-primary" type="button" data-typo-use>Yes, use that</button>
+          <button class="btn btn-ghost" type="button" data-typo-keep>No, keep what I typed</button>
+        </div>
+      </div>
       <p class="status-line" id="testerStatus" role="status" aria-live="polite"></p>
       <button class="btn btn-ghost" id="testerDismiss" type="button">Not right now</button>
     </section>
@@ -738,6 +748,17 @@
         <button class="btn btn-primary" type="submit" id="magicSubmit">Email me a code</button>
       </form>
 
+      <!-- Same question as the tester invite's, before a code goes to an
+           address that cannot exist. See emailTypoGate in app.js. -->
+      <div class="notice notice--info email-typo" id="magicEmailTypo" role="group"
+           aria-labelledby="magicEmailTypoText" tabindex="-1" hidden>
+        <p id="magicEmailTypoText">Did you mean <strong data-typo-address></strong>?</p>
+        <div class="email-typo-actions">
+          <button class="btn btn-primary" type="button" data-typo-use>Yes, use that</button>
+          <button class="btn btn-ghost" type="button" data-typo-keep>No, keep what I typed</button>
+        </div>
+      </div>
+
       <!-- Cloudflare Turnstile renders here when a site key is configured.
            Invisible to nearly all real users. -->
       <div id="turnstileHost" class="turnstile-host" hidden></div>
@@ -993,6 +1014,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="identity/identity.js"></script>
+<script src="identity/email-typos.js"></script>
 <script src="identity/entitlements.js"></script>
 <script src="identity/identity-ui.js"></script>
 <script src="config.js"></script>
