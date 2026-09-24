@@ -20,6 +20,13 @@ doc examples, illustrating how a caller would use them. The one place that is
 allowed to exist as an actual value is a product's own bridge file — see
 `app/identity-bridge.js` for Pie Timers'.
 
+The four variables in the table are the main ones, not all of them.
+`identity-ui.css` also reads `--ink-muted`, `--urgent-text` and `--bg` (the
+page ground, which fills the panel's fields), and its header lists all seven.
+Its fallbacks are a dark palette, so a host with a light theme should define
+every one: an undefined `--bg` left Pie Timers' light theme with dark fields
+under dark text until the app defined it.
+
 ## Public interface
 
 ```js
