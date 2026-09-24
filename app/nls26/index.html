@@ -405,9 +405,23 @@ button,select{ font:inherit; }
 }
 
 .listhead{ margin:0 0 10px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-muted); }
-/* Set off from the live list above it, and quieter: it is reference, not
-   the thing anyone is waiting on. Carried from /ndexpo26 unchanged. */
-.listhead-done{ margin-top:18px; opacity:.75; }
+/* Set off from the live list above it: it is reference, not the thing
+   anyone is waiting on. Carried from /ndexpo26, MINUS its opacity:.75.
+
+   That .75 over this page's light background measures 3.17:1 on 9.4pt
+   bold text - under AA, which wants 4.5:1 below 14pt bold. Without it the
+   same words measure 5.24:1. The file already holds itself to exactly
+   this standard twenty lines up, where .flag records rejecting an
+   opacity:.85 at 4.4:1 "under AA, for no gain", so shipping 3.17 on the
+   one word this section is labelled with would have been the same mistake
+   with a worse number. The margin does the setting-off instead.
+
+   Dark keeps it: there the same token measures 4.95:1 at .75. */
+.listhead-done{ margin-top:18px; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .listhead-done{ opacity:.75; }
+}
+:root[data-theme="dark"] .listhead-done{ opacity:.75; }
 .venue .listhead-done{ margin-top:14px; }
 .timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
@@ -719,12 +733,26 @@ button,select{ font:inherit; }
       <h2 class="listhead" id="listhead">The day</h2>
       <!-- ONE scroll box around BOTH lists, not one around each.
            /ndexpo26 needs no box at all - six blocks fit its screen - so
-           it can simply put its Finished section after the list. Here the
-           box is sized to eat every pixel left below its own top, so
-           anything placed after it starts below the fold at every instant
-           of the day. Wrapping both is what makes the second list
-           reachable on the one view that cannot be scrolled by hand. -->
-      <div class="lists" id="lists">
+           it can simply put its Finished section after the list.
+
+           What wrapping buys is NOT visibility, and an earlier version of
+           this comment claimed it was. Measured against a build with the
+           finished section outside the box, the number of finished rows on
+           a 1920x1080 screen is identical at every instant: none until the
+           live list has shrunk enough, then 2 at 2:20pm, 4 at 3:30pm, all
+           of them by 4:40pm. What brings the section into view is the live
+           list getting shorter above it, not this div.
+
+           What wrapping buys is that the finished list does not become a
+           SECOND scroll container inside the venue layout, and that one
+           box measures and scrolls the whole programme rather than half of
+           it. That is worth having and it is all that is being claimed. -->
+      <!-- role and name because this div is FOCUSABLE: Chrome puts a
+           scroll container in the tab order, and on the foyer view it is
+           the last Tab stop on the page. Before the box moved here it was
+           the <ol>, which announced as a list of 13; an unnamed div
+           announces as nothing at all. -->
+      <div class="lists" id="lists" role="group" aria-labelledby="listhead">
         <ol class="timeline" id="timeline"></ol>
         <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
         <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
@@ -773,9 +801,9 @@ button,select{ font:inherit; }
         Close is a moment rather than a block.</li>
       <li><strong>Items are listed in the order the agenda prints them</strong>, and
         are never re-sorted into clock order. Once an item has finished it moves
-        to a <strong>Finished</strong> list below the one still running, so
-        whatever is on is always at the top of the screen; the published order
-        is kept inside each of the two lists. Nothing is reordered, renamed or
+        to a <strong>Finished</strong> list after the one still running, so
+        whatever is on is always the first row of the programme; the published
+        order is kept inside each of the two lists. Nothing is reordered, renamed or
         given a time it was not published with.</li>
       <li><strong>A row this page will not time shows a grey, empty plate</strong>
         rather than a pie — the Welcome to Country, the networking drinks and
