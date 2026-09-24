@@ -386,6 +386,10 @@ button,select{ font:inherit; }
 }
 
 .listhead{ margin:0 0 10px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-muted); }
+/* Set off from the live list above it, and quieter: it is reference, not
+   the thing anyone is waiting on. */
+.listhead-done{ margin-top:18px; opacity:.75; }
+.venue .listhead-done{ margin-top:14px; }
 .timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
   display:grid;
@@ -483,7 +487,12 @@ button,select{ font:inherit; }
    118-character session title, this one has a four-word one. The room can
    have the size back. Sized so nothing clips at 1920x1080 — which is
    checked, not hoped. */
-.venue .title{ font-size:clamp(1.6rem,3vw,2.6rem); }
+/* 2.3rem, not 2.6: the hero line now carries the event name AND its
+   status, and at 2.6 "Neurodivergent Entrepreneurs Expo is Open" took a
+   third line and pushed the on-now/next line 12px below a 1080 screen.
+   2.3 is the largest that clears it, with 48px to spare at the worst
+   instant. Measured at 9:30, 1pm and after the close. */
+.venue .title{ font-size:clamp(1.6rem,3vw,2.3rem); }
 .venue .left{ font-size:clamp(1.5rem,3vw,2.4rem); }
 .venue .window, .venue .then{ font-size:clamp(.95rem,1.4vw,1.2rem); }
 .venue .kicker{ font-size:clamp(.8rem,1.1vw,1rem); }
@@ -634,6 +643,14 @@ button,select{ font:inherit; }
     <section>
       <h2 class="listhead" id="listhead">The day</h2>
       <ol class="timeline" id="timeline" hidden></ol>
+
+      <!-- Finished blocks move down here as the day goes on, so whatever
+           is happening now is always at the top of the screen. On a foyer
+           display that matters more than it sounds: the live block stays
+           in the same place all day instead of walking down the screen and
+           eventually off it. -->
+      <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
+      <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
 
       <!-- Shown while the programme is empty, which today it is. If a run
            sheet arrives, the list above takes over and this hides itself;
@@ -1118,7 +1135,11 @@ button,select{ font:inherit; }
 
     paintNow(day, today, mins, state);
 
-    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next;
+    /* The finished count is in the key because it is what decides which
+       list a row sits in, and a row moving between lists is a rebuild. */
+    var fin = 0;
+    for (var fi = 0; fi < day.items.length; fi++) if (isFinished(day, day.items[fi], mins)) fin++;
+    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next + '|' + fin;
     if (force || key !== lastKey) { lastKey = key; buildList(day, state, mins); }
     paintRows(day, state, mins);
   }
@@ -1178,7 +1199,7 @@ button,select{ font:inherit; }
          The longer one wrapped on the foyer screen and left "open" alone
          on a line of its own at 38px, which is the one line in the room
          that has to be read at a glance. */
-      set('', 'Starting soon', PRESET.name,
+      set('', 'Starting soon', PRESET.name + ' opens at ' + clock(day.start),
         where + ' · ' + PRESET.venue.split(',')[0],
         'Doors open in ' + words(until),
         'Free, and you can arrive whenever suits.');
@@ -1194,7 +1215,7 @@ button,select{ font:inherit; }
       var urgent = leftMin <= 10;
       accent(urgent ? URGENT_KIND : DAY_KIND);
       set(urgent ? 'urgent' : '', 'On now · ' + DAY_KIND.word,
-        PRESET.name, where, words(leftMin) + ' left', running(day, state));
+        PRESET.name + ' is Open', where, words(leftMin) + ' left', running(day, state));
       meter(true, spentMin, total);
       dialSays('How much of the expo is left');
       setPie(urgent ? URGENT_KIND : DAY_KIND, clamp((day.end - mins) / total), total);
@@ -1206,7 +1227,7 @@ button,select{ font:inherit; }
     /* The sign-off is the product's own line - it is what app/manifest
        .webmanifest has said since the beginning, and what the store
        listing opens with. An empty plate is exactly the moment for it. */
-    set('done', dayWord(day), PRESET.name,
+    set('done', dayWord(day), PRESET.name + ' has Closed',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '',
       'Some days you eat the pie. Some days the pie eats you.');
     dialSays('The expo has finished');
@@ -1240,10 +1261,10 @@ button,select{ font:inherit; }
      moment, an open-ended item, a doors-and-exhibits period - get no pie
      at all, exactly as the hero refuses to draw one for them. */
   function paintRows(day, state, mins) {
-    var list = $('timeline');
-    if (!list || list.hidden) return;
     day.items.forEach(function (it, i) {
-      var li = list.children[i];
+      /* By index, not by position: a row lives in whichever of the two
+         lists it belongs to, and it moves between them during the day. */
+      var li = document.querySelector('#timeline [data-i="' + i + '"], #timelineDone [data-i="' + i + '"]');
       if (!li) return;
       var dial = li.querySelector('.pie'), label = li.querySelector('.rowleft');
       if (!dial || !label) return;
@@ -1260,23 +1281,36 @@ button,select{ font:inherit; }
   /* The list and the "what is known" card are alternatives, not layers:
      exactly one of them is on screen, decided by whether anyone has
      published a running order. */
+  /* A block is finished once its own finish time has passed. The one
+     running now is NOT finished, so it stays at the top with whatever is
+     still to come. A moment is a minute wide; an open-ended item runs to
+     the end of the day. */
+  function isFinished(day, it, mins) {
+    var end = it.moment ? it.time + 1 : (it.end === null ? day.end : it.end);
+    return mins >= end;
+  }
+
   function buildList(day, state, mins) {
     $('listhead').textContent = dayWord(day);
     var list = $('timeline'), known = $('known');
+    var done = $('timelineDone'), doneHead = $('listheadDone');
 
     if (!day.items.length) {
       list.hidden = true;
       list.textContent = '';
+      done.hidden = true; doneHead.hidden = true;
+      done.textContent = '';
       known.hidden = false;
       return;
     }
     known.hidden = true;
-    list.hidden = false;
     list.textContent = '';
+    done.textContent = '';
 
     day.items.forEach(function (it, i) {
       var li = document.createElement('li');
       li.className = 'item';
+      li.setAttribute('data-i', String(i));
       li.style.setProperty('--accent', KINDS[it.kind].accent);
       /* The row dial paints with --accent-fill, the same token the hero
          pie uses. Without it the wedge inherits whatever the card had. */
@@ -1305,8 +1339,17 @@ button,select{ font:inherit; }
         '<span class="kind">' + esc(KINDS[it.kind].word) +
         (it.end !== null && !it.moment ? ' · ' + words(it.end - it.time) : '') +
         '</span></span>';
-      list.appendChild(li);
+      (state.phase !== 'other' && isFinished(day, it, mins) ? done : list).appendChild(li);
     });
+
+    /* Either list disappears, heading and all, when it has nothing in it -
+       before the doors there is nothing finished, and after the close
+       there is nothing left. An empty heading over an empty list is
+       furniture. */
+    list.hidden = !list.children.length;
+    done.hidden = !done.children.length;
+    doneHead.hidden = done.hidden;
+    $('listhead').hidden = list.hidden;
   }
 
   /* ─────────────────────────── Controls ─────────────────────────── */
