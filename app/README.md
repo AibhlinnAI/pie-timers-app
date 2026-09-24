@@ -208,6 +208,18 @@ trade-off for a small single-user document edited on a handful of devices — a 
 UI would cost far more than the merge saves. Exact ties resolve in favour of the server so
 devices converge instead of ping-ponging.
 
+Last write wins only between copies that have met. Each device records which
+account its copy was last in step with (`countdown-timers/synced-account/v1`). A
+copy never in step with the signed-in account — a fresh install, or one left by a
+different account — loses to that account's row whatever its `updatedAt`. Without
+this, a new install that saved anything before signing in (dismissing the welcome
+panel is enough) looked newer than the account and replaced its schedule, settings
+and appointments with defaults and an empty list. Appointments made on a fresh
+install before its first sign-in are merged into the account's list rather than
+dropped; ones left by a different account are not, since they are already on that
+account's row. A device already signed in when this rule shipped counts as in step,
+so its behaviour did not change.
+
 ### Deleting an account
 
 Account → **Delete my account**. The user must type `DELETE` to confirm; a single
