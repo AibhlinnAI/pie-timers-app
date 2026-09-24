@@ -55,7 +55,7 @@ html{ -webkit-text-size-adjust:100%; }
    day-tab strip is lifted from the FIRST, the only multi-day one. The
    session-as-hero logic — the gap state, period/open/moment, the
    speaker line — is the SECOND's, because here there is a full
-   programme and the thing worth timing is the session you are sitting
+   program and the thing worth timing is the session you are sitting
    in, not the day as a block.
 
    Two conference days only, 11 and 12 November. The 10 November
@@ -65,7 +65,7 @@ html{ -webkit-text-size-adjust:100%; }
    offer covers invites a question nobody meant to raise.
 
    ── Read this before touching the Day 1 data ──
-   The published Day 1 programme lists MORNING TEA AT 10:40 AM in the row
+   The published Day 1 program lists MORNING TEA AT 10:40 AM in the row
    ABOVE a session that starts at 10:20 AM. That is not a transcription
    slip at this end. It was read out of the DOM and then confirmed a
    second time by measuring where the two rows actually render (7110px
@@ -76,8 +76,14 @@ html{ -webkit-text-size-adjust:100%; }
    clock, or show it as published and time nothing across it — and he
    chose the third, 23 September 2026. So those three items carry
    `unclear: true`: they appear at the times published, in the order
-   published, with no inferred finish, no pie and no countdown, and the
-   page says plainly that it has not guessed. Do NOT "tidy" this by
+   published, with no inferred finish of their own, and the page says
+   plainly that it has not guessed.
+
+   AMENDED 24 September, also on Mal's word: "looks like the timer just
+   stopped". Drawing nothing at all left a dead dial for two and a half
+   hours on the instant the bare link opens at. The card now times the
+   WINDOW — 9:30 to 12:00, both published starts — and still refuses to
+   time the three items inside it. Do NOT "tidy" this by
    sorting the array. The point is that it is not sorted.
 
    The palette is not a choice made here. It is Pie Timers' own, carried
@@ -351,9 +357,11 @@ button,select{ font:inherit; }
 .now.idle, .now.done{ --accent:var(--off); --accent-fill:var(--off); }
 /* ── The plate has to say "nothing is being counted" ──
    Found by looking at a foyer screenshot, not by a test, and the test
-   had passed. Every state that draws no wedge — the unclear block, the
-   Welcome to Country, the networking drinks with no published finish —
-   left the plate at full brand green. A full green circle at the size
+   had passed. Every state that draws no wedge — the Welcome to Country,
+   the networking drinks with no published finish, the Day 2 close — left
+   the plate at full brand green. (The unclear block was on that list too
+   until 24 Sep, when it started timing its own window and stopped being
+   a no-wedge state.) A full green circle at the size
    this renders on a 1920x1080 screen reads as a FULL PIE, i.e. "all of
    it still to come", which is the exact opposite of what those states
    mean. The idle and done states already greyed it; these three did not,
@@ -544,7 +552,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -624,7 +632,7 @@ button,select{ font:inherit; }
         <em>Conference Day</em> panels on 23 September 2026.</li>
       <li><strong>No finish times are published for any item.</strong> Every
         finish shown here is read off the start of the next item, the way a
-        printed programme reads, and every one of them says
+        printed program reads, and every one of them says
         <strong>(est.)</strong> on screen for that reason.</li>
       <li><strong>Two sessions have no speaker yet.</strong> The agenda says they
         will be announced, so this page says the same. No name has been guessed.</li>
@@ -634,9 +642,11 @@ button,select{ font:inherit; }
       <li><strong>The Day 1 morning is shown exactly as published, and it does
         not run in order.</strong> The agenda lists Morning Tea at 10:40am above
         a session starting at 10:20am. Rather than reorder someone else's
-        programme or invent a time to reconcile them, this page prints all three
-        items as published and runs no countdown across them. Everything from
-        12:00pm onward times normally.</li>
+        program or invent a time to reconcile them, this page prints all three
+        items as published and does not time them one by one. The one countdown
+        it runs across them is the stretch from the first published start to the
+        next published start after them, 9:30am to 12:00pm, and that 12:00pm is
+        inferred exactly the way every other finish on this page is.</li>
       <li>Times are Sydney time, <strong id="footZone">UTC+11:00</strong>. New South Wales daylight
         saving starts on the first Sunday in October — the 4th in 2026 — so both
         conference days fall inside it.</li>
@@ -650,7 +660,7 @@ button,select{ font:inherit; }
         show what Pie Timers looks like timing a real event. It is not run by,
         endorsed by or affiliated with the Neurodiversity Leadership Summit or
         The Leadership Institute, nobody has asked for it, and nothing on it is
-        an official programme. Speakers and session titles are reproduced from
+        an official program. Speakers and session titles are reproduced from
         the published agenda so the demonstration is of a real day rather than
         an invented one. Pie Timers itself is in closed testing and has not
         publicly launched.</p>
@@ -676,7 +686,7 @@ button,select{ font:inherit; }
 (function () {
   'use strict';
 
-  /* ── The programme, as published at theleadershipinstitute.com.au and
+  /* ── The program, as published at theleadershipinstitute.com.au and
      nothing more. Read off the two "Conference Day" panels on 23
      September 2026 — the agenda lives in modal markup rather than on the
      page body, so it was taken out of the DOM and then checked a second
@@ -715,7 +725,7 @@ button,select{ font:inherit; }
      `speaker` prints above the title. `tba: true` prints "Speaker to be
        announced" instead, and is never a name.
      A finish is read off the start of the NEXT item, the way a printed
-       programme reads, and anything resolved that way is marked
+       program reads, and anything resolved that way is marked
        `estimated` automatically by the resolver below — it is not typed
        per row, so it cannot drift.
      `end`        — an explicit published finish. There are none here.
@@ -831,7 +841,7 @@ button,select{ font:inherit; }
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   /* ── Resolving finishes, and the two things that must not happen ──
-     Nothing in this programme publishes a finish, so every one is read
+     Nothing in this program publishes a finish, so every one is read
      off the next item — and every one of those is marked `estimated`
      HERE rather than by hand on each row, so a row can never claim a
      published finish it does not have.
@@ -860,7 +870,8 @@ button,select{ font:inherit; }
      gets a `flow`: the ordinary items as they are, plus ONE synthetic
      entry standing for each run of `unclear` items. The synthetic entry
      starts at the earliest time in the run and ends where the next
-     ordinary item starts, and carries no pie.
+     ordinary item starts. Its own span IS timed; the items inside it are
+     not.
 
      This is the whole mechanism. Everything downstream — locate(), the
      now-card, the scrubber — reads `flow` and never has to know why. */
@@ -882,7 +893,7 @@ button,select{ font:inherit; }
            previous card's "Then 9:30am · ..." says something useful
            rather than the bare word "Session". */
         speaker: earliest.speaker || null,
-        title: 'Morning sessions'
+        title: 'Morning program'
       });
     }
     day.flow = flow;
@@ -1116,7 +1127,7 @@ button,select{ font:inherit; }
     demo.last = real;
 
     /* Left running, the clock would slide past the close, then past
-       midnight, onto a date the programme knows nothing about — a demo
+       midnight, onto a date the program knows nothing about — a demo
        somebody left open on a desk would be sitting on "Already over"
        inside a minute. Roll to the next day instead, and from the last
        day back to the first. */
@@ -1197,7 +1208,7 @@ button,select{ font:inherit; }
     }
 
     if (state.phase === 'other') {
-      /* "runs to 4:40pm" was a finish this programme does not publish —
+      /* "runs to 4:40pm" was a finish this program does not publish —
          4:40pm is where the networking drinks START. Say what is actually
          known: when the day opens, how many items, and that the last one
          is open-ended. */
@@ -1248,28 +1259,58 @@ button,select{ font:inherit; }
                             : nextDayLine(day);
 
       /* ── The block whose published times do not run in order ──
-         No pie, no countdown, no invented finish. The card names the
-         window the three items sit inside and then says, in the calmest
-         words available, that it is showing what was published rather
-         than a reading of it. */
+         No invented finish for any of the three. The card times the window
+         they sit inside and then says, in the calmest words available, that
+         it is showing what was published rather than a reading of it. */
       if (it.unclear) {
+        /* ── Time the WINDOW, not the items inside it ──
+           The first version drew no pie at all here, which was honest and
+           looked broken: a dead grey dial for two and a half hours of the
+           day, on the instant the bare link happens to open at. To anyone
+           who did not stop to read the amber note, the timer had simply
+           stopped — on a page whose entire pitch is a timer.
+
+           The window itself is not in doubt. It runs from 9:30, Session 1's
+           published start, to 12:00, the next published start after the
+           block. BOTH ends are times the organisers printed, which makes
+           this stretch better evidenced than an ordinary row, whose finish
+           is only ever inferred from what follows it.
+
+           What is unknown is how the three items divide the window, and
+           that is exactly what is still not shown: no per-item finishes, no
+           guess at the order, the "as published" chips still on the rows,
+           and the note below still saying so. The pie counts the morning.
+           It does not count any session. */
         var listed = it.members.map(function (m) { return clock(m.time); }).join(', ');
-        set('untimed', 'On now · This morning', 'Morning sessions',
-          clock(it.time) + ' – ' + clock(it.end) + ' · ' +
-            it.members.length + ' items published', '', then);
-        flag('The published agenda lists these at ' + listed +
-          ', in that order, so this page shows no finish times and runs no ' +
-          'countdown across them. Everything from ' + clock(it.end) +
-          ' is timed as normal.');
-        dialSays('No countdown is running across these items');
-        setPie(null, 0);
+        var blockTotal = it.end - it.time;
+        /* "Morning program", not "Morning sessions": the window contains
+           Morning Tea, which is not a session. And "until 12pm", not "left
+           this morning" — the morning program runs to lunch at 1pm, so at
+           11:55 there are sixty-five minutes of it left, not five. The
+           countdown is to a boundary and it should name which one.
+
+           The end carries "(est.)" like every other inferred finish here.
+           It is derived exactly the way they are — off the next published
+           start — and the footnote promises every one of them is labelled.
+           Exempting the one stretch the page is least sure about would
+           have been precisely backwards. */
+        set('', 'On now · This morning', 'Morning program',
+          clock(it.time) + ' – ' + clock(it.end) + ' (est.) · ' +
+            it.members.length + ' items published',
+          words(it.end - mins) + ' until ' + clock(it.end), then);
+        flag('The agenda lists these three at ' + listed + ', in that order, so ' +
+          'this page does not time them one by one or guess which runs when. ' +
+          clock(it.end) + ' is the next start the agenda publishes, not a ' +
+          'published finish, so this stretch may not be full.');
+        dialSays('How much of the morning is left');
+        setPie(KINDS[it.kind], clamp((it.end - mins) / blockTotal), blockTotal);
         return;
       }
       flag('');
 
       if (it.moment) {
         set('untimed', 'On now · ' + who(it), it.title, clock(it.time), '', then);
-        dialSays('A moment in the programme, not a block');
+        dialSays('A moment in the program, not a block');
         setPie(null, 0);
       } else if (it.period) {
         /* A Welcome to Country. It has a finish, so the range is real,
@@ -1547,7 +1588,7 @@ button,select{ font:inherit; }
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
   function announce() {
-    var unofficial = ' Nothing here is an official programme.';
+    var unofficial = ' Nothing here is an official program.';
     var n = $('note'), f = $('footClock');
     var dayName = function (d) {
       return new Date(Date.parse(d.date + 'T00:00:00Z')).toLocaleDateString('en-AU',
