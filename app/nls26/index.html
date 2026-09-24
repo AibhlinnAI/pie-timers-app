@@ -55,7 +55,7 @@ html{ -webkit-text-size-adjust:100%; }
    day-tab strip is lifted from the FIRST, the only multi-day one. The
    session-as-hero logic — the gap state, period/open/moment, the
    speaker line — is the SECOND's, because here there is a full
-   programme and the thing worth timing is the session you are sitting
+   program and the thing worth timing is the session you are sitting
    in, not the day as a block.
 
    Two conference days only, 11 and 12 November. The 10 November
@@ -65,7 +65,7 @@ html{ -webkit-text-size-adjust:100%; }
    offer covers invites a question nobody meant to raise.
 
    ── Read this before touching the Day 1 data ──
-   The published Day 1 programme lists MORNING TEA AT 10:40 AM in the row
+   The published Day 1 program lists MORNING TEA AT 10:40 AM in the row
    ABOVE a session that starts at 10:20 AM. That is not a transcription
    slip at this end. It was read out of the DOM and then confirmed a
    second time by measuring where the two rows actually render (7110px
@@ -544,7 +544,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -624,7 +624,7 @@ button,select{ font:inherit; }
         <em>Conference Day</em> panels on 23 September 2026.</li>
       <li><strong>No finish times are published for any item.</strong> Every
         finish shown here is read off the start of the next item, the way a
-        printed programme reads, and every one of them says
+        printed program reads, and every one of them says
         <strong>(est.)</strong> on screen for that reason.</li>
       <li><strong>Two sessions have no speaker yet.</strong> The agenda says they
         will be announced, so this page says the same. No name has been guessed.</li>
@@ -634,7 +634,7 @@ button,select{ font:inherit; }
       <li><strong>The Day 1 morning is shown exactly as published, and it does
         not run in order.</strong> The agenda lists Morning Tea at 10:40am above
         a session starting at 10:20am. Rather than reorder someone else's
-        programme or invent a time to reconcile them, this page prints all three
+        program or invent a time to reconcile them, this page prints all three
         items as published and runs no countdown across them. Everything from
         12:00pm onward times normally.</li>
       <li>Times are Sydney time, <strong id="footZone">UTC+11:00</strong>. New South Wales daylight
@@ -650,7 +650,7 @@ button,select{ font:inherit; }
         show what Pie Timers looks like timing a real event. It is not run by,
         endorsed by or affiliated with the Neurodiversity Leadership Summit or
         The Leadership Institute, nobody has asked for it, and nothing on it is
-        an official programme. Speakers and session titles are reproduced from
+        an official program. Speakers and session titles are reproduced from
         the published agenda so the demonstration is of a real day rather than
         an invented one. Pie Timers itself is in closed testing and has not
         publicly launched.</p>
@@ -676,7 +676,7 @@ button,select{ font:inherit; }
 (function () {
   'use strict';
 
-  /* ── The programme, as published at theleadershipinstitute.com.au and
+  /* ── The program, as published at theleadershipinstitute.com.au and
      nothing more. Read off the two "Conference Day" panels on 23
      September 2026 — the agenda lives in modal markup rather than on the
      page body, so it was taken out of the DOM and then checked a second
@@ -715,7 +715,7 @@ button,select{ font:inherit; }
      `speaker` prints above the title. `tba: true` prints "Speaker to be
        announced" instead, and is never a name.
      A finish is read off the start of the NEXT item, the way a printed
-       programme reads, and anything resolved that way is marked
+       program reads, and anything resolved that way is marked
        `estimated` automatically by the resolver below — it is not typed
        per row, so it cannot drift.
      `end`        — an explicit published finish. There are none here.
@@ -831,7 +831,7 @@ button,select{ font:inherit; }
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   /* ── Resolving finishes, and the two things that must not happen ──
-     Nothing in this programme publishes a finish, so every one is read
+     Nothing in this program publishes a finish, so every one is read
      off the next item — and every one of those is marked `estimated`
      HERE rather than by hand on each row, so a row can never claim a
      published finish it does not have.
@@ -1116,7 +1116,7 @@ button,select{ font:inherit; }
     demo.last = real;
 
     /* Left running, the clock would slide past the close, then past
-       midnight, onto a date the programme knows nothing about — a demo
+       midnight, onto a date the program knows nothing about — a demo
        somebody left open on a desk would be sitting on "Already over"
        inside a minute. Roll to the next day instead, and from the last
        day back to the first. */
@@ -1197,7 +1197,7 @@ button,select{ font:inherit; }
     }
 
     if (state.phase === 'other') {
-      /* "runs to 4:40pm" was a finish this programme does not publish —
+      /* "runs to 4:40pm" was a finish this program does not publish —
          4:40pm is where the networking drinks START. Say what is actually
          known: when the day opens, how many items, and that the last one
          is open-ended. */
@@ -1269,7 +1269,7 @@ button,select{ font:inherit; }
 
       if (it.moment) {
         set('untimed', 'On now · ' + who(it), it.title, clock(it.time), '', then);
-        dialSays('A moment in the programme, not a block');
+        dialSays('A moment in the program, not a block');
         setPie(null, 0);
       } else if (it.period) {
         /* A Welcome to Country. It has a finish, so the range is real,
@@ -1547,7 +1547,7 @@ button,select{ font:inherit; }
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
   function announce() {
-    var unofficial = ' Nothing here is an official programme.';
+    var unofficial = ' Nothing here is an official program.';
     var n = $('note'), f = $('footClock');
     var dayName = function (d) {
       return new Date(Date.parse(d.date + 'T00:00:00Z')).toLocaleDateString('en-AU',

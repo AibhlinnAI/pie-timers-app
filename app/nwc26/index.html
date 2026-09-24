@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NWC26 programme — Pie Timers</title>
-<meta name="description" content="The NWC26 conference programme as pies you can watch run down. A demonstration of Pie Timers, on a simulated clock.">
+<title>NWC26 program — Pie Timers</title>
+<meta name="description" content="The NWC26 conference program as pies you can watch run down. A demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -30,7 +30,7 @@
 html{ -webkit-text-size-adjust:100%; }
 
 /* ============================================================
-   NWC26 in Pie Timers — the real programme viewer, self-contained.
+   NWC26 in Pie Timers — the real program viewer, self-contained.
 
    The palette is not a choice made here. It is Pie Timers' own, carried
    across from app/styles.css token for token, down to the green being
@@ -387,7 +387,7 @@ body.venue .days{ display:none; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is the official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is the official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -439,7 +439,7 @@ body.venue .days{ display:none; }
   <section class="foot">
     <h2>What this is</h2>
     <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at a
-      glance without anyone reading a number. This page is the NWC26 programme
+      glance without anyone reading a number. This page is the NWC26 program
       running through it. The clock is simulated so the whole thing can be watched
       now rather than on the day — press <strong>Pause</strong> and drag the slider
       to land anywhere in a day.</p>
@@ -449,7 +449,7 @@ body.venue .days{ display:none; }
       it all day.</p>
 
     <p>Times are the ones published at anzmh.asn.au/nwc. Each finish is read off
-      the start of the next item, the way a printed programme reads. Tuesday's
+      the start of the next item, the way a printed program reads. Tuesday's
       close has no published finish, so half an hour is an estimate and says so
       on screen. The two socials are appointments rather than sessions — a start
       time and then the evening.</p>
@@ -476,7 +476,7 @@ body.venue .days{ display:none; }
 
   /* The preset, verbatim from app/presets/nwc26.json in the repo. Inlined
      here only because this page has to stand alone; in the app it is a
-     file that is fetched, so a changed programme is a changed file and no
+     file that is fetched, so a changed program is a changed file and no
      changed code. */
   var PRESET = {
     name: 'Neurodivergence Wellbeing Conference 2026',
@@ -506,7 +506,7 @@ body.venue .days{ display:none; }
         { time: 900, kind: 'keynote', title: 'Keynote Session' },
         /* No finish was published for the close. Half an hour is the
            estimate, marked as one on the page rather than passed off as
-           the programme's own figure. */
+           the program's own figure. */
         { time: 990, end: 1020, kind: 'close', estimated: true, title: 'Conference Close' }
       ]}
     ]
@@ -524,7 +524,7 @@ body.venue .days{ display:none; }
   var CX = 80, CY = 80, R = 70, MIN = 60000;
   var $ = function (id) { return document.getElementById(id); };
 
-  /* Resolve each finish from the next item, the way a printed programme
+  /* Resolve each finish from the next item, the way a printed program
      reads. Only what cannot be inferred is carried in the data. */
   PRESET.days.forEach(function (day) {
     day.items.forEach(function (it, i) {
@@ -771,7 +771,7 @@ body.venue .days{ display:none; }
     }
     set('done', dayWord(day), 'That is the day.',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '',
-      after || 'That is the whole programme. Safe travels.');
+      after || 'That is the whole program. Safe travels.');
     setPie(null, 0);
   }
 
