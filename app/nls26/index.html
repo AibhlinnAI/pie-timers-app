@@ -405,6 +405,10 @@ button,select{ font:inherit; }
 }
 
 .listhead{ margin:0 0 10px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-muted); }
+/* Set off from the live list above it, and quieter: it is reference, not
+   the thing anyone is waiting on. Carried from /ndexpo26 unchanged. */
+.listhead-done{ margin-top:18px; opacity:.75; }
+.venue .listhead-done{ margin-top:14px; }
 .timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
   display:grid;
@@ -563,7 +567,11 @@ button,select{ font:inherit; }
    The 62vh here is only a pre-script fallback. sizeList() replaces it
    with the room actually left below the list's own top edge — see the
    comment there for why a fixed fraction was wrong. */
-.venue .timeline{
+/* The box is around BOTH lists (#lists), not around the live one. Put it
+   on .timeline and the finished list becomes a second, independent
+   scroller that starts below the fold and can never be reached on an
+   unattended screen. */
+.venue .lists{
   max-height:62vh;
   overflow-y:auto;
   overscroll-behavior:contain;
@@ -571,6 +579,18 @@ button,select{ font:inherit; }
      otherwise shave off at the left and right edges. */
   padding-inline:3px;
   margin-inline:-3px;
+}
+
+/* ── Printing ──
+   Nothing here is a print design; it undoes the two things that make a
+   printout a lie. sizeList() writes an INLINE max-height on the box, and
+   an inline style survives into print - so printing the foyer view used
+   to hand you one screenful of a thirteen-row day with the rest silently
+   cut. And the page prints in the order it is showing, which is the live
+   list then the finished one; the footnote says that is what it does. */
+@media print {
+  .lists{ max-height:none !important; overflow:visible !important; }
+  .item{ break-inside:avoid; }
 }
 
 /* ───────────────────────── Footnotes ───────────────────────── */
@@ -689,8 +709,26 @@ button,select{ font:inherit; }
     </section>
 
     <section>
+      <!-- The day's name sits OUTSIDE the scroll box, so it is still on
+           screen once the box has scrolled and still on screen at the end
+           of the day, when everything has moved into Finished and the
+           list above it is empty. /ndexpo26 hides its heading at that
+           point and lets the hero say "... has Closed"; this page's hero
+           says "That is the day.", which names no day, so the heading is
+           the only thing left carrying "Thursday · Conference Day 2". -->
       <h2 class="listhead" id="listhead">The day</h2>
-      <ol class="timeline" id="timeline"></ol>
+      <!-- ONE scroll box around BOTH lists, not one around each.
+           /ndexpo26 needs no box at all - six blocks fit its screen - so
+           it can simply put its Finished section after the list. Here the
+           box is sized to eat every pixel left below its own top, so
+           anything placed after it starts below the fold at every instant
+           of the day. Wrapping both is what makes the second list
+           reachable on the one view that cannot be scrolled by hand. -->
+      <div class="lists" id="lists">
+        <ol class="timeline" id="timeline"></ol>
+        <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
+        <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
+      </div>
     </section>
   </main>
 
@@ -733,6 +771,12 @@ button,select{ font:inherit; }
       <li><strong>Day 1 ends on networking drinks with no published finish</strong>,
         so it shows a start and nothing to count down to. Day 2's Conference
         Close is a moment rather than a block.</li>
+      <li><strong>Items are listed in the order the agenda prints them</strong>, and
+        are never re-sorted into clock order. Once an item has finished it moves
+        to a <strong>Finished</strong> list below the one still running, so
+        whatever is on is always at the top of the screen; the published order
+        is kept inside each of the two lists. Nothing is reordered, renamed or
+        given a time it was not published with.</li>
       <li><strong>A row this page will not time shows a grey, empty plate</strong>
         rather than a pie — the Welcome to Country, the networking drinks and
         the Day 2 close. It is the same mark the large pie uses, for the same
@@ -1508,15 +1552,18 @@ button,select{ font:inherit; }
      ahead — which on the Thursday tab is true on the Wednesday and false
      on the Thursday, and the list has no way of telling which. */
   function paintRows(day, today, mins, state) {
-    var list = $('timeline');
-    if (!list || list.hidden) return;
+    /* No early return on list.hidden any more. Either list can be hidden
+       now - and at the end of the day the live one always is - so a guard
+       that skipped the repaint would leave thirteen finished rows holding
+       whatever wedge they had at the last minute they were visible. */
     var live = day.date === today;
     /* The synthetic flow entry standing for the run of unclear items, so
        the three rows inside it can show the window the hero is showing. */
     var block = null;
     day.flow.forEach(function (fl) { if (fl.unclear) block = fl; });
     day.items.forEach(function (it, i) {
-      var li = list.children[i];
+      var li = document.querySelector('#timeline [data-i="' + i + '"], ' +
+                                      '#timelineDone [data-i="' + i + '"]');
       if (!li) return;
       var dial = li.querySelector('.rowdial'), pie = li.querySelector('.pie');
       var label = li.querySelector('.rowleft');
@@ -1566,10 +1613,39 @@ button,select{ font:inherit; }
     });
   }
 
+  /* ── When a row is over ──
+     The single place this page decides an item has finished. Both the
+     row's .past class and which of the two lists it lands in read it, so
+     the list a row sits in and the way it is drawn cannot disagree.
+
+     /ndexpo26's version of this is three lines shorter and copying it
+     would break this page twice over:
+
+       - Its `it.end === null ? day.end` is safe there only because every
+         one of its six blocks carries an explicit end, so the branch is
+         dead code. Here it runs, on Day 1's networking drinks, whose
+         start IS day.end - 4:40pm against 4:40pm - so the drinks would be
+         filed under "Finished" at the instant they begin. That is the
+         same bug, in a new place, that five review lenses found on this
+         line once already. 1440 is the honest answer: an item with no
+         published finish runs until the date changes.
+       - It has no notion of an `unclear` run. These three rows have no
+         finish of their own by construction and never will; the only
+         finish they have is the window they share, which lives on the
+         synthetic day.flow entry. Without this branch they would never
+         finish at all, and the morning would sit in the live list until
+         midnight. With it, all three cross together at noon, which is
+         the whole point of treating them as one stretch. */
+  function endOf(day, it, block) {
+    if (it.unclear) return block ? block.end : day.end;
+    return it.moment ? it.time + 1 : (it.end === null ? 1440 : it.end);
+  }
+
   function buildList(day, today, mins, state) {
     setText($('listhead'), dayWord(day));
-    var list = $('timeline');
+    var list = $('timeline'), done = $('timelineDone');
     list.textContent = '';
+    done.textContent = '';
     var live = day.date === today;
 
     /* The "· next" badge is taken from the SAME flow entry the card's
@@ -1590,19 +1666,24 @@ button,select{ font:inherit; }
     var block = null;
     day.flow.forEach(function (f) { if (f.unclear) block = f; });
 
-    day.items.forEach(function (it) {
+    day.items.forEach(function (it, i) {
       var li = document.createElement('li');
       li.className = 'item';
+      /* paintRows finds rows by this, not by position: a row lives in
+         whichever list it belongs to and moves between them during the
+         day, so list.children[i] stops meaning day.items[i]. */
+      li.setAttribute('data-i', String(i));
       li.style.setProperty('--accent', KINDS[it.kind].accent);
       /* The row dial fills with --accent-fill, the same token the hero
          uses. Without this the li inherits the page default and every
          break and meal drew a forest-green pie under an orange rule. */
       li.style.setProperty('--accent-fill', KINDS[it.kind].fill);
 
+      var fin = endOf(day, it, block);
       if (live) {
         if (it.unclear && block) {
-          if (mins >= block.time && mins < block.end) li.classList.add('on');
-          else if (mins >= block.end) li.classList.add('past');
+          if (mins >= block.time && mins < fin) li.classList.add('on');
+          else if (mins >= fin) li.classList.add('past');
           /* The block's earliest member still takes the "next" badge
              before the block opens — otherwise the card says "Then
              9:30am · Tia Squire" from 9:10 and nothing in the list is
@@ -1618,9 +1699,8 @@ button,select{ font:inherit; }
              page contradicted itself for the rest of the evening, on the
              one row the footnote singles out as the honest special case.
              Found by review; five separate lenses landed on this line. */
-          var end = it.moment ? it.time + 1 : (it.end === null ? 1440 : it.end);
-          if (mins >= it.time && mins < end) li.classList.add('on');
-          else if (mins >= end) li.classList.add('past');
+          if (mins >= it.time && mins < fin) li.classList.add('on');
+          else if (mins >= fin) li.classList.add('past');
           else if (it === nextRow) li.classList.add('next');
         }
       }
@@ -1651,10 +1731,23 @@ button,select{ font:inherit; }
         (!it.unclear && it.end !== null && !it.moment ? ' · ' + words(it.end - it.time) : '') +
         (it.unclear ? '<span class="tag">as published</span>' : '') +
         '</span></span>';
-      list.appendChild(li);
+      /* The only line that splits the day. Everything before it decided
+         how the row LOOKS; this decides where it sits, off the same
+         number, so a row cannot be dimmed in one list and live in the
+         other. Published order is preserved inside each list - the split
+         is by whether a thing has happened, never a re-sort by time - and
+         the footnote says so in as many words. */
+      (live && mins >= fin ? done : list).appendChild(li);
     });
 
-    follow(list);
+    /* A heading over an empty list is furniture: before the first item
+       nothing is finished, and after the last one nothing is left. The
+       DAY's heading is not on this switch - see the markup comment. */
+    list.hidden = !list.children.length;
+    done.hidden = !done.children.length;
+    $('listheadDone').hidden = done.hidden;
+
+    follow($('lists'));
   }
 
   /* ── Keep the live row in view, on the foyer screen only ──
@@ -1679,13 +1772,17 @@ button,select{ font:inherit; }
      was centred off the screen, so the last rows of the day were still
      unreachable and the box had eaten two visible rows for nothing.
      Measure the room that is actually left instead. */
-  function sizeList(list) {
+  /* Both of these take the BOX (#lists), which holds the live list, the
+     Finished heading and the finished list. Handed the live list alone
+     they would size and scroll a container that no longer holds the whole
+     programme, and the finished half would be unreachable. */
+  function sizeList(box) {
     if (!document.documentElement.classList.contains('venue')) {
-      list.style.maxHeight = '';
+      box.style.maxHeight = '';
       return;
     }
-    var top = Math.max(0, list.getBoundingClientRect().top);
-    list.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 14)) + 'px';
+    var top = Math.max(0, box.getBoundingClientRect().top);
+    box.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 14)) + 'px';
   }
 
   function follow(list) {
