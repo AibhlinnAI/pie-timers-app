@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NSW ADHD 2026 programme — Pie Timers</title>
-<meta name="description" content="The New South Wales ADHD Conference 2026 programme as pies you can watch run down. A demonstration of Pie Timers, on a simulated clock.">
+<title>NSW ADHD 2026 program — Pie Timers</title>
+<meta name="description" content="The New South Wales ADHD Conference 2026 program as pies you can watch run down. A demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -33,7 +33,7 @@ html{ -webkit-text-size-adjust:100%; }
    NSW ADHD Conference 2026 in Pie Timers — self-contained.
 
    Modelled on app/nwc26/index.html (225f9b8), which this shares its CSS
-   and its dial maths with. Two things differ, both because the programme
+   and its dial maths with. Two things differ, both because the program
    differs: sessions carry a speaker, split off at the "|" the source uses,
    because the longest title here is 118 characters against NWC26's 43; and
    there is one day, so the day-tab strip is gone rather than reduced to a
@@ -291,7 +291,7 @@ button,select{ font:inherit; }
 }
 .item .when{ font-variant-numeric:tabular-nums; font-weight:700; font-size:.88rem; color:var(--ink-muted); flex:none; min-width:11ch; }
 .item .body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-/* The speaker leads, small and spaced, because on this programme the name
+/* The speaker leads, small and spaced, because on this program the name
    is what someone scans for and the titles run to 118 characters. */
 .item .speaker{
   font-size:.7rem; font-weight:700; text-transform:uppercase;
@@ -314,7 +314,7 @@ body.venue .main{ grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); }
 body.venue .now{ flex-direction:column; text-align:center; justify-content:center; }
 body.venue .now::before{ align-self:center; width:min(200px,45%); height:5px; }
 body.venue .dialwrap{ width:min(240px,42vw); }
-/* Smaller than NWC26's hero type, and deliberately. That programme's
+/* Smaller than NWC26's hero type, and deliberately. That program's
    longest title was 43 characters; this one's is 118, and a foyer screen
    that clips the back half of a session title is worse than one that sets
    it a size down. Sized so the longest fits without clipping at 1920×1080
@@ -389,7 +389,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is the official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is the official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -444,7 +444,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     <h2>What this is</h2>
     <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at a
       glance without anyone reading a number. This page is the New South Wales
-      ADHD Conference programme, Sunday 18 October 2026, running through it. The
+      ADHD Conference program, Sunday 18 October 2026, running through it. The
       clock is simulated so the day can be watched now rather than on the day
       itself — press <strong>Pause</strong> and drag the slider to land anywhere
       between the doors opening and the close.</p>
@@ -454,7 +454,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
       it all day.</p>
 
     <p>Times and speakers are the ones published at myspiritedmind.com. Each
-      finish is read off the start of the next item, the way a printed programme
+      finish is read off the start of the next item, the way a printed program
       reads. <strong>Registration, 8:30am to 10:00am, is an open period</strong> —
       doors and exhibits, not something to count down. The <strong>close at
       3:50pm is shown as ten minutes</strong>, an estimate to reach the published
@@ -480,7 +480,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 (function () {
   'use strict';
 
-  /* The programme as published by My Spirited Mind, one Sunday, inlined
+  /* The program as published by My Spirited Mind, one Sunday, inlined
      because this page has to stand alone. Times are the venue's wall
      clock; `speaker` is split from `title` at the "|" the source itself
      uses, because the longest title here runs to 118 characters and the
@@ -537,7 +537,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
   var CX = 80, CY = 80, R = 70, MIN = 60000;
   var $ = function (id) { return document.getElementById(id); };
 
-  /* Resolve each finish from the next item, the way a printed programme
+  /* Resolve each finish from the next item, the way a printed program
      reads. Only what cannot be inferred is carried in the data. A kind
      that is not in the map falls back rather than throwing — a blank page
      is a poor way to find out someone mistyped a word in the data. */
@@ -784,7 +784,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     accent(null);
     set('done', dayWord(day), 'That is the day.',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '',
-      'That is the whole programme. Safe travels.');
+      'That is the whole program. Safe travels.');
     setPie(null, 0);
   }
 
@@ -830,7 +830,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     s.max = String(Math.min(1439, day.end + 15));
   }
 
-  /* NWC26 built a day tab here per day of its programme. One Sunday needs
+  /* NWC26 built a day tab here per day of its program. One Sunday needs
      none, and the slider already covers every minute of it. */
 
   $('play').addEventListener('click', function () {
