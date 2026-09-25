@@ -125,6 +125,32 @@
 .aib-signin-status{
   margin:12px 0 0; font-size:.84rem; min-height:1.2em;
 }
+
+/* "Did you mean …?" -- shown in place of a send when email-typos.js
+   thinks the address is a slip. "Yes" reuses the send button's look,
+   because it is the send; "keep" is the quieter way through. The
+   address may break anywhere, having no spaces to wrap at. Focus is
+   put on the box by script so the question is read out; it is not a
+   control, so it draws no ring. */
+.aib-signin-typo{
+  margin:12px 0 0; padding:12px;
+  border-radius:10px; border:1px solid var(--accent, #B07FE0);
+  font-size:.88rem;
+}
+.aib-signin-typo[hidden]{ display:none; }
+.aib-signin-typo:focus{ outline:none; }
+.aib-signin-typo p{ margin:0 0 10px; }
+.aib-signin-typo strong{ overflow-wrap:anywhere; }
+.aib-signin-typo-actions{ display:flex; flex-direction:column; gap:8px; }
+.aib-signin-typo-keep{
+  min-height:44px;
+  border-radius:10px; border:1px solid var(--line, #3A2A47);
+  background:transparent; color:inherit;
+  font:inherit; font-weight:600; font-size:.92rem;
+  cursor:pointer;
+}
+.aib-signin-typo-keep:hover{ border-color:var(--accent, #B07FE0); }
+.aib-signin-typo-keep:focus-visible{ outline:3px solid var(--accent, #B07FE0); outline-offset:2px; }
 .aib-signin-status[data-tone="error"]{ color:var(--urgent-text, #FF9E9E); }
 
 /* The type-in-a-code fallback, revealed once the email is on its way.

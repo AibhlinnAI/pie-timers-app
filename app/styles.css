@@ -1256,6 +1256,18 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .status-line{ margin:16px 0 0; font-size:.85rem; color:var(--ink-muted); min-height:1.2em; }
 .status-line.is-error{ color:var(--orange-text); font-weight:600; }
 
+/* "Did you mean …?" under either email form (emailTypoGate in app.js).
+   A .notice--info box like any other; the address sits inside the
+   question, so it undoes .notice strong's block display -- with the
+   extra `p` because that rule comes later in this file and would
+   otherwise win the tie -- and may break anywhere because an address
+   has no spaces to wrap at. Focus is put on the box by script so the
+   question is read out; it is not a control, so it draws no ring. */
+.email-typo p{ margin:0; }
+.email-typo p strong{ display:inline; margin:0; overflow-wrap:anywhere; }
+.email-typo:focus{ outline:none; }
+.email-typo-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+
 .sync-rows{ display:flex; flex-direction:column; }
 .sync-row{
   display:flex; align-items:center; justify-content:space-between; gap:16px;

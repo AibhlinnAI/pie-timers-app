@@ -585,6 +585,71 @@
   $('welcomeDismiss').addEventListener('click', completeOnboarding);
   $('welcomeSetup').addEventListener('click', completeOnboarding);
 
+  /* ─────────────────── Email typo question ───────────────────
+     "…@gmail.comj" passes every check the server makes, and the
+     sign-in code then goes to an address that cannot exist. A tester
+     did exactly that on both forms below, and nothing told them. So
+     before either form sends, CT.emailTypos looks for a near miss of
+     a common provider, and if it finds one the send waits on a
+     question: use the fix, or keep what was typed.
+
+     Asked at the send, not on blur: the box appearing as the field
+     loses focus would push down whatever the finger was already
+     heading for. Either answer carries straight on with the send, so
+     it costs one tap, not two. The address is never changed without
+     that tap. Focus goes to the question itself, not the "yes"
+     button, so a second Enter pressed without reading cannot accept a
+     fix nobody looked at.
+
+     Returns holds(): call it at the top of the submit handler, and
+     stop if it says true. */
+  function emailTypoGate(inputId, boxId, submitId) {
+    var input = $(inputId);
+    var box = $(boxId);
+    var shown = box.querySelector('[data-typo-address]');
+    var kept = '';   // an address someone has said is right as typed
+
+    function hide() { box.hidden = true; }
+
+    function carryOn() {
+      var submit = $(submitId);
+      submit.focus();
+      submit.click();
+    }
+
+    /* A changed address makes the question stale. */
+    input.addEventListener('input', hide);
+
+    box.querySelector('[data-typo-use]').addEventListener('click', function () {
+      input.value = shown.textContent;
+      hide();
+      /* Announced as an edit, so anything already watching for a
+         changed address -- the sign-in form's stale-code reset --
+         runs as if it had been typed. */
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      carryOn();
+    });
+
+    box.querySelector('[data-typo-keep]').addEventListener('click', function () {
+      kept = input.value.trim().toLowerCase();
+      hide();
+      carryOn();
+    });
+
+    return function holds() {
+      var typed = input.value.trim();
+      /* Checked, not assumed: a shell cached without email-typos.js
+         must still be able to send. */
+      var better = CT.emailTypos && typed.toLowerCase() !== kept
+        ? CT.emailTypos.suggest(typed) : null;
+      if (!better) { hide(); return false; }
+      shown.textContent = better;
+      box.hidden = false;
+      box.focus();
+      return true;
+    };
+  }
+
   /* ──────────────────── Android tester invite ────────────────────
      The funnel behind the QR code printed on t-shirts, which points at
      the bare pietimers.aibhlinn.ai root and cannot be changed -- so this
@@ -616,10 +681,13 @@
 
   $('testerDismiss').addEventListener('click', dismissTesterInvite);
 
+  var testerTypoHolds = emailTypoGate('testerEmail', 'testerEmailTypo', 'testerSubmit');
+
   $('testerInviteForm').addEventListener('submit', function (event) {
     event.preventDefault();
     var email = $('testerEmail').value.trim();
     if (!email) return;
+    if (testerTypoHolds()) return;
     var button = $('testerSubmit');
     var status = $('testerStatus');
     button.disabled = true;
@@ -2849,10 +2917,13 @@
       });
     }
 
+    var magicTypoHolds = emailTypoGate('magicEmail', 'magicEmailTypo', 'magicSubmit');
+
     $('magicForm').addEventListener('submit', function (event) {
       event.preventDefault();
       var email = $('magicEmail').value.trim();
       if (!email) return;
+      if (magicTypoHolds()) return;
       var button = $('magicSubmit');
       var token = CT.turnstile.token();
 

@@ -55,7 +55,7 @@ html{ -webkit-text-size-adjust:100%; }
    day-tab strip is lifted from the FIRST, the only multi-day one. The
    session-as-hero logic — the gap state, period/open/moment, the
    speaker line — is the SECOND's, because here there is a full
-   programme and the thing worth timing is the session you are sitting
+   program and the thing worth timing is the session you are sitting
    in, not the day as a block.
 
    Two conference days only, 11 and 12 November. The 10 November
@@ -65,7 +65,7 @@ html{ -webkit-text-size-adjust:100%; }
    offer covers invites a question nobody meant to raise.
 
    ── Read this before touching the Day 1 data ──
-   The published Day 1 programme lists MORNING TEA AT 10:40 AM in the row
+   The published Day 1 program lists MORNING TEA AT 10:40 AM in the row
    ABOVE a session that starts at 10:20 AM. That is not a transcription
    slip at this end. It was read out of the DOM and then confirmed a
    second time by measuring where the two rows actually render (7110px
@@ -76,8 +76,14 @@ html{ -webkit-text-size-adjust:100%; }
    clock, or show it as published and time nothing across it — and he
    chose the third, 23 September 2026. So those three items carry
    `unclear: true`: they appear at the times published, in the order
-   published, with no inferred finish, no pie and no countdown, and the
-   page says plainly that it has not guessed. Do NOT "tidy" this by
+   published, with no inferred finish of their own, and the page says
+   plainly that it has not guessed.
+
+   AMENDED 24 September, also on Mal's word: "looks like the timer just
+   stopped". Drawing nothing at all left a dead dial for two and a half
+   hours on the instant the bare link opens at. The card now times the
+   WINDOW — 9:30 to 12:00, both published starts — and still refuses to
+   time the three items inside it. Do NOT "tidy" this by
    sorting the array. The point is that it is not sorted.
 
    The palette is not a choice made here. It is Pie Timers' own, carried
@@ -351,9 +357,11 @@ button,select{ font:inherit; }
 .now.idle, .now.done{ --accent:var(--off); --accent-fill:var(--off); }
 /* ── The plate has to say "nothing is being counted" ──
    Found by looking at a foyer screenshot, not by a test, and the test
-   had passed. Every state that draws no wedge — the unclear block, the
-   Welcome to Country, the networking drinks with no published finish —
-   left the plate at full brand green. A full green circle at the size
+   had passed. Every state that draws no wedge — the Welcome to Country,
+   the networking drinks with no published finish, the Day 2 close — left
+   the plate at full brand green. (The unclear block was on that list too
+   until 24 Sep, when it started timing its own window and stopped being
+   a no-wedge state.) A full green circle at the size
    this renders on a 1920x1080 screen reads as a FULL PIE, i.e. "all of
    it still to come", which is the exact opposite of what those states
    mean. The idle and done states already greyed it; these three did not,
@@ -396,16 +404,133 @@ button,select{ font:inherit; }
   max-width:62ch;
 }
 
+/* ── Elapsed and remaining, shown together ──
+   Ported from /ndexpo26 with the hero. Structure from the app's own
+   appointment card: a bar, a legend naming both ends, and the pair
+   computed from ONE rounded number — remaining rounded up, spent the
+   difference — so the picture and the words can never contradict.
+
+   The colours are the brand asset's, not the app's. brand/pie-timers-
+   elapsed-remaining.png labels orange "Time remaining" and the plate
+   green "Time already spent", so the bar is the pie unrolled: the plate
+   grows in from the left as the day is spent and the orange on the right
+   is what is still to come. /ndexpo26's session drew this with the app's
+   accent instead and put two near-identical oranges in the legend, which
+   were indistinguishable in a screenshot at arm's length. */
+.meter{ margin:12px 0 0; }
+.meter-bar{
+  height:9px; border-radius:999px; overflow:hidden; margin-bottom:9px;
+  background:var(--accent-fill);              /* what is left */
+  /* A real border, not a wash of black: at rgba(0,0,0,.18) the bar had no
+     edge that reached 3:1 against the card in the light theme. */
+  border:1px solid var(--field-border);
+}
+.meter-bar span{
+  display:block; height:100%; border-radius:999px 0 0 999px;
+  background:var(--plate);                    /* what has gone */
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+}
+.meter-legend{
+  display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  font-size:.79rem; color:var(--ink-muted);
+}
+.meter-legend b{ color:var(--ink); font-variant-numeric:tabular-nums; font-weight:700; }
+/* These are <i> elements used as swatches; reset the inherited italic. */
+.dot{
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  margin-right:6px; vertical-align:1px; font-style:normal;
+}
+.dot-elapsed{ background:var(--plate); border:1px solid var(--field-border); }
+.dot-remaining{ background:var(--accent-fill); }
+@media (prefers-reduced-motion:reduce){
+  .meter-bar span{ transition:none; }
+}
+.venue .meter-bar{ height:14px; }
+.venue .meter-legend{ font-size:clamp(.85rem,1.2vw,1.05rem); }
+.venue .meter{ max-width:620px; margin-inline:auto; width:100%; }
+
 .listhead{ margin:0 0 10px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-muted); }
-.timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+/* Set off from the live list above it: it is reference, not the thing
+   anyone is waiting on. Carried from /ndexpo26, MINUS its opacity:.75.
+
+   That .75 over this page's light background measures 3.17:1 on 9.4pt
+   bold text - under AA, which wants 4.5:1 below 14pt bold. Without it the
+   same words measure 5.24:1. The file already holds itself to exactly
+   this standard twenty lines up, where .flag records rejecting an
+   opacity:.85 at 4.4:1 "under AA, for no gain", so shipping 3.17 on the
+   one word this section is labelled with would have been the same mistake
+   with a worse number. The margin does the setting-off instead.
+
+   Dark keeps it: there the same token measures 4.95:1 at .75. */
+.listhead-done{ margin-top:18px; }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .listhead-done{ opacity:.75; }
+}
+:root[data-theme="dark"] .listhead-done{ opacity:.75; }
+.venue .listhead-done{ margin-top:14px; }
+.timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
-  display:flex; gap:14px; align-items:baseline;
+  display:grid;
+  grid-template-columns:auto auto minmax(0,1fr);
+  align-items:baseline;
+  gap:4px 14px;
   padding:11px 14px; border-radius:var(--radius-sm);
   background:var(--card); border:1px solid var(--line);
   border-left:4px solid var(--accent);
 }
-.item .when{ font-variant-numeric:tabular-nums; font-weight:700; font-size:.88rem; color:var(--ink-muted); flex:none; min-width:11ch; }
+.item .when{ font-variant-numeric:tabular-nums; font-weight:700; font-size:.88rem; color:var(--ink-muted); min-width:11ch; }
 .item .body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+
+/* ── A pie on every row, not only on the one that is running ──
+   The hero pie answers "how long has THIS got left". It cannot answer
+   "how long is the one after it", and at a two-day conference that is
+   the question a delegate deciding whether to duck out is actually
+   asking. So every row carries its own pie: full for something that has
+   not started, emptying for the one running now, empty for one that is
+   done. Read down the column and the shape of the day is there without
+   reading a single number.
+
+   The pies run down the LEFT edge, and the timer is FIRST in the markup
+   as well as first on screen, so the order a screen reader takes is the
+   order an eye takes.
+
+   One size for every row, including the live one. Drawing the live row
+   larger makes the column jog in and out as the day moves, and changes
+   the row heights under it; a column of identical circles emptying one
+   after another is the thing worth looking at. Ported from /ndexpo26,
+   where the same three decisions were settled. */
+.item .rowtimer{ width:76px; align-self:center; text-align:center; }
+.item .rowdial{ width:52px; height:52px; display:block; margin:0 auto; }
+/* ── The rows this page will not time ──
+   Three kinds of row never get a wedge: the Welcome to Country, the
+   networking drinks with no published finish, and the Day 2 close. The
+   hero already refuses to draw a pie for each of them, and a row must
+   not claim a countdown the hero will not run — a page that times a
+   session in the list and declines to time it in the panel beside it is
+   a page arguing with itself. The rule is the hero's, and the list
+   follows it; that is why the three Day 1 morning rows are NOT on this
+   list, because the hero does time the stretch they sit in.
+
+   They are not simply left blank. A blank dial is what a FINISHED row
+   looks like, so at 8:50am a Welcome to Country would have read as
+   already over. They take the greyed plate instead — the same mark the
+   hero uses, in the same two tokens, so a reader who learns it there
+   reads it here. Which row is past is carried by .item.past dimming the
+   whole row, which is where it already was. */
+.item .rowdial.untimed .plate{ fill:var(--off-plate); }
+.item .rowdial.untimed .rim{ stroke-opacity:.45; }
+/* One line, never two. It sits directly under its own pie, and a label
+   that wraps pushes the pie off the vertical centre of the row and makes
+   the whole column jump. The longest countdown this agenda can produce
+   is "1 hr left" — the 12pm session, the only sixty-minute block on
+   either day — and the column is sized for it. min-height holds the
+   space open on the rows that carry no number, so the row does not move
+   when one arrives. */
+.item .rowleft{
+  display:block; margin-top:4px; font-size:.66rem; font-weight:700;
+  color:var(--orange-text); font-variant-numeric:tabular-nums;
+  white-space:nowrap; line-height:1.25; min-height:1.25em;
+}
 .item .speaker{
   font-size:.7rem; font-weight:700; text-transform:uppercase;
   letter-spacing:.07em; color:var(--accent);
@@ -438,6 +563,25 @@ button,select{ font:inherit; }
 
 /* ───────────────────── Venue display mode ───────────────────── */
 
+/* ── The foyer screen gets the room the pies cost it ──
+   The page's measure is 1120px everywhere, which is right for reading and
+   wrong for a wall. On a 1920 screen it left four hundred pixels of empty
+   margin down each side while the list column was 515px wide — and once
+   every row carried a pie, that column had to give 94px of it away. The
+   long titles went from three lines to five, the rows from 65px to 203px,
+   and the number of rows a passer-by could read dropped from eight to
+   five. The list is the half of this screen that answers "what is on
+   after this one", so five is not enough.
+
+   1480px is measured. At twelve instants across both days, with the dial
+   below, it shows six or seven rows and never fewer than six; 1400px was
+   the first width that cleared six at every one of them and this leaves a
+   row in hand. Only the foyer screen widens — a phone and a laptop keep
+   the 1120px measure, because there the constraint is reading, not range.
+
+   The list is the SECOND column, so it is the one that grows: the hero
+   panel is capped by its own clamps and does not stretch with it. */
+.venue .wrap{ max-width:1480px; }
 .venue .main{ grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); }
 .venue .now{ flex-direction:column; text-align:center; justify-content:center; }
 .venue .now::before{ align-self:center; width:min(200px,45%); height:5px; }
@@ -446,14 +590,35 @@ button,select{ font:inherit; }
    four-word title, this one has to hold "Leaving No One Behind: How
    Inclusive Leadership Leads to Better Systems" at 88 characters without
    throwing four lines at the room. Checked at 1920x1080, not hoped. */
-.venue .title{ font-size:clamp(1.5rem,2.7vw,2.25rem); }
+/* 2rem, not 2.25: the hero gained a line when it became the whole day -
+   the elapsed/remaining meter - and on the one instant that ALSO shows the
+   amber note, 9:30 to 12:00 on Day 1, the panel's last line finished 7px
+   below a 1080 screen. Measured at the block, mid-day and at the Welcome;
+   the block is the worst of the three: 1087 of 1080 before, 1054 after,
+   which is 26px of room. Shortening the note itself bought 23 of those -
+   the type change alone left 3px, which is not a margin. /ndexpo26
+   shrank its own title 2.6 to 2.3 for exactly this reason when its hero
+   gained the status line. */
+.venue .title{ font-size:clamp(1.5rem,2.7vw,2rem); }
 .venue .left{ font-size:clamp(1.35rem,2.5vw,2.1rem); }
 .venue .window, .venue .then{ font-size:clamp(.9rem,1.3vw,1.12rem); }
 .venue .kicker{ font-size:clamp(.78rem,1.05vw,.95rem); }
 .venue .flag{ font-size:clamp(.85rem,1.1vw,1rem); margin-inline:auto; text-align:left; }
-.venue .item{ padding:13px 18px; }
+/* Tighter than the phone's rows. The four pixels this gives back on
+   every row are what pay for the bigger dial without costing a row off
+   the bottom of the scroll box. */
+.venue .item{ padding:9px 16px; }
 .venue .item .name{ font-size:clamp(.95rem,1.25vw,1.1rem); }
 .venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
+/* Bigger than the phone's, smaller than /ndexpo26's 66px, and both for
+   the same reason: how many rows are left over. That page has six blocks
+   and shows all of them; this one has thirteen and a scroll box, so every
+   pixel a dial takes is taken thirteen times and comes off the end of
+   what a passer-by can read. 60px is the largest that still leaves six
+   rows readable at every instant tested, with the width above. */
+.venue .item .rowtimer{ width:80px; }
+.venue .item .rowdial{ width:60px; height:60px; }
+.venue .item .rowleft{ font-size:clamp(.72rem,.95vw,.82rem); margin-top:5px; }
 
 /* ── The foyer list scrolls itself ──
    Thirteen rows do not fit a venue screen, and from about 3pm the row
@@ -470,7 +635,11 @@ button,select{ font:inherit; }
    The 62vh here is only a pre-script fallback. sizeList() replaces it
    with the room actually left below the list's own top edge — see the
    comment there for why a fixed fraction was wrong. */
-.venue .timeline{
+/* The box is around BOTH lists (#lists), not around the live one. Put it
+   on .timeline and the finished list becomes a second, independent
+   scroller that starts below the fold and can never be reached on an
+   unattended screen. */
+.venue .lists{
   max-height:62vh;
   overflow-y:auto;
   overscroll-behavior:contain;
@@ -478,6 +647,18 @@ button,select{ font:inherit; }
      otherwise shave off at the left and right edges. */
   padding-inline:3px;
   margin-inline:-3px;
+}
+
+/* ── Printing ──
+   Nothing here is a print design; it undoes the two things that make a
+   printout a lie. sizeList() writes an INLINE max-height on the box, and
+   an inline style survives into print - so printing the foyer view used
+   to hand you one screenful of a thirteen-row day with the rest silently
+   cut. And the page prints in the order it is showing, which is the live
+   list then the finished one; the footnote says that is what it does. */
+@media print {
+  .lists{ max-height:none !important; overflow:visible !important; }
+  .item{ break-inside:avoid; }
 }
 
 /* ───────────────────────── Footnotes ───────────────────────── */
@@ -514,8 +695,15 @@ button,select{ font:inherit; }
   .dialwrap{ margin:0 auto; }
   .head{ flex-direction:column; }
   .clock{ text-align:left; }
-  .item{ flex-direction:column; gap:2px; align-items:stretch; }
-  .item .when{ min-width:0; }
+  /* Two columns on a phone: the pie keeps the left and spans both rows,
+     with the time above the text in column two. Stacking everything —
+     which is what this rule did before the rows had pies — would put the
+     pie on top of the text rather than beside it, and cost a row of
+     height on the view with the least of it. */
+  .item{ grid-template-columns:auto minmax(0,1fr); gap:2px 12px; align-items:start; }
+  .item .rowtimer{ grid-row:1 / span 2; align-self:center; }
+  .item .when{ grid-column:2; min-width:0; }
+  .item .body{ grid-column:2; }
   .flag{ text-align:left; }
 }
 @media (prefers-reduced-motion:reduce){
@@ -544,7 +732,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -570,7 +758,7 @@ button,select{ font:inherit; }
     <section class="now" id="now" aria-live="polite">
       <div class="dialwrap">
         <svg class="dial" viewBox="0 0 160 160" role="img" aria-labelledby="dialLabel">
-          <title id="dialLabel">How much of this session is left</title>
+          <title id="dialLabel">How much of the day is left</title>
           <circle class="plate" cx="80" cy="80" r="70"></circle>
           <g class="ticks" id="ticksUnder"></g>
           <path class="pie" id="pie" d=""></path>
@@ -583,14 +771,53 @@ button,select{ font:inherit; }
         <h2 class="title" id="title">—</h2>
         <p class="window" id="window">&nbsp;</p>
         <p class="left" id="left">&nbsp;</p>
+        <div class="meter" id="meter" hidden>
+          <div class="meter-bar"><span id="meterBar" style="width:0%"></span></div>
+          <div class="meter-legend">
+            <span><i class="dot dot-elapsed"></i>Elapsed <b id="meterSpent">0</b></span>
+            <span><i class="dot dot-remaining"></i>Remaining <b id="meterLeft">0</b></span>
+          </div>
+        </div>
         <p class="flag" id="flag" hidden></p>
         <p class="then" id="then">&nbsp;</p>
       </div>
     </section>
 
     <section>
+      <!-- The day's name sits OUTSIDE the scroll box, so it is still on
+           screen once the box has scrolled and still on screen at the end
+           of the day, when everything has moved into Finished and the
+           list above it is empty. /ndexpo26 hides its heading at that
+           point and lets the hero say "... has Closed"; this page's hero
+           says "That is the day.", which names no day, so the heading is
+           the only thing left carrying "Thursday · Conference Day 2". -->
       <h2 class="listhead" id="listhead">The day</h2>
-      <ol class="timeline" id="timeline"></ol>
+      <!-- ONE scroll box around BOTH lists, not one around each.
+           /ndexpo26 needs no box at all - six blocks fit its screen - so
+           it can simply put its Finished section after the list.
+
+           What wrapping buys is NOT visibility, and an earlier version of
+           this comment claimed it was. Measured against a build with the
+           finished section outside the box, the number of finished rows on
+           a 1920x1080 screen is identical at every instant: none until the
+           live list has shrunk enough, then 2 at 2:20pm, 4 at 3:30pm, all
+           of them by 4:40pm. What brings the section into view is the live
+           list getting shorter above it, not this div.
+
+           What wrapping buys is that the finished list does not become a
+           SECOND scroll container inside the venue layout, and that one
+           box measures and scrolls the whole programme rather than half of
+           it. That is worth having and it is all that is being claimed. -->
+      <!-- role and name because this div is FOCUSABLE: Chrome puts a
+           scroll container in the tab order, and on the foyer view it is
+           the last Tab stop on the page. Before the box moved here it was
+           the <ol>, which announced as a list of 13; an unnamed div
+           announces as nothing at all. -->
+      <div class="lists" id="lists" role="group" aria-labelledby="listhead">
+        <ol class="timeline" id="timeline"></ol>
+        <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
+        <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
+      </div>
     </section>
   </main>
 
@@ -600,7 +827,9 @@ button,select{ font:inherit; }
       a glance without anyone reading a number. This page is the two conference
       days of the Neurodiversity Leadership Summit 2026 — Wednesday 11 and
       Thursday 12 November at Crowne Plaza Sydney Darling Harbour — with a pie
-      running on whichever session is on, and the rest of the day underneath it.
+      running on whatever is on, and the rest of the day as a column of pies —
+      full for what has not started, emptying for what is on, empty for what is
+      done, and an empty plate on anything this page will not put a clock to.
       <!-- This clause is the only sentence on the page that describes the
            clock, so it has to change when the clock does. Left static it
            told a ?live=1 reader the time was simulated and to press a
@@ -624,19 +853,35 @@ button,select{ font:inherit; }
         <em>Conference Day</em> panels on 23 September 2026.</li>
       <li><strong>No finish times are published for any item.</strong> Every
         finish shown here is read off the start of the next item, the way a
-        printed programme reads, and every one of them says
+        printed program reads, and every one of them says
         <strong>(est.)</strong> on screen for that reason.</li>
       <li><strong>Two sessions have no speaker yet.</strong> The agenda says they
         will be announced, so this page says the same. No name has been guessed.</li>
       <li><strong>Day 1 ends on networking drinks with no published finish</strong>,
         so it shows a start and nothing to count down to. Day 2's Conference
         Close is a moment rather than a block.</li>
+      <li><strong>Items are listed in the order the agenda prints them</strong>, and
+        are never re-sorted into clock order. Once an item has finished it moves
+        to a <strong>Finished</strong> list after the one still running, so
+        whatever is on is always the first row of the programme; the published
+        order is kept inside each of the two lists. Nothing is reordered, renamed or
+        given a time it was not published with.</li>
+      <li><strong>A row this page will not time shows a grey, empty plate</strong>
+        rather than a pie — the Welcome to Country, the networking drinks and
+        the Day 2 close. It is the same mark the large pie uses, for the same
+        reason, and it is not the same thing as a finished row, which is
+        dimmed instead.</li>
       <li><strong>The Day 1 morning is shown exactly as published, and it does
         not run in order.</strong> The agenda lists Morning Tea at 10:40am above
         a session starting at 10:20am. Rather than reorder someone else's
-        programme or invent a time to reconcile them, this page prints all three
-        items as published and runs no countdown across them. Everything from
-        12:00pm onward times normally.</li>
+        program or invent a time to reconcile them, this page prints all three
+        items as published and does not time them one by one. The one countdown
+        it runs across them is the stretch from the first published start to the
+        next published start after them, 9:30am to 12:00pm, and that 12:00pm is
+        inferred exactly the way every other finish on this page is. All three
+        rows show that same stretch emptying, identically and without a number
+        of their own, because which of the three is running is the part nobody
+        outside the summit can know.</li>
       <li>Times are Sydney time, <strong id="footZone">UTC+11:00</strong>. New South Wales daylight
         saving starts on the first Sunday in October — the 4th in 2026 — so both
         conference days fall inside it.</li>
@@ -650,7 +895,7 @@ button,select{ font:inherit; }
         show what Pie Timers looks like timing a real event. It is not run by,
         endorsed by or affiliated with the Neurodiversity Leadership Summit or
         The Leadership Institute, nobody has asked for it, and nothing on it is
-        an official programme. Speakers and session titles are reproduced from
+        an official program. Speakers and session titles are reproduced from
         the published agenda so the demonstration is of a real day rather than
         an invented one. Pie Timers itself is in closed testing and has not
         publicly launched.</p>
@@ -676,7 +921,7 @@ button,select{ font:inherit; }
 (function () {
   'use strict';
 
-  /* ── The programme, as published at theleadershipinstitute.com.au and
+  /* ── The program, as published at theleadershipinstitute.com.au and
      nothing more. Read off the two "Conference Day" panels on 23
      September 2026 — the agenda lives in modal markup rather than on the
      page body, so it was taken out of the DOM and then checked a second
@@ -715,7 +960,7 @@ button,select{ font:inherit; }
      `speaker` prints above the title. `tba: true` prints "Speaker to be
        announced" instead, and is never a name.
      A finish is read off the start of the NEXT item, the way a printed
-       programme reads, and anything resolved that way is marked
+       program reads, and anything resolved that way is marked
        `estimated` automatically by the resolver below — it is not typed
        per row, so it cannot drift.
      `end`        — an explicit published finish. There are none here.
@@ -831,7 +1076,7 @@ button,select{ font:inherit; }
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   /* ── Resolving finishes, and the two things that must not happen ──
-     Nothing in this programme publishes a finish, so every one is read
+     Nothing in this program publishes a finish, so every one is read
      off the next item — and every one of those is marked `estimated`
      HERE rather than by hand on each row, so a row can never claim a
      published finish it does not have.
@@ -860,7 +1105,8 @@ button,select{ font:inherit; }
      gets a `flow`: the ordinary items as they are, plus ONE synthetic
      entry standing for each run of `unclear` items. The synthetic entry
      starts at the earliest time in the run and ends where the next
-     ordinary item starts, and carries no pie.
+     ordinary item starts. Its own span IS timed; the items inside it are
+     not.
 
      This is the whole mechanism. Everything downstream — locate(), the
      now-card, the scrubber — reads `flow` and never has to know why. */
@@ -882,7 +1128,7 @@ button,select{ font:inherit; }
            previous card's "Then 9:30am · ..." says something useful
            rather than the bare word "Session". */
         speaker: earliest.speaker || null,
-        title: 'Morning sessions'
+        title: 'Morning program'
       });
     }
     day.flow = flow;
@@ -1015,6 +1261,16 @@ button,select{ font:inherit; }
     var h = Math.floor(n / 60), r = n % 60;
     return h + (h === 1 ? ' hour' : ' hours') + (r ? ' ' + r + ' min' : '');
   }
+  /* "1 hr left", not "1 hour left". The row label has to hold one line
+     under a 52–66px pie and the long form does not. The hero keeps the
+     long form, where there is room for it, and the two never appear on
+     the same line as one another. */
+  function shortWords(m) {
+    var n = Math.max(0, Math.ceil(m));
+    if (n < 60) return n + ' min';
+    var h = Math.floor(n / 60), r = n % 60;
+    return h + ' hr' + (r ? ' ' + r + ' min' : '');
+  }
   function dayWord(day) {
     var d = new Date(Date.parse(day.date + 'T00:00:00Z'));
     return d.toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' }) +
@@ -1116,7 +1372,7 @@ button,select{ font:inherit; }
     demo.last = real;
 
     /* Left running, the clock would slide past the close, then past
-       midnight, onto a date the programme knows nothing about — a demo
+       midnight, onto a date the program knows nothing about — a demo
        somebody left open on a desk would be sitting on "Already over"
        inside a minute. Roll to the next day instead, and from the last
        day back to the first. */
@@ -1155,6 +1411,10 @@ button,select{ font:inherit; }
 
     var key = day.date + '|' + state.phase + '|' + state.index + '|' + Math.floor(mins);
     if (force || key !== lastKey) { lastKey = key; buildList(day, today, mins, state); }
+    /* After buildList, never instead of it: a freshly rebuilt row has an
+       empty wedge, and waiting 200ms for the next tick to fill it is a
+       flicker once a minute, on every row at once. */
+    paintRows(day, today, mins, state);
   }
 
   /* Whose session it is, falling back to what kind of thing it is. A
@@ -1195,16 +1455,46 @@ button,select{ font:inherit; }
       el.hidden = false;
       setText(el, s);
     }
+    /* Elapsed and remaining from ONE rounded number, so the bar and the
+       two words beside it can never disagree by a minute. */
+    function meter(show, spentMin, totalMin) {
+      var box = $('meter');
+      if (!show) { box.hidden = true; return; }
+      box.hidden = false;
+      $('meterBar').style.width = (totalMin > 0 ? (spentMin / totalMin) * 100 : 0).toFixed(2) + '%';
+      setText($('meterSpent'), words(spentMin));
+      setText($('meterLeft'), words(totalMin - spentMin));
+    }
+    /* What the hero used to be. The pie is the DAY now, so the session you
+       are sitting in has to be said in words instead - and the row it
+       belongs to carries its own pie and its own countdown, which is where
+       a per-session number belongs once every row has one.
+
+       The unclear run needs no special case here: its synthetic day.flow
+       entry is already titled "Morning program", which is the only thing
+       this page is willing to call those three items collectively. */
+    function running(day, state) {
+      var bits = [];
+      if (state.phase === 'in' && state.item) bits.push('On now: ' + state.item.title + '.');
+      if (state.next) {
+        bits.push((state.phase === 'in' ? 'Next ' : 'Next up ') +
+          clock(state.next.time) + ': ' + state.next.title + '.');
+      }
+      return bits.join(' ');
+    }
 
     if (state.phase === 'other') {
-      /* "runs to 4:40pm" was a finish this programme does not publish —
+      /* "runs to 4:40pm" was a finish this program does not publish —
          4:40pm is where the networking drinks START. Say what is actually
          known: when the day opens, how many items, and that the last one
          is open-ended. */
       var last = day.items[day.items.length - 1];
-      accent(null); flag('');
-      set('idle', dayWord(day), day.items[0].title,
-        'Starts ' + clock(day.items[0].time) + ' · ' + day.items.length +
+      accent(null); flag(''); meter(false);
+      /* The event, not day.items[0].title - which put "Welcome to Country"
+         at 36px on a foyer screen on a day it had not run for two days,
+         over a dial counting nothing. */
+      set('idle', dayWord(day), PRESET.name,
+        'Opens ' + clock(day.items[0].time) + ' · ' + day.items.length +
         (day.items.length === 1 ? ' item' : ' items') + ' · ' +
         (last.open ? 'last item ' + clock(last.time) + ' onwards'
                    : 'runs to ' + clock(day.end)),
@@ -1214,106 +1504,109 @@ button,select{ font:inherit; }
       return;
     }
 
+    /* ── The hero is the whole day, not the session you are sitting in ──
+       Corrected 25 Sep on Mal's word. The page had been built with a
+       per-session hero and its own comments described that as deliberate,
+       which is how it survived a comparison against /ndexpo26 and an
+       adversarial review: I fed the wrong premise to both.
+
+       It is also the arrangement the page has been growing towards. Every
+       row now carries its own pie and the live row its own countdown, so
+       "how long is THIS" is answered thirteen times down the list. The one
+       question left for a dial the size of a dinner plate, read from across
+       a foyer, is how much of the day is left. The list carries the
+       sessions; the hero carries the day. */
+    /* The DAY is not a session and must not be coloured like one. Two
+       reasons, and the second is the one a screenshot found.
+
+       The obvious one: every row in the list is forest green for a
+       session, so a forest-green day pie says "the day is a session".
+       /ndexpo26 uses orange for its day for exactly this reason.
+
+       The one that mattered: the elapsed/remaining bar takes its two
+       colours from brand/pie-timers-elapsed-remaining.png, which labels
+       the plate green "time already spent" and ORANGE "time remaining".
+       Built with KINDS.session the bar was plate green against forest
+       green - two greens a step apart, which is the same defect the
+       /ndexpo26 session recorded when it drew the bar with two near
+       identical oranges and could not tell them apart in a screenshot.
+       The board's note on that says: look at the picture. */
+    var DAY = { accent: 'var(--orange-text)', fill: 'var(--orange)' };
+    var URGENT = { accent: 'var(--urgent-text)', fill: 'var(--urgent)' };
+
     if (state.phase === 'before') {
-      /* The run-up counts down to the DAY, not to its first item. It used
-         to put the title "Welcome to Country" over a draining pie and
-         "10 minutes until it starts" — a countdown hung on the one item
-         the brief says must carry no timer pressure, and the exact state
-         the day tabs land you on. The countdown is still useful, so it
-         stays; what it is pointed at is the day opening. */
+      /* The run-up counts down to the DAY opening, over the hour before
+         it. It used to put the title "Welcome to Country" over a draining
+         pie - a countdown hung on the one item the brief says must carry
+         no timer pressure, and the exact state the day tabs land on. */
       var until = state.next.time - mins, runUp = Math.min(60, state.next.time);
-      accent(KINDS[state.next.kind]); flag('');
-      /* Non-breaking space before the day number: `text-wrap:balance` on
-         the h2 broke "Conference Day 1 starts at 9am" after "Day" at
-         foyer size, orphaning the "1" onto a line of its own at 36px. */
-      set('', 'Starting soon',
-        day.label.replace(/ (\d+)$/, ' $1') + ' starts at ' + clock(state.next.time),
-        PRESET.venue.split(',')[0],
-        'Starts in ' + words(until),
+      accent(KINDS[state.next.kind]); flag(''); meter(false);
+      set('', 'Starting soon', PRESET.name + ' opens at ' + clock(day.start),
+        dayWord(day) + ' · ' + PRESET.venue.split(',')[0],
+        'Opens in ' + words(until),
         'First up: ' + state.next.title + '.');
-      dialSays('How long until the day starts');
+      dialSays('How long until the day opens');
       setPie(KINDS[state.next.kind], clamp(until / runUp), runUp);
       return;
     }
 
-    if (state.phase === 'in') {
-      var it = state.item;
-      accent(KINDS[it.kind]);
-      /* On the last item of a day, point at the next day rather than
-         saying "last item" and stopping. Day 1 ends on networking drinks
-         with no published finish, so it never reaches the done card at
-         all — without this, a foyer screen left running on the Wednesday
-         evening would never mention that there is a Thursday. */
-      var then = state.next ? 'Then ' + clock(state.next.time) + ' · ' + who(state.next)
-                            : nextDayLine(day);
+    if (state.phase === 'in' || state.phase === 'gap') {
+      var total = day.end - day.start;
+      /* ONE rounded number for the whole card: the countdown, the bar and
+         the two words under it are all derived from it, so they cannot
+         disagree by a minute. */
+      var leftMin = Math.max(0, Math.ceil(day.end - mins));
+      var spent = total - leftMin;
 
-      /* ── The block whose published times do not run in order ──
-         No pie, no countdown, no invented finish. The card names the
-         window the three items sit inside and then says, in the calmest
-         words available, that it is showing what was published rather
-         than a reading of it. */
-      if (it.unclear) {
-        var listed = it.members.map(function (m) { return clock(m.time); }).join(', ');
-        set('untimed', 'On now · This morning', 'Morning sessions',
-          clock(it.time) + ' – ' + clock(it.end) + ' · ' +
-            it.members.length + ' items published', '', then);
-        flag('The published agenda lists these at ' + listed +
-          ', in that order, so this page shows no finish times and runs no ' +
-          'countdown across them. Everything from ' + clock(it.end) +
-          ' is timed as normal.');
-        dialSays('No countdown is running across these items');
+      var then = running(day, state);
+      if (!state.next) then = (then ? then + ' ' : '') + nextDayLine(day);
+
+      /* ── The published day can be over while something is still on ──
+         Day 1's networking drinks START at day.end - 4:40pm against 4:40pm
+         - and have no published finish. The day pie is empty and there is
+         nothing honest left to count, but the drinks are on and the
+         running line says so. /ndexpo26 never meets this: its last block
+         ends exactly at its day.end. */
+      if (leftMin <= 0) {
+        accent(null); flag(''); meter(false);
+        set('untimed', dayWord(day), PRESET.name + ' has Closed',
+          'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '', then);
+        dialSays('The published day has finished');
         setPie(null, 0);
         return;
       }
-      flag('');
 
-      if (it.moment) {
-        set('untimed', 'On now · ' + who(it), it.title, clock(it.time), '', then);
-        dialSays('A moment in the programme, not a block');
-        setPie(null, 0);
-      } else if (it.period) {
-        /* A Welcome to Country. It has a finish, so the range is real,
-           but there is nothing here anybody should be counting down.
-           Range, no pie, and the "then" line points at what does start. */
-        set('untimed', 'On now · ' + KINDS[it.kind].word, it.title,
-          clock(it.time) + ' – ' + clock(it.end) + (it.estimated ? ' (estimated)' : ''),
-          '', then);
-        dialSays('No countdown runs on this item');
-        setPie(null, 0);
-      } else if (it.end === null) {
-        /* A start and no published finish: an appointment, not a session.
-           No pie, and no line where the countdown would go — an empty
-           countdown is worse than no countdown. */
-        set('untimed', 'On now · ' + who(it), it.title,
-          clock(it.time) + ' onwards', '', then);
-        dialSays('No finish has been published for this item');
-        setPie(null, 0);
+      var urgent = leftMin <= 10;
+      accent(urgent ? URGENT : DAY);
+
+      /* ── The three rows whose published times do not run in order ──
+         The note stays, and it is now what it always should have been: a
+         note about the LIST, shown while that stretch is the one running.
+         The hero no longer times the window - the day pie does not care
+         which item is on - so the sentence no longer has to explain a
+         countdown. It explains three rows the reader can see. */
+      if (state.phase === 'in' && state.item && state.item.unclear) {
+        var listed = state.item.members.map(function (m) { return clock(m.time); }).join(', ');
+        flag('The agenda lists these three at ' + listed + ', in that order. ' +
+          'This page prints them as published and does not time them one by ' +
+          'one. ' + clock(state.item.end) + ' is the next start the agenda ' +
+          'publishes, not a published finish.');
       } else {
-        var remaining = it.end - mins, total = it.end - it.time;
-        set(remaining <= 5 ? 'urgent' : '', 'On now · ' + who(it), it.title,
-          clock(it.time) + ' – ' + clock(it.end) +
-            (it.estimated ? ' (estimated)' : '') + ' · ' + words(total) + ' long',
-          words(remaining) + ' left', then);
-        dialSays('How much of this session is left');
-        setPie(KINDS[it.kind], clamp(remaining / total), total);
+        flag('');
       }
+
+      set(urgent ? 'urgent' : '', 'On now · ' + dayWord(day),
+        PRESET.name + ' is Open',
+        clock(day.start) + ' – ' + clock(day.end) + ' · ' + words(total) + ' long',
+        words(leftMin) + ' left', then);
+      meter(true, spent, total);
+      dialSays('How much of the day is left');
+      setPie(urgent ? URGENT : DAY, clamp(leftMin / total), total);
       return;
     }
 
-    if (state.phase === 'gap' && state.next) {
-      var wait = state.next.time - mins;
-      var gap = Math.max(1, state.next.time - (state.item.end !== null ? state.item.end : state.item.time));
-      accent(KINDS[state.next.kind]); flag('');
-      set('', 'Next up · ' + who(state.next), state.next.title,
-        clock(state.next.time) + (state.next.end !== null ? ' – ' + clock(state.next.end) + ' (estimated)' : ' onwards'),
-        words(wait) + ' to go', 'Between items.');
-      dialSays('How long until the next item');
-      setPie(KINDS[state.next.kind], clamp(wait / gap), gap);
-      return;
-    }
-
-    accent(null); flag('');
-    set('done', dayWord(day), 'That is the day.',
+    accent(null); flag(''); meter(false);
+    set('done', dayWord(day), PRESET.name + ' has Closed',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '', nextDayLine(day));
     dialSays('The day has finished');
     setPie(null, 0);
@@ -1335,10 +1628,116 @@ button,select{ font:inherit; }
   /* The list renders `day.items` in PUBLISHED order — the promise this
      page makes — and decides what is on now by time rather than by index,
      so it never has to agree with `flow` about a number. */
+  /* ── The wedge on each row ──
+     Full for something that has not started, shrinking for the one
+     running now, empty for one that is done, and the greyed plate for
+     any row this page will not time — see the .rowdial.untimed comment
+     for which three those are and why. The Day 1 morning run is the one
+     exception and it is handled first, below.
+
+     Only the live row carries a number. Thirteen countdowns at once is
+     noise; one is information.
+
+     A day that is not today gets plates all the way down. The hero says
+     "This day is not running today" and draws nothing; a column of full
+     pies beside it would say the opposite — that the whole day is still
+     ahead — which on the Thursday tab is true on the Wednesday and false
+     on the Thursday, and the list has no way of telling which. */
+  function paintRows(day, today, mins, state) {
+    /* No early return on list.hidden any more. Either list can be hidden
+       now - and at the end of the day the live one always is - so a guard
+       that skipped the repaint would leave thirteen finished rows holding
+       whatever wedge they had at the last minute they were visible. */
+    var live = day.date === today;
+    /* The synthetic flow entry standing for the run of unclear items, so
+       the three rows inside it can show the window the hero is showing. */
+    var block = null;
+    day.flow.forEach(function (fl) { if (fl.unclear) block = fl; });
+    day.items.forEach(function (it, i) {
+      var li = document.querySelector('#timeline [data-i="' + i + '"], ' +
+                                      '#timelineDone [data-i="' + i + '"]');
+      if (!li) return;
+      var dial = li.querySelector('.rowdial'), pie = li.querySelector('.pie');
+      var label = li.querySelector('.rowleft');
+      if (!dial || !pie || !label) return;
+
+      /* ── The three rows whose published times do not run in order ──
+         They carry the WINDOW's wedge — the identical fraction the hero
+         is showing, on all three, and no number on any of them. Not one
+         countdown each, which would be three claims the page cannot
+         make; and not three dead plates either, which is what shipped
+         first and is why this comment exists. At 11:30 the panel was
+         counting the morning down while the three rows it was counting
+         sat inert and every row BELOW them carried a full pie: the live
+         part of the day looked stopped and the part that had not started
+         looked alive. Mal had already rejected exactly that reading once,
+         on the hero, in those words.
+
+         Three identical wedges moving together is the true statement.
+         It says one stretch is running and does not say which of the
+         three is in it, which is the whole of what this page knows. The
+         "as published" chips and the note under the panel say the rest. */
+      if (it.unclear && block && live) {
+        dial.classList.remove('untimed');
+        pie.setAttribute('d', wedge(
+          mins < block.time ? 1 :
+          mins >= block.end ? 0 :
+          clamp((block.end - mins) / (block.end - block.time))));
+        setText(label, '');
+        return;
+      }
+
+      var timed = !it.unclear && !it.moment && !it.period &&
+                  it.end !== null && it.end > it.time;
+      if (!timed || !live) {
+        dial.classList.add('untimed');
+        pie.setAttribute('d', '');
+        setText(label, '');
+        return;
+      }
+      dial.classList.remove('untimed');
+
+      var running = !!state && state.phase === 'in' && state.item === it;
+      var remaining = running ? clamp((it.end - mins) / (it.end - it.time))
+                    : (mins < it.time ? 1 : 0);
+      pie.setAttribute('d', wedge(remaining));
+      setText(label, running ? shortWords(it.end - mins) + ' left' : '');
+    });
+  }
+
+  /* ── When a row is over ──
+     The single place this page decides an item has finished. Both the
+     row's .past class and which of the two lists it lands in read it, so
+     the list a row sits in and the way it is drawn cannot disagree.
+
+     /ndexpo26's version of this is three lines shorter and copying it
+     would break this page twice over:
+
+       - Its `it.end === null ? day.end` is safe there only because every
+         one of its six blocks carries an explicit end, so the branch is
+         dead code. Here it runs, on Day 1's networking drinks, whose
+         start IS day.end - 4:40pm against 4:40pm - so the drinks would be
+         filed under "Finished" at the instant they begin. That is the
+         same bug, in a new place, that five review lenses found on this
+         line once already. 1440 is the honest answer: an item with no
+         published finish runs until the date changes.
+       - It has no notion of an `unclear` run. These three rows have no
+         finish of their own by construction and never will; the only
+         finish they have is the window they share, which lives on the
+         synthetic day.flow entry. Without this branch they would never
+         finish at all, and the morning would sit in the live list until
+         midnight. With it, all three cross together at noon, which is
+         the whole point of treating them as one stretch. */
+  function endOf(day, it, block) {
+    if (it.unclear) return block ? block.end : day.end;
+    return it.moment ? it.time + 1 : (it.end === null ? 1440 : it.end);
+  }
+
   function buildList(day, today, mins, state) {
     setText($('listhead'), dayWord(day));
-    var list = $('timeline');
+    var list = $('timeline'), done = $('timelineDone');
     list.textContent = '';
+    done.textContent = '';
     var live = day.date === today;
 
     /* The "· next" badge is taken from the SAME flow entry the card's
@@ -1359,15 +1758,24 @@ button,select{ font:inherit; }
     var block = null;
     day.flow.forEach(function (f) { if (f.unclear) block = f; });
 
-    day.items.forEach(function (it) {
+    day.items.forEach(function (it, i) {
       var li = document.createElement('li');
       li.className = 'item';
+      /* paintRows finds rows by this, not by position: a row lives in
+         whichever list it belongs to and moves between them during the
+         day, so list.children[i] stops meaning day.items[i]. */
+      li.setAttribute('data-i', String(i));
       li.style.setProperty('--accent', KINDS[it.kind].accent);
+      /* The row dial fills with --accent-fill, the same token the hero
+         uses. Without this the li inherits the page default and every
+         break and meal drew a forest-green pie under an orange rule. */
+      li.style.setProperty('--accent-fill', KINDS[it.kind].fill);
 
+      var fin = endOf(day, it, block);
       if (live) {
         if (it.unclear && block) {
-          if (mins >= block.time && mins < block.end) li.classList.add('on');
-          else if (mins >= block.end) li.classList.add('past');
+          if (mins >= block.time && mins < fin) li.classList.add('on');
+          else if (mins >= fin) li.classList.add('past');
           /* The block's earliest member still takes the "next" badge
              before the block opens — otherwise the card says "Then
              9:30am · Tia Squire" from 9:10 and nothing in the list is
@@ -1383,9 +1791,8 @@ button,select{ font:inherit; }
              page contradicted itself for the rest of the evening, on the
              one row the footnote singles out as the honest special case.
              Found by review; five separate lenses landed on this line. */
-          var end = it.moment ? it.time + 1 : (it.end === null ? 1440 : it.end);
-          if (mins >= it.time && mins < end) li.classList.add('on');
-          else if (mins >= end) li.classList.add('past');
+          if (mins >= it.time && mins < fin) li.classList.add('on');
+          else if (mins >= fin) li.classList.add('past');
           else if (it === nextRow) li.classList.add('next');
         }
       }
@@ -1401,6 +1808,14 @@ button,select{ font:inherit; }
                   : '';
 
       li.innerHTML =
+        /* Left of everything, and filled in by paintRows() rather than
+           here: buildList only runs when the minute changes, and a wedge
+           has to move between those moments. */
+        '<span class="rowtimer"><svg class="rowdial" viewBox="0 0 160 160" aria-hidden="true">' +
+        '<circle class="plate" cx="80" cy="80" r="70"></circle>' +
+        '<path class="pie" d=""></path>' +
+        '<circle class="rim" cx="80" cy="80" r="70"></circle>' +
+        '</svg><b class="rowleft"></b></span>' +
         '<span class="when">' + esc(when) + '</span><span class="body">' +
         speaker +
         '<span class="name">' + esc(it.title) + '</span>' +
@@ -1408,10 +1823,23 @@ button,select{ font:inherit; }
         (!it.unclear && it.end !== null && !it.moment ? ' · ' + words(it.end - it.time) : '') +
         (it.unclear ? '<span class="tag">as published</span>' : '') +
         '</span></span>';
-      list.appendChild(li);
+      /* The only line that splits the day. Everything before it decided
+         how the row LOOKS; this decides where it sits, off the same
+         number, so a row cannot be dimmed in one list and live in the
+         other. Published order is preserved inside each list - the split
+         is by whether a thing has happened, never a re-sort by time - and
+         the footnote says so in as many words. */
+      (live && mins >= fin ? done : list).appendChild(li);
     });
 
-    follow(list);
+    /* A heading over an empty list is furniture: before the first item
+       nothing is finished, and after the last one nothing is left. The
+       DAY's heading is not on this switch - see the markup comment. */
+    list.hidden = !list.children.length;
+    done.hidden = !done.children.length;
+    $('listheadDone').hidden = done.hidden;
+
+    follow($('lists'));
   }
 
   /* ── Keep the live row in view, on the foyer screen only ──
@@ -1436,13 +1864,17 @@ button,select{ font:inherit; }
      was centred off the screen, so the last rows of the day were still
      unreachable and the box had eaten two visible rows for nothing.
      Measure the room that is actually left instead. */
-  function sizeList(list) {
+  /* Both of these take the BOX (#lists), which holds the live list, the
+     Finished heading and the finished list. Handed the live list alone
+     they would size and scroll a container that no longer holds the whole
+     programme, and the finished half would be unreachable. */
+  function sizeList(box) {
     if (!document.documentElement.classList.contains('venue')) {
-      list.style.maxHeight = '';
+      box.style.maxHeight = '';
       return;
     }
-    var top = Math.max(0, list.getBoundingClientRect().top);
-    list.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 14)) + 'px';
+    var top = Math.max(0, box.getBoundingClientRect().top);
+    box.style.maxHeight = Math.max(240, Math.round(window.innerHeight - top - 14)) + 'px';
   }
 
   function follow(list) {
@@ -1547,7 +1979,7 @@ button,select{ font:inherit; }
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
   function announce() {
-    var unofficial = ' Nothing here is an official programme.';
+    var unofficial = ' Nothing here is an official program.';
     var n = $('note'), f = $('footClock');
     var dayName = function (d) {
       return new Date(Date.parse(d.date + 'T00:00:00Z')).toLocaleDateString('en-AU',
