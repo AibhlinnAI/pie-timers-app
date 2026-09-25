@@ -146,5 +146,37 @@ $$;
 --                       ('can_use_screensaver')) as c(cap)
 --    where u.email = 'someone@example.com';
 --
--- To take it back, delete the identity rows and set complimentary =
--- false. Nothing expires on its own here.
+-- To take it back, BOTH statements, in this order. Clearing complimentary
+-- on its own does NOT revoke anything: the row is left status 'active' with
+-- current_period_end null, and has_active_plan() above still reads that as
+-- entitled through its SECOND branch. Supabase reports the update as
+-- succeeding, so it looks done while the person keeps Premium for ever.
+-- status has to leave 'active' too; 'none' is the no-access value.
+--
+-- Note the column: identity.product_entitlements keys on account_id, not
+-- user_id. A revoke written against user_id errors 42703 and deletes nothing.
+--
+--   delete from identity.product_entitlements
+--    where product_id = 'pie-timers'
+--      and account_id = (select id from auth.users
+--                         where email = 'someone@example.com');
+--
+--   update public.subscriptions s
+--      set complimentary = false, status = 'none', plan = null,
+--          current_period_end = null, updated_at = now()
+--     from auth.users u
+--    where s.user_id = u.id and u.email = 'someone@example.com'
+--   returning u.email, s.status, s.complimentary,
+--             public.has_active_plan(u.id) as still_entitled;
+--
+-- still_entitled must come back FALSE. Never take the update on trust:
+-- Supabase says "Success. No rows returned" whether it matched everybody
+-- or nobody, which is why the returning clause is there.
+--
+-- If the grant went to the WRONG ADDRESS, do not leave that person on
+-- 'none' -- that strips the trial the public offer gave them. Put them back
+-- instead: status 'trialing', plan 'trial', and current_period_end at their
+-- trial's finish line (trial_length() in schema-access-codes.sql lands the
+-- whole pre-18-Oct cohort on one instant).
+--
+-- Nothing expires on its own here.
