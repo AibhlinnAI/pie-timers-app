@@ -15,6 +15,11 @@
   var cfg = CT.config;
   var PRODUCT_ID = 'pie-timers';
 
+  /* "Did you mean …@gmail.com?" for app.js's own two email forms; the
+     shared sign-in panel asks it directly. Above the early return
+     because the tester invite is not an account feature. */
+  CT.emailTypos = window.Aibhlinn && window.Aibhlinn.emailTypos;
+
   if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return; // no account features configured
 
   /* Poll rather than use a callback: CT.turnstile owns the widget's

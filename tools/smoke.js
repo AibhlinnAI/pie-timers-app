@@ -31,10 +31,11 @@ const ROOT = path.join(__dirname, '..');
    and each file may depend on what the earlier ones left behind. */
 const SCRIPTS = [
   ['identity/identity.js',      ['Aibhlinn.identity']],
+  ['identity/email-typos.js',   ['Aibhlinn.emailTypos']],
   ['identity/entitlements.js',  ['Aibhlinn.entitlements']],
   ['identity/identity-ui.js',   ['Aibhlinn.identityUI']],
   ['app/config.js',             ['CT.config']],
-  ['app/identity-bridge.js',    ['CT.entitlements']],
+  ['app/identity-bridge.js',    ['CT.entitlements', 'CT.emailTypos']],
   ['app/supabase.js',           ['CT.auth', 'CT.db']],
   ['app/billing.js',            ['CT.turnstile', 'CT.billing']],
   ['app/notify.js',             ['CT.notify']],

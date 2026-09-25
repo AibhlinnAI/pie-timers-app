@@ -7,8 +7,10 @@
    a hardcoded word, so this file is copy-pasted into a second app
    verbatim rather than forked.
 
-   Depends on identity.js. Does not depend on entitlements.js or on
-   anything Pie-Timers-specific.
+   Depends on identity.js. Uses email-typos.js when it has loaded, to
+   ask "did you mean …?" before a code goes to a mistyped address, and
+   works exactly as before without it. Does not depend on
+   entitlements.js or on anything Pie-Timers-specific.
 
    Usage:
      Aibhlinn.identityUI.mount({
@@ -39,6 +41,10 @@
     (children || []).forEach(function (c) { node.appendChild(c); });
     return node;
   }
+
+  /* One page can mount the panel more than once (Pie Timers does, in
+     the header and in the upgrade card), and ids must not repeat. */
+  var mounts = 0;
 
   function mount(options) {
     var identity = Aibhlinn.identity;
@@ -95,6 +101,33 @@
       type: 'submit', class: 'aib-signin-submit', text: 'Email me a sign-in code'
     });
     form.appendChild(submit);
+
+    /* "…@gmail.comj" passes every check the server makes, and the code
+       then goes to an address that cannot exist -- a tester did exactly
+       that. When email-typos.js finds a near miss of a common provider,
+       the send waits on this question instead. Either answer carries
+       straight on with the send, and the address never changes without
+       the tap. Asked at the send rather than on blur, so nothing moves
+       under a finger already heading for the button. */
+    var typoId = 'aibSigninTypo' + (++mounts);
+    var typoAddress = el('strong', {});
+    var typo = el('div', {
+      class: 'aib-signin-typo', role: 'group', 'aria-labelledby': typoId,
+      tabindex: '-1', hidden: 'hidden'
+    }, [
+      el('p', { id: typoId }, [
+        document.createTextNode('Did you mean '), typoAddress, document.createTextNode('?')
+      ])
+    ]);
+    var typoUse = el('button', {
+      type: 'button', class: 'aib-signin-submit', text: 'Yes, use that'
+    });
+    var typoKeep = el('button', {
+      type: 'button', class: 'aib-signin-typo-keep', text: 'No, keep what I typed'
+    });
+    typo.appendChild(el('div', { class: 'aib-signin-typo-actions' }, [typoUse, typoKeep]));
+    form.appendChild(typo);
+    var typoKept = '';   // an address someone has said is right as typed
 
     /* Where a product's bot check renders, if the product supplies one. Empty and
        invisible otherwise -- identity itself knows nothing about
@@ -231,6 +264,7 @@
       submit.disabled = false;
       status.textContent = '';
       status.dataset.tone = '';
+      typo.hidden = true;
     }
 
     btn.addEventListener('click', function () {
@@ -258,10 +292,45 @@
       }, RESEND_AFTER_MS);
     }
 
+    /* True when the send should wait on the typo question, which is
+       then on screen. Looked up at send time, not at mount, so the
+       order the two files load in does not matter. Focus goes to the
+       question, not to "yes", so a second Enter pressed without
+       reading cannot accept a fix nobody looked at. */
+    function typoHolds(email) {
+      var typos = Aibhlinn.emailTypos;
+      var better = typos && email.toLowerCase() !== typoKept ? typos.suggest(email) : null;
+      if (!better) { typo.hidden = true; return false; }
+      typoAddress.textContent = better;
+      typo.hidden = false;
+      typo.focus();
+      return true;
+    }
+
+    function typoCarryOn() {
+      typo.hidden = true;
+      submit.focus();
+      submit.click();
+    }
+
+    typoUse.addEventListener('click', function () {
+      emailInput.value = typoAddress.textContent;
+      /* Announced as an edit, so the stale-state reset below runs as if
+         the fix had been typed. */
+      emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+      typoCarryOn();
+    });
+
+    typoKeep.addEventListener('click', function () {
+      typoKept = emailInput.value.trim().toLowerCase();
+      typoCarryOn();
+    });
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var email = emailInput.value.trim();
       if (!email) return;
+      if (typoHolds(email)) return;
       clearTimeout(resendTimer);
       submit.disabled = true;
       submit.textContent = 'Sending…';
@@ -335,6 +404,7 @@
       codeInput.value = '';
       codeSubmit.disabled = false;
       codeSubmit.textContent = CODE_LABEL;
+      typo.hidden = true;
     });
 
     googleBtn.addEventListener('click', function () {
