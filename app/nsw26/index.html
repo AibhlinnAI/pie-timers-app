@@ -548,17 +548,19 @@ button,select{ font:inherit; }
    Everything above was measured at 1920x1080, and only there. At 1366x768
    and 1280x720 (and a 1080p TV at 1.5x, which is 1280x720 in CSS pixels)
    the hero ran off the bottom: the time left, the meter and "On now" were
-   all below the fold, on a screen nobody can scroll. Under 900px of height
+   all below the fold, on a screen nobody can scroll. Up to 1000px of height
    the hero turns sideways, dial beside the words the way a phone lays it
    out, which needs about a third of the height. 1920x1080 is untouched.
+   Why 1000 and not 900: a sweep of every 2.5 minutes of the day found the
+   tall hero cut at 1920x901 to 1920x946, which is a maximised browser on a
+   1080p screen that is not in full screen, and clear at 960 by only 8px.
    Landscape only: a phone held upright is 844px tall too, and one that taps
    "The foyer screen" must keep the stacked hero, not a 230px dial beside
    a hundred pixels of words. */
-@media (max-height:900px) and (orientation:landscape){
+@media (max-height:1000px) and (orientation:landscape){
   .venue .brand .strap{ display:none; }
-  /* Spacing only, no type shrunk: at 8:30am, the worst instant (the running
-     line is two lines), this is what took 1280x720 from 2px over to clear
-     and 1024x768 from 22px over to clear. */
+  /* Spacing only, no type shrunk. The worst instant is not 8:30am: the long
+     talk titles at 11:05am and 1:20pm wrap the running line furthest. */
   .venue .wrap{ padding-block:12px 24px; gap:12px; }
   .venue .head{ padding-block:10px; }
   .venue .note{ padding-block:7px; }
@@ -568,6 +570,19 @@ button,select{ font:inherit; }
   .venue .dialwrap{ width:min(230px,30vh); flex:none; }
   .venue .title{ font-size:clamp(1.3rem,2.4vw,1.9rem); }
   .venue .meter{ margin-inline:0; }
+}
+
+/* The running line ("On now: ... Next ...") is the one line that grows with
+   a long talk title, and on a narrow or very short screen it is what ran off
+   the bottom: 1024x768 at 59 of 231 instants, 1024x600 at 177, and 1280x577
+   (a laptop at 150%, not in full screen) at 136. The list beside the hero
+   already says the same thing, with the session on now lit up and the next
+   one marked "next", so on those screens the line goes. Only while the day
+   is running: "Still to come", "Already over" and the sign-off are short,
+   and they stay. */
+@media (max-height:1000px) and (max-width:1100px) and (orientation:landscape),
+       (max-height:640px) and (orientation:landscape){
+  .venue .now:not(.idle):not(.done) .then{ display:none; }
 }
 
 /* ───────────────────────── Footnotes ───────────────────────── */
