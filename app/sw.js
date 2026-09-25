@@ -5,8 +5,19 @@
 'use strict';
 
 /* Bump this whenever a shell file changes, or installed copies keep
-   serving the old one. */
-var CACHE = 'countdown-timers-v103';
+   serving the old one. Bump it too when a page people may already have
+   opened changes in a way their saved copy would get wrong (an event page
+   going from demo to live, say): the fetch handler keeps the last copy of
+   every page each person opened, and only a new CACHE clears them. */
+var CACHE = 'countdown-timers-v105';
+
+/* The app itself answers at the manifest's scope ('./') and start_url
+   ('index.html'), resolved against this worker. Only these may fall back
+   to the app shell offline; see the fetch handler. */
+var APP_PAGES = [
+  new URL('./', self.location.href).pathname,
+  new URL('index.html', self.location.href).pathname
+];
 
 var SHELL = [
   './',
@@ -88,16 +99,36 @@ self.addEventListener('fetch', function (event) {
   // Network-first for navigations so a deploy is picked up promptly,
   // cache-first for static assets so the app opens instantly offline.
   if (request.mode === 'navigate') {
+    /* One saved copy per page, whatever the query. The host serves the
+       same file for /nsw26/, /nsw26/?live=1 and /nsw26/?fbclid=…, so a
+       copy per full URL only piles up entries, and an older one can
+       answer a later visit. */
+    var key = url.origin + url.pathname;
     event.respondWith(
       fetch(request)
         .then(function (response) {
-          var copy = response.clone();
-          caches.open(CACHE).then(function (c) { c.put(request, copy); });
+          /* An error page must not replace a good copy, or a hosting blip
+             while online becomes the app the next time it opens offline.
+             Redirects (/nsw26 → /nsw26/) are kept so they work offline. */
+          if (response.ok || response.type === 'opaqueredirect') {
+            var copy = response.clone();
+            caches.open(CACHE).then(function (c) { c.put(key, copy); });
+          }
           return response;
         })
-        .catch(function () {
-          return caches.match(request).then(function (hit) {
-            return hit || caches.match('index.html');
+        .catch(function (err) {
+          return caches.match(key).then(function (hit) {
+            if (hit) return hit;
+            if (APP_PAGES.indexOf(url.pathname) !== -1) return caches.match('index.html');
+            /* Anything else fails as a network error, so the browser shows
+               its own error page. The event pages (/nsw26/, /ndexpo26/
+               and the rest) sit inside this worker's scope, so for anyone
+               who has opened Pie Timers, web or Play app, falling back to
+               index.html here would serve the app at /nsw26/?live=1: its
+               relative styles.css and app.js resolve under /nsw26/ and
+               fail, and the person gets a broken, unstyled "Pie Timers"
+               page instead of the program. */
+            throw err;
           });
         })
     );
