@@ -20,6 +20,10 @@
     var t = q.get('theme');
     if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
     if (q.get('display') === '1' || q.get('view') === 'venue') document.documentElement.classList.add('venue');
+    /* The foyer link itself, ?display=1&live=1: a screen on a wall that
+       nobody touches all day. Only the URL can set this, never the view
+       toggle, so a phone that taps "The foyer screen" never gets it. */
+    if (q.get('display') === '1' && q.get('live') === '1') document.documentElement.classList.add('kiosk');
   } catch (e) { /* no query string support, no harm: carry on */ }
 }());
 </script>
@@ -534,6 +538,38 @@ button,select{ font:inherit; }
 .venue .item .rowdial{ width:64px; height:64px; }
 .venue .item .rowleft{ font-size:clamp(.72rem,.95vw,.82rem); margin-top:5px; }
 
+/* The foyer link (?display=1&live=1, see the head script) is a screen on a
+   wall. There is no view to choose and no clock to scrub, so the bar that
+   offers both goes. A phone that taps "The foyer screen" gets .venue but
+   never .kiosk, so it keeps the button to tap back. */
+.kiosk .bar{ display:none; }
+
+/* ── Short screens ──
+   Everything above was measured at 1920x1080, and only there. At 1366x768
+   and 1280x720 (and a 1080p TV at 1.5x, which is 1280x720 in CSS pixels)
+   the hero ran off the bottom: the time left, the meter and "On now" were
+   all below the fold, on a screen nobody can scroll. Under 900px of height
+   the hero turns sideways, dial beside the words the way a phone lays it
+   out, which needs about a third of the height. 1920x1080 is untouched.
+   Landscape only: a phone held upright is 844px tall too, and one that taps
+   "The foyer screen" must keep the stacked hero, not a 230px dial beside
+   a hundred pixels of words. */
+@media (max-height:900px) and (orientation:landscape){
+  .venue .brand .strap{ display:none; }
+  /* Spacing only, no type shrunk: at 8:30am, the worst instant (the running
+     line is two lines), this is what took 1280x720 from 2px over to clear
+     and 1024x768 from 22px over to clear. */
+  .venue .wrap{ padding-block:12px 24px; gap:12px; }
+  .venue .head{ padding-block:10px; }
+  .venue .note{ padding-block:7px; }
+  .venue .now{ padding-block:clamp(12px,2vh,20px); }
+  .venue .now{ flex-direction:row; text-align:left; align-items:center; }
+  .venue .now::before{ align-self:stretch; width:5px; height:auto; }
+  .venue .dialwrap{ width:min(230px,30vh); flex:none; }
+  .venue .title{ font-size:clamp(1.3rem,2.4vw,1.9rem); }
+  .venue .meter{ margin-inline:0; }
+}
+
 /* ───────────────────────── Footnotes ───────────────────────── */
 
 /* Full width like every other card, so the page keeps one left and right
@@ -730,8 +766,7 @@ button,select{ font:inherit; }
         show what Pie Timers looks like timing a real event. It is not run by,
         endorsed by or affiliated with the New South Wales ADHD Conference or My
         Spirited Mind, and nothing on it is an official program. Speakers and
-        session titles are reproduced from the published program so the
-        demonstration is of a real day rather than an invented one. If this page
+        session titles are reproduced from the published program. If this page
         and the published program ever disagree, <strong>the published program
         is right</strong>. Pie Timers itself is in closed testing and has not
         publicly launched.</p>
@@ -1474,14 +1509,13 @@ button,select{ font:inherit; }
     var unofficial = ' Nothing here is an official program.';
     var n = $('note'), f = $('footClock');
     if (mode.live) {
-      setText(n, 'Live — this page is reading the real ' + PRESET.timeZone +
+      setText(n, 'Live: this page is reading the real ' + PRESET.timeZone +
         ' clock, ' + zoneLabel(liveOffset()) + '.' + unofficial);
       /* It knows the published times and the real clock, nothing about
          the room: a talk that runs over still moves to Finished on time. */
       setText(f, 'This page is running on the real Sydney clock against the ' +
         'published times, so nothing on it moves if a session starts or ' +
-        'finishes late. The preview controls are not shown while it is ' +
-        'live, because a real clock cannot be paused or dragged.');
+        'finishes late.');
       return;
     }
     if (!touched && mode.at !== null) {
