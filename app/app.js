@@ -3163,6 +3163,7 @@
         try { localStorage.removeItem(STORE_KEY); } catch (e) { /* nothing to clear */ }
         state = normalise({});
         save({ fromSync: true });
+        CT.sync.forgetAccount();
 
         closeDeleteDialog();
         syncSettingInputs();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neurodivergent Entrepreneurs Expo 2026 — Pie Timers</title>
-<meta name="description" content="The Neurodivergent Entrepreneurs Expo, Tuesday 29 September 2026, as one four-hour pie with the time spent and the time left shown together. An unofficial demonstration of Pie Timers, on a simulated clock.">
+<meta name="description" content="The Neurodivergent Entrepreneurs Expo, Tuesday 29 September 2026. The programme published by Mingle Co, shown as pies you can watch run down, with the time spent and the time left together. A Pie Timers display.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -53,11 +53,18 @@ html{ -webkit-text-size-adjust:100%; }
    their dial maths. What differs is the shape of the event, and it is a
    bigger difference than between the first two:
 
-   - There is NO published programme. The council lists a start, a finish,
-     a venue and a price, and nothing else. So the hero is the whole day
-     as one four-hour pie rather than the session you are sitting in, and
-     the item list is empty on purpose. Inventing a running order for
-     somebody else's event is the one thing this page must never do.
+   - The hero is the whole day as one pie rather than the session you are
+     sitting in. That was settled when there was NO published programme —
+     the council listed only a start, a finish, a venue and a price — and
+     it is kept now that Mingle Co have supplied one, because the page had
+     already promised in its own words that a programme would fill the list
+     and leave the pie alone. The list carries the sessions; the hero
+     carries the day.
+   - The programme is REPRODUCED, never invented. Two spellings in it read
+     like slips ("Loarraine Monaghan", "Lauging Yoga") and are left exactly
+     as published. Quietly correcting somebody else's programme is the same
+     class of error as inventing one: either way the screen stops matching
+     the paper, and the paper is the one people are holding.
    - Because the hero is the whole day, elapsed and remaining are both on
      screen at once, the way the app's own appointment card shows them.
      That pairing is the product's strongest idea and it needs a long
@@ -379,21 +386,65 @@ button,select{ font:inherit; }
 }
 
 .listhead{ margin:0 0 10px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-muted); }
-.timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+/* Set off from the live list above it, and quieter: it is reference, not
+   the thing anyone is waiting on. */
+.listhead-done{ margin-top:18px; opacity:.75; }
+.venue .listhead-done{ margin-top:14px; }
+.timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
-  display:flex; gap:14px; align-items:baseline;
+  display:grid;
+  grid-template-columns:auto auto minmax(0,1fr);
+  align-items:baseline;
+  gap:4px 14px;
   padding:11px 14px; border-radius:var(--radius-sm);
   background:var(--card); border:1px solid var(--line);
   border-left:4px solid var(--accent);
 }
 .item .when{ font-variant-numeric:tabular-nums; font-weight:700; font-size:.88rem; color:var(--ink-muted); flex:none; min-width:11ch; }
 .item .body{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+
+/* ── A timer on each session, not just on the day ──
+   The whole-day pie answers "how long has this got left"; it cannot
+   answer "how long is THIS". At an event with a published programme that
+   is the question people are actually asking, so every row carries its
+   own pie: full for a session that has not started, shrinking for the one
+   running now, empty for one that is done. Read down the column and you
+   see the shape of the whole day at once.
+
+   Only the live row carries a number. Six countdowns at once is noise;
+   one is information. */
+/* The pies run down the LEFT edge of the list, so scanning the column
+   reads as one column of pies rather than a ragged right margin. The
+   markup puts the timer first too, so the reading order a screen reader
+   takes matches the order an eye takes.
+
+   One size for every row, including the live one. The live row used to be
+   drawn larger, which made the column jog in and out as the day moved and
+   made the row heights change under it. A column of identical circles,
+   emptying one after another, is the thing worth looking at. */
+.item .rowtimer{ width:88px; align-self:center; text-align:center; }
+.item .rowdial{ width:52px; height:52px; display:block; margin:0 auto; }
+/* One line, never two. It sits directly under its own pie, and a label
+   that wraps pushes the pie off the vertical centre of the row and makes
+   the whole column jump. The column is sized to the longest countdown
+   this programme can produce, and the wording is the short form for the
+   same reason. */
+.item .rowleft{
+  display:block; margin-top:4px; font-size:.66rem; font-weight:700;
+  color:var(--orange-text); font-variant-numeric:tabular-nums;
+  white-space:nowrap; line-height:1.25; min-height:1.25em;
+}
 /* Kept from NSW26 against the day a run sheet arrives with names on it. */
 .item .speaker{
   font-size:.7rem; font-weight:700; text-transform:uppercase;
   letter-spacing:.07em; color:var(--accent);
 }
 .item .name{ font-weight:600; overflow-wrap:anywhere; }
+/* The sub-items under each heading on the published programme — who is
+   doing what inside a block. Deliberately NOT repeated in the hero: the
+   hero is read from across a room and has to stay glanceable, and this
+   is the part you read standing at the screen. */
+.item .detail{ font-size:.8rem; color:var(--ink-muted); line-height:1.4; }
 .item .kind{ font-size:.74rem; color:var(--ink-muted); }
 .item.past{ opacity:.45; }
 .item.on{ background:var(--today-bg); border-color:var(--orange); border-left-color:var(--accent); box-shadow:var(--shadow); }
@@ -436,16 +487,37 @@ button,select{ font:inherit; }
    118-character session title, this one has a four-word one. The room can
    have the size back. Sized so nothing clips at 1920x1080 — which is
    checked, not hoped. */
-.venue .title{ font-size:clamp(1.6rem,3vw,2.6rem); }
+/* 2.3rem, not 2.6: the hero line now carries the event name AND its
+   status, and at 2.6 "Neurodivergent Entrepreneurs Expo is Open" took a
+   third line and pushed the on-now/next line 12px below a 1080 screen.
+   2.3 is the largest that clears it, with 48px to spare at the worst
+   instant. Measured at 9:30, 1pm and after the close. */
+.venue .title{ font-size:clamp(1.6rem,3vw,2.3rem); }
 .venue .left{ font-size:clamp(1.5rem,3vw,2.4rem); }
 .venue .window, .venue .then{ font-size:clamp(.95rem,1.4vw,1.2rem); }
 .venue .kicker{ font-size:clamp(.8rem,1.1vw,1rem); }
 .venue .meter-bar{ height:14px; }
 .venue .meter-legend{ font-size:clamp(.85rem,1.2vw,1.05rem); }
 .venue .meter{ max-width:620px; margin-inline:auto; width:100%; }
-.venue .item{ padding:13px 18px; }
+/* Tighter than the phone's rows. The 4px this gives back per row is
+     what buys the bigger dial above without losing the last block. */
+.venue .item{ padding:9px 16px; }
 .venue .item .name{ font-size:clamp(.95rem,1.25vw,1.1rem); }
 .venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
+.venue .item .rowtimer{ width:116px; }
+.venue .item .rowdial{ width:68px; height:68px; }
+/* Wide enough for "35 minutes left" on one line. At 80px it broke after
+   "minutes" and left "left" stranded under it, which is the one line on
+   the row somebody across the room is trying to read. */
+.venue .item .rowleft{ font-size:clamp(.72rem,.95vw,.82rem); margin-top:5px; }
+
+/* The sub-items are hidden on the foyer screen and kept on the phone.
+   Nothing is truncated or reworded - one view simply carries more than
+   the other, which is what having two views is for. At 1080 the six
+   blocks did not fit with them; without them the whole programme is on
+   screen at once, which is what a room wants from a foyer display. At
+   three metres this text was never legible anyway. */
+.venue .item .detail{ display:none; }
 .venue .known dl{ font-size:clamp(.92rem,1.2vw,1.05rem); }
 .venue .known .none{ font-size:clamp(.88rem,1.15vw,1rem); }
 
@@ -483,8 +555,14 @@ button,select{ font:inherit; }
   .dialwrap{ margin:0 auto; }
   .head{ flex-direction:column; }
   .clock{ text-align:left; }
-  .item{ flex-direction:column; gap:2px; align-items:stretch; }
-  .item .when{ min-width:0; }
+  /* Two columns on a phone: the pie keeps the left and spans both rows,
+     with the time above the text in column two. Stacking everything - what
+     this rule used to do, before the rows had pies - put the pie on top of
+     the text instead of beside it. */
+  .item{ grid-template-columns:auto minmax(0,1fr); gap:2px 12px; align-items:start; }
+  .item .rowtimer{ grid-row:1 / span 2; align-self:center; }
+  .item .when{ grid-column:2; min-width:0; }
+  .item .body{ grid-column:2; }
   .known dl{ grid-template-columns:1fr; gap:2px 0; }
   .known dd{ margin-bottom:6px; }
 }
@@ -514,7 +592,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official programme.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Programme by Mingle Co.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -566,6 +644,14 @@ button,select{ font:inherit; }
       <h2 class="listhead" id="listhead">The day</h2>
       <ol class="timeline" id="timeline" hidden></ol>
 
+      <!-- Finished blocks move down here as the day goes on, so whatever
+           is happening now is always at the top of the screen. On a foyer
+           display that matters more than it sounds: the live block stays
+           in the same place all day instead of walking down the screen and
+           eventually off it. -->
+      <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
+      <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
+
       <!-- Shown while the programme is empty, which today it is. If a run
            sheet arrives, the list above takes over and this hides itself;
            neither is built from the other. -->
@@ -575,16 +661,20 @@ button,select{ font:inherit; }
           <dt>Where</dt><dd>Woodville Town Hall, 74–76 Woodville Road, Woodville SA 5011</dd>
           <dt>Cost</dt><dd>Free</dd>
           <dt>Getting in</dt><dd>Drop in any time — it runs as one open four-hour block</dd>
-          <!-- "Listed by", not "Run with". The council publishes the
-               listing, which is where every fact on this card comes from.
-               Crediting them as the organiser while the actual organiser
-               is named nowhere - she has agreed to nothing and naming her
-               on an unofficial page would imply she had - got the
-               attribution wrong in both directions at once. -->
+          <!-- "Listed by", not "Run with": the council publishes the
+               listing, which is where this card's facts came from. The
+               whole card only renders while the item array is empty, which
+               it no longer is, so it is not on screen on the day. It is
+               kept for the next event copied out of this file.
+               NOTE: an earlier version of this comment explained that the
+               organiser was deliberately unnamed because she had agreed to
+               nothing. That stopped being true on 24 September — Mingle Co
+               supplied the programme and a foyer spot, and are credited by
+               name throughout the page now. -->
           <dt>Listed by</dt><dd>The City of Charles Sturt</dd>
         </dl>
         <p class="none">
-          <b>No running order has been published.</b>
+          <b>No running order has been published yet.</b>
           <!-- Not "the pie above times the whole four hours": in the foyer
                view the pie is beside this card rather than above it, and
                before 10am it is counting down to the doors rather than
@@ -603,8 +693,9 @@ button,select{ font:inherit; }
     <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at
       a glance without anyone reading a number. This page is the Neurodivergent
       Entrepreneurs Expo — Tuesday 29 September 2026, 10am to 2pm at Woodville
-      Town Hall — running as one four-hour pie, with the time already spent and
-      the time still to come shown together underneath it.
+      Town Hall — running as one pie for the whole day, with the time already
+      spent and the time still to come shown together underneath it, and the
+      published programme beside it.
       <!-- This clause is the only sentence on the page that describes the
            clock, so it has to change when the clock does. Left static it
            told a ?live=1 reader the time was simulated and to press a
@@ -621,25 +712,31 @@ button,select{ font:inherit; }
       display at the door shows, reading from across a room, with nobody
       touching it all day.</p>
 
-    <h2>What is published, and what is not</h2>
+    <h2>Where the times come from</h2>
     <ul>
-      <li>The City of Charles Sturt lists the expo as <strong>10:00am – 2:00pm on
-        Tuesday 29 September 2026</strong>, free, at Woodville Town Hall.</li>
-      <li><strong>No sessions, speakers or running order have been published.</strong>
-        None are shown here and none have been invented. A four-hour drop-in
-        block is what the expo is, and it is what the pie counts.</li>
+      <li>Every session, speaker and time on this page is taken from the
+        <strong>event programme published by Mingle Co</strong>, exactly as
+        written. Nothing has been added, shortened or guessed.</li>
+      <li>The expo is billed <strong>10am to 2pm</strong>, which is what the City
+        of Charles Sturt lists. The programme's own closing item runs to
+        <strong>2:10pm</strong>, so that is where the pie finishes — otherwise
+        the screen would call the day over while the closing is still running.</li>
+      <li>The gaps between sessions are real gaps in the published programme,
+        including the <strong>half hour from 1:30</strong>. They are drawn as
+        gaps rather than filled in.</li>
       <li>Times are South Australian, <strong>UTC+09:30</strong>. South Australian
         daylight saving does not start until Sunday 4 October, so 29 September
         is still standard time.</li>
     </ul>
 
     <div class="ask">
-      <p><strong>This is an unofficial page.</strong> It was made by AibhlínnAI to
-        show what Pie Timers looks like timing a real event. It is not run by,
-        endorsed by or affiliated with the expo's organisers or the City of
-        Charles Sturt, nobody has asked for it, and nothing on it is an official
-        programme. Pie Timers itself is in closed testing and has not publicly
-        launched.</p>
+      <p><strong>Whose page this is.</strong> The programme belongs to the
+        Neurodivergent Entrepreneurs Expo and to Mingle Co, who published it and
+        who agreed to it being shown here. Pie Timers and this page are
+        AibhlínnAI's. It is a display, not an official publication — if this
+        page and the programme ever disagree, <strong>the programme is
+        right</strong>. Pie Timers itself is in closed testing and has not
+        publicly launched.</p>
     </div>
 
     <!-- This line used to end "closing the tab leaves no trace of your having
@@ -649,7 +746,8 @@ button,select{ font:inherit; }
          and app/sw.js caches the response to any navigation here. What this
          page itself stores is still nothing, which is what the rest of the
          sentence says and what it can stand behind. The same sentence is on
-         /nsw26 and /nwc26 word for word, so the three cannot drift apart. -->
+         /nsw26, /nwc26 and /nls26 word for word. If you change one, change
+         four. -->
     <p class="promise">Pie Timers from AibhlínnAI · No ads. No tracking. No selling
       your data. Ever. This page sets no cookie, stores nothing and sends nothing
       anywhere: every countdown on it is worked out in your own browser.</p>
@@ -683,8 +781,14 @@ button,select{ font:inherit; }
     days: [
       {
         date: '2026-09-29', label: 'Expo day',
-        /* Minutes past midnight, venue wall clock. 600 = 10am, 840 = 2pm. */
-        start: 600, end: 840,
+        /* Minutes past midnight, venue wall clock. 600 = 10am, 850 = 2:10pm.
+
+           The expo is billed 10am to 2pm and that is what the council
+           lists, but the published programme's own closing item runs
+           2:00 to 2:10. The day has to end where the programme ends, or
+           the page would say "That is the expo" while Vee is still on
+           her feet thanking the sponsors. */
+        start: 600, end: 850,
 
         /* ── ADDING A RUN SHEET IS A DATA EDIT AND NOTHING ELSE ──
            Drop items in here, in time order, and the list beside the pie
@@ -710,7 +814,31 @@ button,select{ font:inherit; }
            `estimated:true` — the finish is inferred, and the screen says so.
 
            Nothing below this line needs changing to add a programme. ── */
-        items: []
+        items: [
+          { time: 600, end: 615, kind: 'session', title: 'Welcome & Opening',
+            detail: 'Acknowledgement of Country by Cameron Bradshaw · Meditation with Sarah Frustie · Official welcome by MC Krystle Jencik · Live performance by Anshul · Remarks from Vee, Mingle Co' },
+          { time: 615, end: 645, kind: 'session', speaker: 'JC Pride',
+            title: 'Overcoming Challenges Keynote Story',
+            detail: 'Entrepreneur and stroke survivor, on rebuilding his life and business with a disability.' },
+          { time: 650, end: 695, kind: 'session',
+            speaker: 'Loarraine Monaghan, Freddie Brincat & Matthew Pham',
+            title: 'Panel Discussion',
+            detail: 'Empowering neurodivergent people in the workforce.' },
+          { time: 700, end: 730, kind: 'session',
+            speaker: 'Sharon Harris & Sharon Stewart',
+            title: 'Practical Workshops',
+            detail: "Cooking with Shaz's Easy Recipes, and Lauging Yoga — participants invited to join in." },
+          { time: 740, end: 810, kind: 'session',
+            speaker: 'Nan Berrett & Michelle Gregory',
+            title: 'Inspirational Speakers',
+            detail: 'The Labyrinth Plan: There Are No Dead Ends · Anchored in Purpose' },
+          /* The half-hour between 1:30 and 2:00 is a real gap in the
+             published programme, not a missing item. The page draws it as
+             a gap and counts down to the close, which is correct: it is
+             the window when the room is free to walk the stalls. */
+          { time: 840, end: 850, kind: 'close', title: 'Thank You and Closing',
+            detail: 'Vee, founder of Mingle Co, thanks the sponsors, stall holders, speakers and participants.' }
+        ]
       }
     ]
   };
@@ -869,6 +997,15 @@ button,select{ font:inherit; }
     var h = Math.floor(n / 60), r = n % 60;
     return h + (h === 1 ? ' hour' : ' hours') + (r ? ' ' + r + ' min' : '');
   }
+  /* "1 hr 10 min left", not "1 hour 10 minutes left". The row label has
+     to hold one line under a 52-84px pie, and the long form does not. The
+     hero keeps the long form, where there is room for it. */
+  function shortWords(m) {
+    var n = Math.max(0, Math.ceil(m));
+    if (n < 60) return n + ' min';
+    var h = Math.floor(n / 60), r = n % 60;
+    return h + ' hr' + (r ? ' ' + r + ' min' : '');
+  }
   function dayWord(day) {
     var d = new Date(Date.parse(day.date + 'T00:00:00Z'));
     return d.toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' }) +
@@ -998,8 +1135,13 @@ button,select{ font:inherit; }
 
     paintNow(day, today, mins, state);
 
-    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next;
+    /* The finished count is in the key because it is what decides which
+       list a row sits in, and a row moving between lists is a rebuild. */
+    var fin = 0;
+    for (var fi = 0; fi < day.items.length; fi++) if (isFinished(day, day.items[fi], mins)) fin++;
+    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next + '|' + fin;
     if (force || key !== lastKey) { lastKey = key; buildList(day, state, mins); }
+    paintRows(day, state, mins);
   }
 
   function paintNow(day, today, mins, state) {
@@ -1057,7 +1199,7 @@ button,select{ font:inherit; }
          The longer one wrapped on the foyer screen and left "open" alone
          on a line of its own at 38px, which is the one line in the room
          that has to be read at a glance. */
-      set('', 'Starting soon', 'The expo opens at ' + clock(day.start),
+      set('', 'Starting soon', PRESET.name + ' opens at ' + clock(day.start),
         where + ' · ' + PRESET.venue.split(',')[0],
         'Doors open in ' + words(until),
         'Free, and you can arrive whenever suits.');
@@ -1073,7 +1215,7 @@ button,select{ font:inherit; }
       var urgent = leftMin <= 10;
       accent(urgent ? URGENT_KIND : DAY_KIND);
       set(urgent ? 'urgent' : '', 'On now · ' + DAY_KIND.word,
-        'The expo is open', where, words(leftMin) + ' left', running(day, state));
+        PRESET.name + ' is Open', where, words(leftMin) + ' left', running(day, state));
       meter(true, spentMin, total);
       dialSays('How much of the expo is left');
       setPie(urgent ? URGENT_KIND : DAY_KIND, clamp((day.end - mins) / total), total);
@@ -1082,9 +1224,12 @@ button,select{ font:inherit; }
 
     accent(null);
     meter(false);
-    set('done', dayWord(day), 'That is the expo.',
+    /* The sign-off is the product's own line - it is what app/manifest
+       .webmanifest has said since the beginning, and what the store
+       listing opens with. An empty plate is exactly the moment for it. */
+    set('done', dayWord(day), PRESET.name + ' has Closed',
       'Ran ' + clock(day.start) + ' to ' + clock(day.end) + '.', '',
-      'Four hours of neurodivergent-led business. Safe travels.');
+      'Some days you eat the pie. Some days the pie eats you.');
     dialSays('The expo has finished');
     setPie(null, 0);
   }
@@ -1092,11 +1237,15 @@ button,select{ font:inherit; }
   /* The line under the meter. With no programme it says the one thing a
      visitor needs; with a programme it says what is on and what is next,
      without ever taking the hero away from the whole-day pie. */
+  /* The hero line no longer repeats the speaker. Every session now
+     carries its own pie and its own name in the list, so naming the
+     panellists twice bought nothing and cost the foyer hero 74 pixels -
+     it wrapped, and pushed the bottom of the card below a 1080 screen. */
   function running(day, state) {
     var bits = [];
     if (state.cur >= 0) {
       var it = day.items[state.cur];
-      bits.push('On now: ' + (it.speaker ? it.speaker + ' · ' : '') + it.title + '.');
+      bits.push('On now: ' + it.title + '.');
     }
     if (state.next >= 0) {
       var nx = day.items[state.next];
@@ -1106,27 +1255,66 @@ button,select{ font:inherit; }
     return 'Free, drop in any time. The doors close at ' + clock(day.end) + '.';
   }
 
+  /* Every row's own pie, updated on the same tick as the hero.
+     A session that has not started is full, the one running is shrinking,
+     one that is finished is empty. Items with no real duration - a
+     moment, an open-ended item, a doors-and-exhibits period - get no pie
+     at all, exactly as the hero refuses to draw one for them. */
+  function paintRows(day, state, mins) {
+    day.items.forEach(function (it, i) {
+      /* By index, not by position: a row lives in whichever of the two
+         lists it belongs to, and it moves between them during the day. */
+      var li = document.querySelector('#timeline [data-i="' + i + '"], #timelineDone [data-i="' + i + '"]');
+      if (!li) return;
+      var dial = li.querySelector('.pie'), label = li.querySelector('.rowleft');
+      if (!dial || !label) return;
+      var drawable = it.end !== null && !it.moment && !it.period && !it.open;
+      var total = drawable ? it.end - it.time : 0;
+      if (!total) { dial.setAttribute('d', ''); setText(label, ''); return; }
+      var live = state.phase !== 'other' && i === state.cur;
+      var remaining = live ? clamp((it.end - mins) / total) : (it.time > mins ? 1 : 0);
+      dial.setAttribute('d', wedge(remaining));
+      setText(label, live ? shortWords(it.end - mins) + ' left' : '');
+    });
+  }
+
   /* The list and the "what is known" card are alternatives, not layers:
      exactly one of them is on screen, decided by whether anyone has
      published a running order. */
+  /* A block is finished once its own finish time has passed. The one
+     running now is NOT finished, so it stays at the top with whatever is
+     still to come. A moment is a minute wide; an open-ended item runs to
+     the end of the day. */
+  function isFinished(day, it, mins) {
+    var end = it.moment ? it.time + 1 : (it.end === null ? day.end : it.end);
+    return mins >= end;
+  }
+
   function buildList(day, state, mins) {
     $('listhead').textContent = dayWord(day);
     var list = $('timeline'), known = $('known');
+    var done = $('timelineDone'), doneHead = $('listheadDone');
 
     if (!day.items.length) {
       list.hidden = true;
       list.textContent = '';
+      done.hidden = true; doneHead.hidden = true;
+      done.textContent = '';
       known.hidden = false;
       return;
     }
     known.hidden = true;
-    list.hidden = false;
     list.textContent = '';
+    done.textContent = '';
 
     day.items.forEach(function (it, i) {
       var li = document.createElement('li');
       li.className = 'item';
+      li.setAttribute('data-i', String(i));
       li.style.setProperty('--accent', KINDS[it.kind].accent);
+      /* The row dial paints with --accent-fill, the same token the hero
+         pie uses. Without it the wedge inherits whatever the card had. */
+      li.style.setProperty('--accent-fill', KINDS[it.kind].fill);
       if (state.phase !== 'other') {
         if (i === state.cur) li.classList.add('on');
         else if (it.time <= mins) li.classList.add('past');
@@ -1135,15 +1323,33 @@ button,select{ font:inherit; }
       var when = it.moment ? clock(it.time)
                : it.end === null ? clock(it.time) + ' →'
                : clock(it.time) + ' – ' + clock(it.end) + (it.estimated ? ' (est.)' : '');
+      /* The dial and its label are filled in by paintRows on every tick,
+         not here: buildList only runs when the programme's position
+         changes, and a countdown has to move between those moments. */
       li.innerHTML =
+        '<span class="rowtimer"><svg class="rowdial" viewBox="0 0 160 160" aria-hidden="true">' +
+        '<circle class="plate" cx="80" cy="80" r="70"></circle>' +
+        '<path class="pie" d=""></path>' +
+        '<circle class="rim" cx="80" cy="80" r="70"></circle>' +
+        '</svg><b class="rowleft"></b></span>' +
         '<span class="when">' + esc(when) + '</span><span class="body">' +
         (it.speaker ? '<span class="speaker">' + esc(it.speaker) + '</span>' : '') +
         '<span class="name">' + esc(it.title) + '</span>' +
+        (it.detail ? '<span class="detail">' + esc(it.detail) + '</span>' : '') +
         '<span class="kind">' + esc(KINDS[it.kind].word) +
         (it.end !== null && !it.moment ? ' · ' + words(it.end - it.time) : '') +
         '</span></span>';
-      list.appendChild(li);
+      (state.phase !== 'other' && isFinished(day, it, mins) ? done : list).appendChild(li);
     });
+
+    /* Either list disappears, heading and all, when it has nothing in it -
+       before the doors there is nothing finished, and after the close
+       there is nothing left. An empty heading over an empty list is
+       furniture. */
+    list.hidden = !list.children.length;
+    done.hidden = !done.children.length;
+    doneHead.hidden = done.hidden;
+    $('listhead').hidden = list.hidden;
   }
 
   /* ─────────────────────────── Controls ─────────────────────────── */
@@ -1190,7 +1396,12 @@ button,select{ font:inherit; }
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
   function announce() {
-    var unofficial = ' Nothing here is an official programme.';
+    /* This used to read "Nothing here is an official programme." It was
+       true while nobody had asked for the page, and stopped being true the
+       day Mingle Co supplied the programme and a foyer spot. A credit is
+       the honest sentence now; the disclaiming is done properly in the
+       footer, where there is room to say who owns what. */
+    var unofficial = ' Programme by Mingle Co.';
     var n = $('note'), f = $('footClock');
     if (mode.live) {
       n.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
