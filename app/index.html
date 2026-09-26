@@ -345,6 +345,33 @@
         </table>
       </div>
 
+      <!-- Copy one day onto others, from tester feedback: the same hours
+           typed into five rows one at a time is exactly the kind of chore
+           this app exists to take away. Below the table rather than a
+           button per row, because on a phone the table scrolls sideways
+           and a per-row button would sit off-screen. The day chips and the
+           source list are built in app.js. -->
+      <section class="copy-day" aria-labelledby="copyDayHeading">
+        <h3 id="copyDayHeading">Copy a day to other days</h3>
+        <div class="copy-day-grid">
+          <label class="field">
+            <span>Copy from</span>
+            <select id="copyFrom"></select>
+          </label>
+          <div class="field">
+            <span id="copyToLabel">Copy to</span>
+            <div class="day-chips" id="copyTo" role="group" aria-labelledby="copyToLabel"></div>
+          </div>
+        </div>
+        <p class="hint">Copies the whole day: its times, its Head Home ticks, and
+        whether it's a working day.</p>
+        <div class="copy-day-actions">
+          <button class="btn btn-primary" type="button" id="copyApply" disabled>Copy</button>
+          <p class="copy-day-status" id="copyStatus" role="status" aria-live="polite"></p>
+          <button class="btn btn-quiet" type="button" id="copyUndo" hidden>Undo</button>
+        </div>
+      </section>
+
       <div class="naming">
         <label class="field field--grow">
           <span>Break timer is called:</span>
