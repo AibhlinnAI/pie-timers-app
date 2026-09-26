@@ -170,7 +170,11 @@ match the `cx` / `cy` / `r` in the SVG markup in `index.html`.
 - **Tab-title countdown.** The remaining time shows in the browser tab.
 - **12/24-hour clock**, optional seconds, export/import of settings as JSON.
 - **Overnight shifts** work — a timer whose target is before its start correctly
-  wraps past midnight.
+  wraps past midnight. After midnight the pies keep counting last night's shift,
+  on that day's own hours, until four hours after it ends or until today's
+  shift starts. Only a shift that really runs past midnight carries over, so
+  a 1pm–9pm day is not read as running into the next morning.
+  `node tools/shift-alerts-sim.js` checks every alert against the schedule.
 
 ## Colour scheme
 
@@ -669,6 +673,12 @@ exposes no secrets, but does name them.
 - **Client/server parity.** Every minute of the day across five schedules
   (7,200 checks) produces the same milestone in `app.js` and in the edge function.
   Zero mismatches.
+- **Shifts across midnight.** `tools/shift-alerts-sim.js` runs the real
+  `app.js` and `notify-milestones` code through afternoon, evening, night, 12- and
+  14-hour shifts, a rotating roster and ten daylight-saving changes (including
+  zones that change at midnight), at 1 s and 60 s ticks and two cron timings.
+  Every "Time reached" and milestone fires once, at the right moment, tagged
+  with the day the shift started.
 - **Sync.** Remote-newer, local-newer, empty-remote seeding, exact ties, no-echo on
   adopt, corrupt server payloads, and network failure — 9 cases, all passing.
 - **Crypto.** The RFC 8291 payload round-trips through an independent decryption
