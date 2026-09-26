@@ -90,6 +90,12 @@
 
   --shell:       #F5F7F5;
   --card:        #FFFFFF;
+  /* The page ground again, under the name the shared sign-in panel
+     (identity/identity-ui.css) fills its fields with. Without it those
+     fields kept that file's dark fallback in the light theme, under
+     light-theme text, and could not be read. Follows --shell, so the
+     dark theme below needs no line of its own. */
+  --bg:          var(--shell);
 
   /* Text. #FF8A00 is ~2.6:1 on white, which fails at any size, so these
      darker oranges carry the same meaning where the colour must be read. */

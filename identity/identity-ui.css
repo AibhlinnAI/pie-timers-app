@@ -1,9 +1,16 @@
 /* ============================================================
    AibhlínnAI shared sign-in UI.
    Deliberately unbranded — colours come from the host app's own CSS
-   custom properties (--ink, --card, --line, --accent, etc.), which
-   every AibhlínnAI app is expected to define. This file supplies
-   structure and behaviour, not a palette.
+   custom properties, which every AibhlínnAI app is expected to define.
+   This file supplies structure and behaviour, not a palette.
+
+   All seven it reads: --ink, --ink-muted, --card, --line, --accent,
+   --urgent-text, and --bg (the page ground; the fields are filled with
+   it). The fallbacks are one dark palette, so a host with a light
+   theme should define all seven, or at least check each fallback on
+   its light ground: text follows the host while an undefined fill
+   stays dark, which is how Pie Timers' light theme lost its email
+   field until it defined --bg.
    ============================================================ */
 
 .aib-signin-btn{
