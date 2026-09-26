@@ -1165,6 +1165,9 @@
   /* ─────────────────────────── Schedule editor ─────────────────────────── */
 
   function buildScheduleEditor() {
+    // A rebuild means the schedule was replaced (sync, import, reset), so
+    // an Undo from before it would restore days that no longer apply.
+    clearCopyUndo();
     var body = $('scheduleBody');
     body.innerHTML = '';
 
@@ -1252,8 +1255,152 @@
     });
   }
 
+  /* ─────────────────────────── Copy a day ───────────────────────────
+     From tester feedback: typing the same hours into five rows one at a
+     time is exactly the chore this app exists to take away.
+
+     Copies the whole day, including whether it is a working day, so each
+     target reads exactly like the source afterwards. Copying only the
+     times would leave a day that looks copied but still says time off.
+
+     Selected days are filled AND ticked, not just recoloured: the same
+     tester found a picker's selected AM/PM hard to tell apart, and a
+     colour change alone is the easiest state to miss.
+
+     Undo lasts until the schedule next changes. One tap can overwrite six
+     days, so a mis-tap should cost one tap to take back, not six rows of
+     retyping. */
+
+  var copyTargets = {};
+  var copyUndo = null;
+
+  function buildCopyDay() {
+    var from = $('copyFrom');
+    var chips = $('copyTo');
+
+    DAYS.forEach(function (day) {
+      var option = document.createElement('option');
+      option.value = day;
+      option.textContent = day;
+      from.appendChild(option);
+
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'day-chip';
+      chip.dataset.day = day;
+      chip.textContent = day.slice(0, 3);
+      chip.setAttribute('aria-label', day);
+      chip.addEventListener('click', function () {
+        copyTargets[day] = !copyTargets[day];
+        renderCopyDay();
+      });
+      chips.appendChild(chip);
+    });
+
+    from.addEventListener('change', function () {
+      delete copyTargets[from.value];   // a day cannot be copied onto itself
+      renderCopyDay();
+    });
+    $('copyApply').addEventListener('click', applyCopyDay);
+    $('copyUndo').addEventListener('click', undoCopyDay);
+    renderCopyDay();
+  }
+
+  function copyTargetDays() {
+    var source = $('copyFrom').value;
+    return DAYS.filter(function (day) { return day !== source && copyTargets[day]; });
+  }
+
+  function renderCopyDay() {
+    var source = $('copyFrom').value;
+    $$('#copyTo .day-chip').forEach(function (chip) {
+      var day = chip.dataset.day;
+      var isSource = day === source;
+      chip.disabled = isSource;
+      chip.setAttribute('aria-pressed', String(!isSource && !!copyTargets[day]));
+      chip.title = isSource ? 'Copying from ' + day : '';
+    });
+
+    var targets = copyTargetDays();
+    var button = $('copyApply');
+    button.disabled = targets.length === 0;
+    button.textContent = targets.length === 0 ? 'Copy'
+      : targets.length === 1 ? 'Copy to ' + targets[0]
+      : 'Copy to ' + targets.length + ' days';
+  }
+
+  /* "Tuesday", "Tuesday and Friday", "Tuesday, Wednesday and Friday". */
+  function listDays(days) {
+    if (days.length < 2) return days.join('');
+    return days.slice(0, -1).join(', ') + ' and ' + days[days.length - 1];
+  }
+
+  function showCopyStatus(message, canUndo) {
+    $('copyStatus').textContent = message;
+    $('copyUndo').hidden = !canUndo;
+  }
+
+  /* The status line describes the last copy or undo, so it goes too:
+     left up, it would describe a schedule that has since moved on. */
+  function clearCopyUndo() {
+    copyUndo = null;
+    showCopyStatus('', false);
+  }
+
+  function applyCopyDay() {
+    var source = $('copyFrom').value;
+    var targets = copyTargetDays();
+    if (!targets.length) return;
+    var hadFocus = document.activeElement === $('copyApply');
+
+    var before = { source: source, days: {} };
+    targets.forEach(function (day) {
+      before.days[day] = Object.assign({}, state.schedule[day]);
+      state.schedule[day] = Object.assign({}, state.schedule[source]);
+    });
+
+    copyTargets = {};
+    save();
+    completeOnboarding();
+    buildScheduleEditor();
+    applyLunchLabel();
+    render();
+    flashSaved();
+    renderCopyDay();
+
+    // Set after the rebuild and flashSaved above, both of which clear it.
+    copyUndo = before;
+    showCopyStatus('Copied ' + source + ' to ' + listDays(targets) + '.', true);
+    // The Copy button has just disabled itself; keep focus in this box.
+    if (hadFocus) $('copyUndo').focus();
+  }
+
+  function undoCopyDay() {
+    if (!copyUndo) return;
+    var undo = copyUndo;
+    var days = Object.keys(undo.days);
+    days.forEach(function (day) { state.schedule[day] = undo.days[day]; });
+
+    save();
+    buildScheduleEditor();
+    applyLunchLabel();
+    render();
+    flashSaved();
+
+    // Back to the moment before Copy was pressed, days still picked, so
+    // one wrong day can be fixed without starting again.
+    $('copyFrom').value = undo.source;
+    copyTargets = {};
+    days.forEach(function (day) { copyTargets[day] = true; });
+    renderCopyDay();
+    showCopyStatus('Put ' + listDays(days) + ' back how ' +
+      (days.length === 1 ? 'it was' : 'they were') + '.', false);
+    $('copyApply').focus();
+  }
+
   var savedTimer;
   function flashSaved() {
+    clearCopyUndo();   // every local schedule edit passes through here
     var el = $('scheduleSaved');
     el.textContent = 'Saved.';
     clearTimeout(savedTimer);
@@ -3283,6 +3430,7 @@
 
   syncSettingInputs();
   buildScheduleEditor();
+  buildCopyDay();
   primeAppointmentForm();
   buildAppointmentList();
   renderAppointmentsPlanGate();
