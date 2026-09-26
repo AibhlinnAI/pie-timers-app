@@ -18,10 +18,19 @@ memory, so it is the only way a fact learned in one session reaches the next.
   never suggest tracking it "so it survives", and if you find it untracked,
   that is not an oversight to fix.
 - **If you are in a clone and there is no board, that is expected.** It exists
-  only in Mal's Drive folder at `H:\My Drive\Professional\AibhlínnAI\Pie
-  Timers`. Do not create a fresh one in a clone — a second board that nobody
-  else reads is worse than none, because it looks authoritative. Ask Mal for
-  the contents, or work without it and tell him what you could not check.
+  only in Mal's Drive folder at `H:\My Drive\Professional\AibhlínnAI\repo\Pie
+  Timers` — **the repo moved under `repo\` on 24 September 2026**, so any
+  older path you have seen is stale. Do not create a fresh one in a clone — a
+  second board that nobody else reads is worse than none, because it looks
+  authoritative. Ask Mal for the contents, or work without it and tell him
+  what you could not check.
+- **The repo is one folder inside a private Drive folder, and the boundary
+  matters.** `AibhlínnAI\repo\` holds code repos; `AibhlínnAI\events\` holds
+  per-event working material — invoices, organisers' photos, draft emails —
+  none of which belongs in a public repo. Two near-misses on 24 Sep 2026 put
+  an organiser's programme and a conference invoice inside the working tree;
+  neither was committed. `!! PUBLIC REPO STARTS HERE !!.md` at the repo root
+  and `!! FOLDER MAP !!.md` one level up exist to make that boundary visible.
 
 ## Things worth knowing before you act
 
