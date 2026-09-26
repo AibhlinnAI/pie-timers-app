@@ -806,7 +806,7 @@ button,select{ font:inherit; }
 
            What wrapping buys is that the finished list does not become a
            SECOND scroll container inside the venue layout, and that one
-           box measures and scrolls the whole programme rather than half of
+           box measures and scrolls the whole program rather than half of
            it. That is worth having and it is all that is being claimed. -->
       <!-- role and name because this div is FOCUSABLE: Chrome puts a
            scroll container in the tab order, and on the foyer view it is
@@ -863,7 +863,7 @@ button,select{ font:inherit; }
       <li><strong>Items are listed in the order the agenda prints them</strong>, and
         are never re-sorted into clock order. Once an item has finished it moves
         to a <strong>Finished</strong> list after the one still running, so
-        whatever is on is always the first row of the programme; the published
+        whatever is on is always the first row of the program; the published
         order is kept inside each of the two lists. Nothing is reordered, renamed or
         given a time it was not published with.</li>
       <li><strong>A row this page will not time shows a grey, empty plate</strong>
@@ -1867,7 +1867,7 @@ button,select{ font:inherit; }
   /* Both of these take the BOX (#lists), which holds the live list, the
      Finished heading and the finished list. Handed the live list alone
      they would size and scroll a container that no longer holds the whole
-     programme, and the finished half would be unreachable. */
+     program, and the finished half would be unreachable. */
   function sizeList(box) {
     if (!document.documentElement.classList.contains('venue')) {
       box.style.maxHeight = '';

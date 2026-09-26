@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neurodivergent Entrepreneurs Expo 2026 — Pie Timers</title>
-<meta name="description" content="The Neurodivergent Entrepreneurs Expo, Tuesday 29 September 2026. The programme published by Mingle Co, shown as pies you can watch run down, with the time spent and the time left together. A Pie Timers display.">
+<meta name="description" content="The Neurodivergent Entrepreneurs Expo, Tuesday 29 September 2026. The program published by Mingle Co, shown as pies you can watch run down, with the time spent and the time left together. A Pie Timers display.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -54,15 +54,15 @@ html{ -webkit-text-size-adjust:100%; }
    bigger difference than between the first two:
 
    - The hero is the whole day as one pie rather than the session you are
-     sitting in. That was settled when there was NO published programme —
+     sitting in. That was settled when there was NO published program —
      the council listed only a start, a finish, a venue and a price — and
      it is kept now that Mingle Co have supplied one, because the page had
-     already promised in its own words that a programme would fill the list
+     already promised in its own words that a program would fill the list
      and leave the pie alone. The list carries the sessions; the hero
      carries the day.
-   - The programme is REPRODUCED, never invented. Two spellings in it read
+   - The program is REPRODUCED, never invented. Two spellings in it read
      like slips ("Loarraine Monaghan", "Lauging Yoga") and are left exactly
-     as published. Quietly correcting somebody else's programme is the same
+     as published. Quietly correcting somebody else's program is the same
      class of error as inventing one: either way the screen stops matching
      the paper, and the paper is the one people are holding.
    - Because the hero is the whole day, elapsed and remaining are both on
@@ -75,7 +75,7 @@ html{ -webkit-text-size-adjust:100%; }
      data edit and nothing else. The format is documented in the comment
      immediately above the (empty) item array in the script below. That
      array is the ONLY place the literal appears, deliberately, so a
-     find-and-replace to add a programme cannot land in a comment.
+     find-and-replace to add a program cannot land in a comment.
 
    The palette is not a choice made here. It is Pie Timers' own, carried
    across from app/styles.css token for token, down to the green being
@@ -405,7 +405,7 @@ button,select{ font:inherit; }
 
 /* ── A timer on each session, not just on the day ──
    The whole-day pie answers "how long has this got left"; it cannot
-   answer "how long is THIS". At an event with a published programme that
+   answer "how long is THIS". At an event with a published program that
    is the question people are actually asking, so every row carries its
    own pie: full for a session that has not started, shrinking for the one
    running now, empty for one that is done. Read down the column and you
@@ -427,7 +427,7 @@ button,select{ font:inherit; }
 /* One line, never two. It sits directly under its own pie, and a label
    that wraps pushes the pie off the vertical centre of the row and makes
    the whole column jump. The column is sized to the longest countdown
-   this programme can produce, and the wording is the short form for the
+   this program can produce, and the wording is the short form for the
    same reason. */
 .item .rowleft{
   display:block; margin-top:4px; font-size:.66rem; font-weight:700;
@@ -440,7 +440,7 @@ button,select{ font:inherit; }
   letter-spacing:.07em; color:var(--accent);
 }
 .item .name{ font-weight:600; overflow-wrap:anywhere; }
-/* The sub-items under each heading on the published programme — who is
+/* The sub-items under each heading on the published program — who is
    doing what inside a block. Deliberately NOT repeated in the hero: the
    hero is read from across a room and has to stay glanceable, and this
    is the part you read standing at the screen. */
@@ -514,7 +514,7 @@ button,select{ font:inherit; }
 /* The sub-items are hidden on the foyer screen and kept on the phone.
    Nothing is truncated or reworded - one view simply carries more than
    the other, which is what having two views is for. At 1080 the six
-   blocks did not fit with them; without them the whole programme is on
+   blocks did not fit with them; without them the whole program is on
    screen at once, which is what a room wants from a foyer display. At
    three metres this text was never legible anyway. */
 .venue .item .detail{ display:none; }
@@ -592,7 +592,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Programme by Mingle Co.</p>
+  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Program by Mingle Co.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -652,7 +652,7 @@ button,select{ font:inherit; }
       <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
       <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
 
-      <!-- Shown while the programme is empty, which today it is. If a run
+      <!-- Shown while the program is empty, which today it is. If a run
            sheet arrives, the list above takes over and this hides itself;
            neither is built from the other. -->
       <div class="known" id="known">
@@ -669,7 +669,7 @@ button,select{ font:inherit; }
                NOTE: an earlier version of this comment explained that the
                organiser was deliberately unnamed because she had agreed to
                nothing. That stopped being true on 24 September — Mingle Co
-               supplied the programme and a foyer spot, and are credited by
+               supplied the program and a foyer spot, and are credited by
                name throughout the page now. -->
           <dt>Listed by</dt><dd>The City of Charles Sturt</dd>
         </dl>
@@ -681,7 +681,7 @@ button,select{ font:inherit; }
                timing the expo. A sentence true in one view at one time of
                day is a sentence to rewrite, not to caveat. -->
           <span>So this page does not show one, and the pie follows the day as
-          a whole instead. If a programme is published, every item appears here
+          a whole instead. If a program is published, every item appears here
           with its own times and the whole-day pie stays exactly where it is.</span>
         </p>
       </div>
@@ -695,7 +695,7 @@ button,select{ font:inherit; }
       Entrepreneurs Expo — Tuesday 29 September 2026, 10am to 2pm at Woodville
       Town Hall — running as one pie for the whole day, with the time already
       spent and the time still to come shown together underneath it, and the
-      published programme beside it.
+      published program beside it.
       <!-- This clause is the only sentence on the page that describes the
            clock, so it has to change when the clock does. Left static it
            told a ?live=1 reader the time was simulated and to press a
@@ -715,13 +715,13 @@ button,select{ font:inherit; }
     <h2>Where the times come from</h2>
     <ul>
       <li>Every session, speaker and time on this page is taken from the
-        <strong>event programme published by Mingle Co</strong>, exactly as
+        <strong>event program published by Mingle Co</strong>, exactly as
         written. Nothing has been added, shortened or guessed.</li>
       <li>The expo is billed <strong>10am to 2pm</strong>, which is what the City
-        of Charles Sturt lists. The programme's own closing item runs to
+        of Charles Sturt lists. The program's own closing item runs to
         <strong>2:10pm</strong>, so that is where the pie finishes — otherwise
         the screen would call the day over while the closing is still running.</li>
-      <li>The gaps between sessions are real gaps in the published programme,
+      <li>The gaps between sessions are real gaps in the published program,
         including the <strong>half hour from 1:30</strong>. They are drawn as
         gaps rather than filled in.</li>
       <li>Times are South Australian, <strong>UTC+09:30</strong>. South Australian
@@ -730,11 +730,11 @@ button,select{ font:inherit; }
     </ul>
 
     <div class="ask">
-      <p><strong>Whose page this is.</strong> The programme belongs to the
+      <p><strong>Whose page this is.</strong> The program belongs to the
         Neurodivergent Entrepreneurs Expo and to Mingle Co, who published it and
         who agreed to it being shown here. Pie Timers and this page are
         AibhlínnAI's. It is a display, not an official publication — if this
-        page and the programme ever disagree, <strong>the programme is
+        page and the program ever disagree, <strong>the program is
         right</strong>. Pie Timers itself is in closed testing and has not
         publicly launched.</p>
     </div>
@@ -784,8 +784,8 @@ button,select{ font:inherit; }
         /* Minutes past midnight, venue wall clock. 600 = 10am, 850 = 2:10pm.
 
            The expo is billed 10am to 2pm and that is what the council
-           lists, but the published programme's own closing item runs
-           2:00 to 2:10. The day has to end where the programme ends, or
+           lists, but the published program's own closing item runs
+           2:00 to 2:10. The day has to end where the program ends, or
            the page would say "That is the expo" while Vee is still on
            her feet thanking the sponsors. */
         start: 600, end: 850,
@@ -805,7 +805,7 @@ button,select{ font:inherit; }
              blanking the page.
            `speaker` is optional and prints above the title.
            A finish is read off the start of the NEXT item, the way a
-             printed programme reads, so most items need no `end`.
+             printed program reads, so most items need no `end`.
            `end`       — an explicit finish, when the next item does not give one.
            `period:true` — a real range with nothing to count down to
                            (registration, exhibits). Range on screen, no pie.
@@ -813,7 +813,7 @@ button,select{ font:inherit; }
            `moment:true` — an instant, not a block.
            `estimated:true` — the finish is inferred, and the screen says so.
 
-           Nothing below this line needs changing to add a programme. ── */
+           Nothing below this line needs changing to add a program. ── */
         items: [
           { time: 600, end: 615, kind: 'session', title: 'Welcome & Opening',
             detail: 'Acknowledgement of Country by Cameron Bradshaw · Meditation with Sarah Frustie · Official welcome by MC Krystle Jencik · Live performance by Anshul · Remarks from Vee, Mingle Co' },
@@ -833,7 +833,7 @@ button,select{ font:inherit; }
             title: 'Inspirational Speakers',
             detail: 'The Labyrinth Plan: There Are No Dead Ends · Anchored in Purpose' },
           /* The half-hour between 1:30 and 2:00 is a real gap in the
-             published programme, not a missing item. The page draws it as
+             published program, not a missing item. The page draws it as
              a gap and counts down to the close, which is correct: it is
              the window when the room is free to walk the stalls. */
           { time: 840, end: 850, kind: 'close', title: 'Thank You and Closing',
@@ -877,7 +877,7 @@ button,select{ font:inherit; }
      never drain. Most of those writes are the same string. */
   function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
 
-  /* Resolve each finish from the next item, the way a printed programme
+  /* Resolve each finish from the next item, the way a printed program
      reads. A no-op while `items` is empty, and correct the moment it is
      not. A kind that is not in the map falls back rather than throwing —
      a blank page is a poor way to find out someone mistyped a word. */
@@ -1106,7 +1106,7 @@ button,select{ font:inherit; }
     demo.last = real;
 
     /* Left running, the clock would slide past the close, then past
-       midnight, onto a date the programme knows nothing about — a demo
+       midnight, onto a date the program knows nothing about — a demo
        somebody left open on a desk would be sitting on "Already over"
        inside two minutes. Loop it back to the run-up instead. */
     if (demo.running && !mode.live) {
@@ -1234,8 +1234,8 @@ button,select{ font:inherit; }
     setPie(null, 0);
   }
 
-  /* The line under the meter. With no programme it says the one thing a
-     visitor needs; with a programme it says what is on and what is next,
+  /* The line under the meter. With no program it says the one thing a
+     visitor needs; with a program it says what is on and what is next,
      without ever taking the hero away from the whole-day pie. */
   /* The hero line no longer repeats the speaker. Every session now
      carries its own pie and its own name in the list, so naming the
@@ -1324,7 +1324,7 @@ button,select{ font:inherit; }
                : it.end === null ? clock(it.time) + ' →'
                : clock(it.time) + ' – ' + clock(it.end) + (it.estimated ? ' (est.)' : '');
       /* The dial and its label are filled in by paintRows on every tick,
-         not here: buildList only runs when the programme's position
+         not here: buildList only runs when the program's position
          changes, and a countdown has to move between those moments. */
       li.innerHTML =
         '<span class="rowtimer"><svg class="rowdial" viewBox="0 0 160 160" aria-hidden="true">' +
@@ -1398,10 +1398,17 @@ button,select{ font:inherit; }
   function announce() {
     /* This used to read "Nothing here is an official programme." It was
        true while nobody had asked for the page, and stopped being true the
-       day Mingle Co supplied the programme and a foyer spot. A credit is
+       day Mingle Co supplied the program and a foyer spot. A credit is
        the honest sentence now; the disclaiming is done properly in the
-       footer, where there is room to say who owns what. */
-    var unofficial = ' Programme by Mingle Co.';
+       footer, where there is room to say who owns what.
+
+       The "programme" inside those quotation marks is DELIBERATE and is
+       the one on this page. It is the sentence the page actually shipped,
+       and a quotation that has been silently respelled is a false claim
+       about its own history - which is the same class of error the header
+       comment names about somebody else's agenda. A find-and-replace for
+       the spelling caught it once already; leave it. */
+    var unofficial = ' Program by Mingle Co.';
     var n = $('note'), f = $('footClock');
     if (mode.live) {
       n.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
