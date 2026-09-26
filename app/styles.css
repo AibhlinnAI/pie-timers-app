@@ -160,7 +160,6 @@
   --btn-primary-fg:#FFFFFF;
   --tab-idle:      #4E6856;   /* dulled, but still clears 4.5:1 */
   --tab-hover:     #3E5A48;
-  --tab-shadow:    #32493C;
   --tab-underline: #4E8C64;
   --today-bg:      #FFF2CC;
   --today-line:    var(--orange);
@@ -266,7 +265,6 @@
   --btn-primary-fg:#16101B;   /* the primary button is light green here */
   --tab-idle:      #8FA894;
   --tab-hover:     #B6D0BC;
-  --tab-shadow:    #1B2A20;
   --tab-underline: #6FD08C;
   --today-bg:      #3A2E14;
   --today-line:    var(--orange);
@@ -531,14 +529,17 @@ button{ font:inherit; }
   transition:color .16s ease, border-color .16s ease;
 }
 /* Unselected tabs sit back in a dulled green; the selected one comes
-   forward in orange with the same green shadow as the wordmark, over a
-   brighter green rule. */
+   forward in orange over a brighter green rule.
+
+   No text shadow. It used to carry the wordmark's green shadow, which
+   works at wordmark size on the dark header but not at 15px on a pale
+   bar: a 1px dark offset under orange text smears the letters into a
+   doubled, blocky shape. A tester said "Dashboard" was hard to read. */
 .tab{ color:var(--tab-idle); }
 .tab:hover{ color:var(--tab-hover); }
 
 .tab.is-active{
   color:var(--tab-active);
-  text-shadow:1px 1px 0 var(--tab-shadow);
   border-bottom-color:var(--tab-underline);
 }
 .tab:focus-visible{ outline:2px solid var(--tab-underline); outline-offset:-4px; border-radius:6px; }
@@ -955,11 +956,11 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   display:flex; align-items:flex-start; justify-content:space-between;
   gap:16px; flex-wrap:wrap; margin-bottom:16px;
 }
-/* Panel headings echo the wordmark: orange lettering, green shadow. */
+/* Panel headings echo the wordmark's orange, but not its shadow — at this
+   size the offset smears the letters, as it did on the tabs. */
 .panel-head h2{
   font-size:1.05rem;
   color:var(--orange-deep);
-  text-shadow:1px 1px 0 var(--tab-shadow);
 }
 .sub{ margin:5px 0 0; font-size:.85rem; color:var(--ink-muted); max-width:60ch; }
 .sub--foot{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
