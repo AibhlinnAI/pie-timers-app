@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>New South Wales ADHD Conference 2026 — Pie Timers</title>
+<title>New South Wales ADHD Conference 2026 | Pie Timers</title>
 <meta name="description" content="The New South Wales ADHD Conference 2026 program, Sunday 18 October at Castle Hill RSL, as pies you can watch run down. An unofficial demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
@@ -653,7 +653,7 @@ button,select{ font:inherit; }
     </div>
   </header>
 
-  <p class="note" id="note">Preview — the clock on this page is simulated, not the real time. Nothing here is an official program.</p>
+  <p class="note" id="note">Preview: the clock on this page is simulated, not the real time. Nothing here is an official program.</p>
 
   <div class="bar">
     <span class="bar-label">Showing</span>
@@ -1534,7 +1534,7 @@ button,select{ font:inherit; }
       return;
     }
     if (!touched && mode.at !== null) {
-      setText(n, 'Preview clock — frozen at ' + clock(mode.at) + ' on ' +
+      setText(n, 'Preview clock: frozen at ' + clock(mode.at) + ' on ' +
         new Date(Date.parse(EVENT.date + 'T00:00:00Z')).toLocaleDateString('en-AU',
           { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) +
         '. This is not the real time.' + unofficial);
@@ -1544,10 +1544,10 @@ button,select{ font:inherit; }
       return;
     }
     if (!touched && mode.fast) {
-      setText(n, 'Preview clock — the whole day is playing at 10 minutes a second. ' +
+      setText(n, 'Preview clock: the whole day is playing at 10 minutes a second. ' +
         'This is not the real time.' + unofficial);
     } else {
-      setText(n, 'Preview — the clock on this page is simulated, not the real time.' + unofficial);
+      setText(n, 'Preview: the clock on this page is simulated, not the real time.' + unofficial);
     }
     if (f.innerHTML !== footDefault) f.innerHTML = footDefault;
   }
