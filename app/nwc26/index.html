@@ -325,6 +325,24 @@ body.venue .item{ padding:13px 18px; }
 body.venue .item .name{ font-size:clamp(1rem,1.4vw,1.2rem); }
 body.venue .days{ display:none; }
 
+/* ── Live mode hides the controls that only a preview can honour ──
+   A real clock cannot be paused, sped up or dragged, so the things that
+   do those are not shown while one is running. The view toggle STAYS: a
+   foyer screen still has to be switchable, and that is the one control
+   that means something on a live page.
+
+   The day tabs go too, and that is the less obvious one. They do not
+   select a day - they MOVE THE CLOCK to just before that day starts (see
+   their handler). On a live page that is a button which silently drops
+   you out of live without saying so, which is exactly the class of thing
+   this page is not allowed to do. A live clock picks its own day. */
+html.live #play,
+html.live label[for="speed"],
+html.live #speed,
+html.live #scrub,
+html.live #scrubOut{ display:none; }
+html.live .days{ display:none; }
+
 /* ───────────────────────── Footnotes ───────────────────────── */
 
 /* Full width like every other card, so the page keeps one left and right
@@ -539,10 +557,101 @@ body.venue .days{ display:none; }
 
   /* Brisbane wall clock. Queensland has no daylight saving, so one fixed
      offset is honest here — read the returned Date with getUTC*. */
-  var demo = { anchor: Date.parse('2026-09-28T00:00:00Z') + (510 - 10) * MIN, scale: 120, running: true, last: Date.now() };
+  /* ── Five ways the page can be driven, and every one says which on screen ──
+     Ported from /nls26 on 26 Sep, the day before this conference opens.
+     Until then this page took NO url parameters at all: every load played
+     Day one from 8:20am at two minutes a second, whatever the real date,
+     so it could not be put on a screen at the venue and could not show
+     the real clock on any of the three days.
+
+       ?at=HH:MM     freeze at that time
+       ?day=1|2|3    which of the three days ?at and the opening view mean
+       ?live=1       read the real Brisbane clock
+       ?demo=1       play the day at 10 minutes a second
+       ?display=1    open straight into the foyer screen (?view=venue too)
+       ?theme=...    force light or dark
+
+     `at` beats `live` beats `demo`, most specific first, and the code
+     below enforces that rather than claiming it: /ndexpo26 shipped a
+     draft that applied `at` and then let `live` overwrite the anchor on
+     every tick, so `?at=9:30&live=1` silently ignored the instant it was
+     asked for. Every value is parsed defensively - a malformed one falls
+     back to the default rather than refusing to open. */
+  var mode = (function () {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { q = null; }
+    var get = function (k) { return q ? q.get(k) : null; };
+
+    var at = null, raw = get('at');
+    if (raw) {
+      var m = /^(\d{1,2}):([0-5]\d)$/.exec(raw.trim());
+      if (m) {
+        var h = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+        if (h >= 0 && h <= 23) at = h * 60 + mm;
+      }
+    }
+    /* POSITIONAL: 1 = Welcome (27th), 2 = Day one (28th), 3 = Day two
+       (29th). The event's own labels do not number the first evening, so
+       position is the only handle that is not ambiguous - "day one" in
+       this programme's language is the SECOND entry.
+
+       And with no ?day at all the page opens where it has always opened,
+       on the 28th, which is position 2. The first draft of this defaulted
+       to position 1 and quietly moved every bare link from 8:20am Monday
+       to 4:50pm Sunday, under a comment claiming it behaved exactly as
+       before. Anything malformed - 0, 4, "two", empty - lands there too. */
+    var DEFAULT_DAY_INDEX = 1;
+    var dayRaw = (get('day') || '').trim();
+    var dayIx = /^[123]$/.test(dayRaw) ? parseInt(dayRaw, 10) - 1 : DEFAULT_DAY_INDEX;
+
+    var frozen = at !== null;
+    var live = !frozen && get('live') === '1';
+    var theme = get('theme');
+    return {
+      at: at,
+      dayIndex: dayIx,
+      live: live,
+      fast: !frozen && !live && get('demo') === '1',
+      venue: get('display') === '1' || get('view') === 'venue',
+      theme: theme === 'light' || theme === 'dark' ? theme : null
+    };
+  }());
+
+  var startDay = PRESET.days[mode.dayIndex] || PRESET.days[0];
+
+  /* Ten minutes before the chosen day's first item. With no parameters
+     that is 8:20am on the 28th, which is the instant this page opened on
+     before it took any - asserted, not assumed: the harness pins the bare
+     link to "Monday 28 September" and "8:20am". */
+  var demo = { anchor: instant(startDay.date, Math.max(0, startDay.items[0].time - 10)),
+               scale: 120, running: true, last: Date.now() };
   var pinnedDate = null;
 
-  function now() { return new Date(demo.anchor); }
+  if (mode.at !== null) {
+    demo.anchor = instant(startDay.date, mode.at);
+    demo.running = false;
+  } else if (mode.fast) {
+    demo.anchor = instant(startDay.date, Math.max(0, startDay.items[0].time - 15));
+    demo.scale = 600;
+  }
+  if (mode.live) demo.running = false;   // nothing to run; the world runs it
+
+  /* ── The live clock, and why it is one line here and thirty on /nls26 ──
+     QUEENSLAND HAS NO DAYLIGHT SAVING. /nls26 needs a whole rule because
+     New South Wales moves twice a year and using the event's own constant
+     would make that page claim to show "the real Sydney clock" while
+     being an hour out for half the year. Here +10:00 is correct on every
+     date there has ever been, so PRESET.utcOffsetMinutes IS the live
+     offset and the header's "UTC+10" is true year round.
+
+     Do not port the nswOffsetAt() rule into this file. It would be right
+     arithmetic for the wrong state. */
+  function liveAnchor() { return Date.now() + PRESET.utcOffsetMinutes * MIN; }
+
+  /* Read fresh every tick in live mode rather than writing the anchor
+     from paint(): the anchor is the preview's state, and a live page has
+     no preview state to keep. */
+  function now() { return new Date(mode.live ? liveAnchor() : demo.anchor); }
   function dateOf(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
   function minutesOf(d) { return d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60; }
   function instant(date, m) { return Date.parse(date + 'T00:00:00Z') + m * MIN; }
@@ -850,6 +959,37 @@ body.venue .days{ display:none; }
     paint(true);
   });
 
+  /* ── Say which clock is running, in the strip at the top ──
+     The board records this page's sibling shipping a note that told a
+     ?live=1 reader the time was simulated and to press a Pause button
+     that live mode does not render - the page contradicting itself three
+     inches below the strip that had just said Live. The note is written
+     from `mode`, so it cannot drift from what is actually running. */
+  function announce() {
+    var unofficial = ' Nothing here is the official program.';
+    var el = $('note');
+    var dayName = function (d) {
+      return new Date(Date.parse(d.date + 'T00:00:00Z')).toLocaleDateString('en-AU',
+        { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    };
+    if (mode.live) {
+      el.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
+        ' clock, UTC+10.' + unofficial;
+      return;
+    }
+    if (mode.at !== null) {
+      el.textContent = 'Preview clock — frozen at ' + clock(mode.at) + ' on ' +
+        dayName(startDay) + '. This is not the real time.' + unofficial;
+      return;
+    }
+    if (mode.fast) {
+      el.textContent = 'Preview clock — ' + startDay.label +
+        ' is playing at 10 minutes a second. This is not the real time.' + unofficial;
+      return;
+    }
+    el.textContent = 'Preview — the clock on this page is simulated, not the real time.' + unofficial;
+  }
+
   function setView(venue) {
     document.body.classList.toggle('venue', venue);
     $('viewVenue').setAttribute('aria-pressed', String(venue));
@@ -859,6 +999,22 @@ body.venue .days{ display:none; }
   $('viewVenue').addEventListener('click', function () { setView(true); });
   $('viewDelegate').addEventListener('click', function () { setView(false); });
 
+  if (mode.theme) document.documentElement.setAttribute('data-theme', mode.theme);
+  if (mode.live) {
+    document.documentElement.classList.add('live');
+  } else {
+    var s0 = $('scrub');
+    if (mode.at !== null) {
+      demo.running = false;
+      $('play').textContent = 'Play';
+      $('play').setAttribute('aria-pressed', 'false');
+      if (mode.at >= +s0.min && mode.at <= +s0.max) s0.value = String(mode.at);
+    }
+    if (mode.fast) $('speed').value = '600';
+  }
+  if (mode.venue) setView(true);
+
+  announce();
   scrubRange();
   paint(true);
   setInterval(paint, 200);
