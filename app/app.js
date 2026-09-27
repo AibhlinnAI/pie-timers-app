@@ -181,6 +181,7 @@
 
   var MILESTONES = [30, 15, 10, 5]; // minutes remaining
   var DONE_ALERT_WINDOW_SEC = 120;   // "Time reached" is only announced this close to it
+  var NIGHT_SHIFT_HOLD_SEC = 4 * 3600; // a finished night shift stays on the pies this long
 
   /* The furthest ahead an appointment can be added. Far enough for any real
      one; near enough that a mistyped year (2206 for 2026) is caught at the
@@ -323,7 +324,7 @@
   }());
 
   var state = load();
-  var firedAlerts = {}; // key -> true, reset each day
+  var firedAlerts = {}; // key -> true, reset each day except a night shift's own
   var lastSeenRunning = {}; // 'lunch|750' -> Date.now() this tab last saw it counting; not reset daily
 
   /* ─────────────────────────── Storage ─────────────────────────── */
@@ -890,9 +891,11 @@
 
   /* ─────────────────────────── Timer maths ───────────────────────────
      Mirrors the workbook: total = target − start (wrapping past midnight),
-     elapsed is clamped into [0, total], remaining is the difference.       */
+     elapsed is clamped into [0, total], remaining is the difference.
+     nowSec counts from midnight on the day the shift started, so it runs
+     past 86400 for a night shift after midnight; currentShift() sets it. */
 
-  function computeTimer(now, startMin, targetMin) {
+  function computeTimer(nowSec, startMin, targetMin) {
     if (!isMinute(startMin) || !isMinute(targetMin)) {
       return { available: false };
     }
@@ -901,9 +904,7 @@
     var totalSec = targetSec - startSec;
     if (totalSec <= 0) totalSec += 86400; // wraps past midnight
 
-    var nowSec = secondsSinceMidnight(now);
     var sinceStart = nowSec - startSec;
-    if (sinceStart < -43200) sinceStart += 86400; // late-night shift still counting
 
     var elapsedSec = Math.min(Math.max(sinceStart, 0), totalSec);
     var remainingSec = totalSec - elapsedSec;
@@ -919,6 +920,69 @@
       notStarted: sinceStart < 0,
       done: remainingSec <= 0,
       progress: totalSec > 0 ? elapsedSec / totalSec : 1
+    };
+  }
+
+  /* Which day's hours the pies count right now. Today's, unless
+     yesterday's shift ran past midnight and today's has not started: then
+     yesterday's keeps them while it runs, and for NIGHT_SHIFT_HOLD_SEC
+     after it ends, so its "Time reached" is seen and read.
+
+     This used to be one line in computeTimer: more than twelve hours
+     before today's start meant still counting last night. That also
+     caught a 1pm to 9pm day at midnight, read it as done, and filed its
+     "Time reached" under the new day at 00:00, so the real one that
+     afternoon never came. It also used today's hours for last night, so
+     a night shift before a day off never finished, and one after a day
+     off appeared from nowhere.
+
+     `key` is the day the shift started. Alerts are filed and tagged
+     under it, so a night shift's alerts after midnight can't collide
+     with that day's own. Must match currentShift() in notify-milestones. */
+  function currentShift(now) {
+    var nowSec = secondsSinceMidnight(now);
+    var cfg = dayConfig(now);
+    var startedToday = worksOn(cfg) && nowSec >= cfg.start * 60;
+
+    var y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    var prev = dayConfig(y);
+    if (!startedToday && worksOn(prev)) {
+      // How far past midnight yesterday's shift ran; negative if it didn't.
+      var pastMidnight = prev.start * 60 + shiftLengthSec(prev) - 86400;
+      if (pastMidnight >= 0 && nowSec < pastMidnight + NIGHT_SHIFT_HOLD_SEC) {
+        return { day: dayNameOf(y), cfg: prev, key: y.toDateString(), sec: nowSec + 86400 };
+      }
+    }
+    return { day: dayNameOf(now), cfg: cfg, key: now.toDateString(), sec: nowSec };
+  }
+
+  function worksOn(cfg) {
+    return !!(cfg && cfg.working && isMinute(cfg.start));
+  }
+
+  /* Start to whichever target comes last. A finish at exactly midnight
+     counts as running past it, so its "Time reached" lands at 00:00. */
+  function shiftLengthSec(cfg) {
+    var longest = 0;
+    [cfg.lunch, cfg.end].forEach(function (target) {
+      if (!isMinute(target)) return;
+      var sec = (target - cfg.start) * 60;
+      if (sec <= 0) sec += 86400;
+      if (sec > longest) longest = sec;
+    });
+    return longest;
+  }
+
+  /* The two work pies for this instant. */
+  function workPies(now) {
+    var shift = currentShift(now);
+    var cfg = shift.cfg;
+    var working = !!(cfg && cfg.working);
+    return {
+      shift: shift,
+      working: working,
+      lunch: working ? computeTimer(shift.sec, cfg.start, cfg.lunch) : { available: false },
+      end: working ? computeTimer(shift.sec, cfg.start, cfg.end) : { available: false }
     };
   }
 
@@ -2292,6 +2356,8 @@
 
   /* ─────────────────────────── Milestone alerts ─────────────────────────── */
 
+  // todayKey is the day the shift started (currentShift), so after
+  // midnight a night shift's alerts are still filed under the day before.
   function checkAlerts(prefix, timer, label, todayKey) {
     if (!state.settings.alerts || !timer.available || timer.notStarted) return;
 
@@ -2729,20 +2795,19 @@
               /^#focus$/.test(location.hash);
 
   function pickFocusTimer(now) {
-    var today = dayNameOf(now);
-    var cfg = dayConfig(now);
-    var working = cfg && cfg.working;
+    var pies = workPies(now);
+    var day = pies.shift.day;
     var candidates = [];
 
-    if (working) {
-      var lunch = computeTimer(now, cfg.start, cfg.lunch);
+    if (pies.working) {
+      var lunch = pies.lunch;
       if (lunch.available && !lunch.done && !lunch.notStarted) {
-        candidates.push({ timer: lunch, label: lunchLabel(today), tone: 'is-lunch',
+        candidates.push({ timer: lunch, label: lunchLabel(day), tone: 'is-lunch',
                           totalMin: Math.round(lunch.totalSec / 60), forced: null });
       }
-      var end = computeTimer(now, cfg.start, cfg.end);
+      var end = pies.end;
       if (end.available && !end.done && !end.notStarted) {
-        candidates.push({ timer: end, label: endLabel(today), tone: 'is-end',
+        candidates.push({ timer: end, label: endLabel(day), tone: 'is-end',
                           totalMin: Math.round(end.totalSec / 60), forced: null });
       }
     }
@@ -2839,10 +2904,19 @@
     var today = dayNameOf(now);
     var cfg = dayConfig(now);
     var todayKey = now.toDateString();
+    var pies = workPies(now);
+    var shift = pies.shift;
 
-    // New day → clear fired milestone alerts.
+    /* New day → clear fired milestone alerts, except those of a night
+       shift still on the pies: they are filed under the day it started,
+       and dropping them would let a lunch at 11:59pm be announced again
+       at midnight. lastSeenRunning deliberately survives: see checkAlerts. */
     if (todayKey !== lastDayKey) {
-      firedAlerts = {};   // lastSeenRunning deliberately survives: see checkAlerts
+      var kept = {};
+      Object.keys(firedAlerts).forEach(function (key) {
+        if (shift.key !== todayKey && key.indexOf(shift.key + '|') === 0) kept[key] = true;
+      });
+      firedAlerts = kept;
       lastDayKey = todayKey;
     }
 
@@ -2863,14 +2937,16 @@
     });
     $('stripDay').classList.toggle('is-off', !working);
 
-    var lunchTimer = working ? computeTimer(now, cfg.start, cfg.lunch) : { available: false };
-    var endTimer = working ? computeTimer(now, cfg.start, cfg.end) : { available: false };
+    /* The strip above is today's hours. The pies can still be finishing
+       last night's shift, so they take theirs from `shift`. */
+    var lunchTimer = pies.lunch;
+    var endTimer = pies.end;
 
-    paintTimer('lunch', lunchTimer, working ? cfg.lunch : null, lunchLabel(today));
-    paintTimer('end', endTimer, working ? cfg.end : null, endLabel(today));
+    paintTimer('lunch', lunchTimer, pies.working ? shift.cfg.lunch : null, lunchLabel(shift.day));
+    paintTimer('end', endTimer, pies.working ? shift.cfg.end : null, endLabel(shift.day));
 
-    checkAlerts('lunch', lunchTimer, lunchLabel(today), todayKey);
-    checkAlerts('end', endTimer, endLabel(today), todayKey);
+    checkAlerts('lunch', lunchTimer, lunchLabel(shift.day), shift.key);
+    checkAlerts('end', endTimer, endLabel(shift.day), shift.key);
 
     renderAppointment(now, todayKey);
     refreshAppointmentList(now, todayKey);
@@ -2880,7 +2956,7 @@
     // Speak only on the minute, not on every tick.
     if (now.getSeconds() === 0 || lastAnnounced === '') announceRemaining();
 
-    document.title = working && lunchTimer.available && !lunchTimer.done
+    document.title = pies.working && lunchTimer.available && !lunchTimer.done
       ? formatCompact(lunchTimer.remainingSec) + ' · Pie Timers'
       : 'Pie Timers';
 
