@@ -183,6 +183,18 @@
   var DONE_ALERT_WINDOW_SEC = 120;   // "Time reached" is only announced this close to it
   var NIGHT_SHIFT_HOLD_SEC = 4 * 3600; // a finished night shift stays on the pies this long
 
+  /* The furthest ahead an appointment can be added. Far enough for any real
+     one; near enough that a mistyped year (2206 for 2026) is caught at the
+     form instead of becoming a pie that will not move for two centuries.
+     Synced calendar events past it are dropped from the cache, because the
+     feed only ever sends three weeks ahead. normaliseCalendarEvents() reads
+     this during load(), a few lines down, so it has to stay up here. */
+  var HORIZON_YEARS = 5;
+
+  function horizonDate(now) {
+    return new Date(now.getFullYear() + HORIZON_YEARS, now.getMonth(), now.getDate());
+  }
+
   /* The Play app is a Trusted Web Activity over this same site, and it is
      where the testers keep their own weeks, so the first-run agenda seed
      must never reach it. The wrapper opens the site with its package as
@@ -466,13 +478,15 @@
   function normaliseCalendarEvents(list) {
     if (!Array.isArray(list)) return [];
     var floor = Date.now() - 86400000;
+    var ceiling = horizonDate(new Date()).getTime();
 
     return list.filter(function (event) {
       return event &&
         typeof event.title === 'string' &&
         typeof event.at === 'number' &&
         isFinite(event.at) &&
-        event.at > floor;
+        event.at > floor &&
+        event.at < ceiling;
     }).map(function (event) {
       return {
         uid: typeof event.uid === 'string' ? event.uid : 'cal',
@@ -485,7 +499,12 @@
 
   /* Appointments arrive from storage or another device, so nothing here is
      trusted. Anything malformed is dropped rather than allowed to break a
-     render loop that runs every second. */
+     render loop that runs every second.
+
+     A date past HORIZON_YEARS is deliberately kept. It is the person's own
+     entry, and dropping it here would lose it silently, on every device,
+     at the next sync. Kept, it stays in the list where it can be seen and
+     fixed. The pie is safe with it: renderNotches() caps the rim. */
   function normaliseAppointments(list) {
     if (!Array.isArray(list)) return [];
 
@@ -1827,6 +1846,10 @@
       error.textContent = 'That time has already passed.';
       return;
     }
+    if (date > isoDate(horizonDate(new Date()))) {
+      error.textContent = 'That date is more than ' + HORIZON_YEARS + ' years away. Check the year.';
+      return;
+    }
 
     error.textContent = '';
     state.appointments = normaliseAppointments(state.appointments.concat([appointment]));
@@ -1840,10 +1863,13 @@
     toast('Added — counting down on the Dashboard.');
   });
 
-  /* Default the form to today so adding something takes two fields, not three. */
+  /* Default the form to today so adding something takes two fields, not three.
+     The max stops a phone's date picker scrolling past the horizon; typed
+     dates are still checked on submit, since a page left open drifts. */
   function primeAppointmentForm() {
     var now = new Date();
     if (!$('apptDate').value) $('apptDate').value = isoDate(now);
+    $('apptDate').max = isoDate(horizonDate(now));
   }
 
   /* ─────────────────────────── Calendar sync ─────────────────────────── */
@@ -2204,6 +2230,18 @@
     { upTo: 1440, interval: 120 }
   ];
 
+  /* Past this many pieces the gaps between notches (2 and 3.5 wide, on a
+     rim 440 long) fall to about a pixel, and by 160 they touch: the rim
+     becomes one solid band, not units anyone could count. So none are drawn
+     at all. The pie and its "N day countdown" still say how far off it is;
+     weekly notches would need that caption to name them, or "two notches"
+     would read as two days.
+
+     It is also the freeze guard. One notch per day to 2999-12-31 was about
+     355,000 lines on each of two layers, and a date that far off arrived
+     by typo or import and then froze the app on every start. */
+  var MAX_NOTCHES = 120;
+
   function notchInterval(totalMinutes) {
     for (var i = 0; i < NOTCH_BANDS.length; i++) {
       if (totalMinutes <= NOTCH_BANDS[i].upTo) return NOTCH_BANDS[i].interval;
@@ -2236,6 +2274,7 @@
     group.dataset.sig = signature;
 
     var count = Math.floor(totalMinutes / interval);
+    if (count > MAX_NOTCHES) return;
     for (var k = 1; k <= count; k++) {
       var minutesToGo = k * interval;
       if (minutesToGo >= totalMinutes) break;      // the rim itself is zero
