@@ -20,6 +20,10 @@
     var t = q.get('theme');
     if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
     if (q.get('display') === '1' || q.get('view') === 'venue') document.documentElement.classList.add('venue');
+    /* The foyer link itself, ?display=1&live=1: a screen on a wall that
+       nobody touches all day. Only the URL can set this, never the view
+       toggle, so a phone that taps "The foyer screen" never gets it. */
+    if (q.get('display') === '1' && q.get('live') === '1') document.documentElement.classList.add('kiosk');
   } catch (e) { /* no query string support, no harm — carry on */ }
 }());
 </script>
@@ -263,7 +267,13 @@ button,select{ font:inherit; }
   font-variant-numeric:tabular-nums; line-height:1;
 }
 .clock-date{ font-size:.82rem; opacity:.85; margin-top:4px; }
-.clock-zone{ font-size:.72rem; opacity:.62; margin-top:2px; }
+/* .72, not .62. The zone line is 11.5px text, so it needs 4.5:1, and
+   white at .62 over the lightest stop of the light header (#3E5A48) is
+   4.08:1 - measured on the foyer's painted pixels too, which are exactly
+   that stop behind this line. At .72 the worst stop in either theme is
+   4.87:1 (that same stop; dark's worst, #2E4438, is 6.35:1), and the line
+   still sits a step under the date's .85. */
+.clock-zone{ font-size:.72rem; opacity:.72; margin-top:2px; }
 
 /* ───────────────────────── Preview strip ───────────────────────── */
 
@@ -370,6 +380,21 @@ button,select{ font:inherit; }
 .now.untimed .rim{ stroke-opacity:.45; }
 .now.urgent{ --accent:var(--urgent); --accent-fill:var(--urgent); }
 .now.urgent .left{ color:var(--urgent-text); }
+/* In the last minutes the wedge is a sliver, and the pie's own outline,
+   painted over the fill as SVG does by default, covered it: in light, at
+   the foyer size, no red pixel was left from 4:38pm on Day 1 (4:18pm on
+   Day 2). Painting the outline first lets the fill cover its inner half,
+   so the red keeps its true area and still has a dark edge. Red counted
+   in pixels against the wedge's true area, in CSS px, at the foyer's
+   260px dial, out of a 460-minute Day 1: light 252 of 265, 166 of 177
+   and 80 of 88 at 4:37, 4:38 and 4:39pm (it was 17, 0 and 0); dark 260,
+   172 and 84 of the same (it was 61, 9 and 0). Day 2, 440 minutes, at
+   4:17 to 4:19pm: light 264, 173 and 84 of 277, 185 and 92 (it was 22,
+   0 and 0); dark 273, 181 and 88 (it was 70, 12 and 0). The 140px phone
+   dial keeps 85 to 96% of its wedge over those six minutes in both
+   themes (it was 0 to 33%).
+   Scoped to #now: the row dials are never urgent. */
+#now.urgent .pie{ paint-order:stroke; }
 
 .dialwrap{ width:clamp(140px,21vw,196px); aspect-ratio:1; flex:none; }
 .dial{ width:100%; height:100%; display:block; }
@@ -620,6 +645,86 @@ button,select{ font:inherit; }
 .venue .item .rowdial{ width:60px; height:60px; }
 .venue .item .rowleft{ font-size:clamp(.72rem,.95vw,.82rem); margin-top:5px; }
 
+/* The foyer link (?display=1&live=1, see the head script) is a screen on a
+   wall. There is no view to choose and no clock to scrub, so the bar that
+   offers both goes. A phone that taps "The foyer screen" gets .venue but
+   never .kiosk, so it keeps the button to tap back. From /nsw26 (a71ee56),
+   like the short-screen rules after it. */
+.kiosk .bar{ display:none; }
+
+/* ── Short screens ──
+   Everything above was measured at 1920x1080, and only there. Swept on
+   26 Sep every five minutes of both days, from the run-up to after the
+   close, on ?display=1 and on the foyer link, the stacked hero ran off the
+   bottom from 1050px of height down: a maximised 1080p browser (1920x969)
+   by 85px, 1536x864 by 190px, 1366x768 by 305px, 1280x720 by 339px,
+   1024x600 by 444px, and, while the "as published" note was up, 1920x1050
+   and 1680x1050 by 4px and 1280x1024 by 35px: this hero is taller than
+   /nsw26's. Between 1051 and 1079px it cleared, but by as little as 0.3px
+   (1430x1079), 0.7px (1280x1060) and 0.8px (1920x1055), and with the 15px
+   scrollbar Chrome on Windows shows, 1440x1079 came 0.4px short (27 Sep).
+   1920x1080 clears by 26px, with or without the scrollbar. So below 1080px
+   of height, not /nsw26's 1000, it turns sideways, for margin: dial beside
+   the words, which needs about a third of the height. 1920x1080 is
+   untouched.
+   Landscape only: a phone held upright is 844px tall too, and one that taps
+   "The foyer screen" must keep the stacked hero, not a 230px dial beside
+   a hundred pixels of words. */
+@media (max-height:1079px) and (orientation:landscape){
+  .venue .brand .strap{ display:none; }
+  .venue .wrap{ padding-block:12px 24px; gap:12px; }
+  .venue .head{ padding-block:10px; }
+  .venue .note{ padding-block:7px; }
+  .venue .now{ flex-direction:row; text-align:left; align-items:center; }
+  .venue .now::before{ align-self:stretch; width:5px; height:auto; }
+  .venue .title{ font-size:clamp(1.3rem,2.4vw,1.9rem); }
+  .venue .meter{ margin-inline:0; }
+  .venue .flag{ margin-inline:0; }
+  /* The rest is this page's own, and all of it is spacing: no type is
+     shrunk. What runs out here is the width of the words beside the dial,
+     160px at 1024x768 with /nsw26's spacing, so the gaps are narrower and
+     the dial is capped at 18vw. Without that, 1280x720 was cut by 11px and
+     1024x768 by 201px. The tighter padding and line spacing are margin
+     where the note still shows: 1240x720 goes from 8px clear to 19px, and
+     1340x720 from 6px to 17px. */
+  .venue .now{ padding-block:clamp(8px,1.2vh,20px); gap:clamp(14px,1.6vw,24px);
+    padding-inline:clamp(14px,1.6vw,26px); }
+  .venue .dialwrap{ width:min(230px,30vh,18vw); flex:none; }
+  .venue .left{ margin-top:8px; }
+  .venue .meter, .venue .flag{ margin-top:10px; }
+  /* While the note is up, it is the line about what is on. The running
+     line under it only says what the list beside it shows, the three rows
+     lit and 12pm marked next, so it gives way. With both, between 9:30 and
+     12:00, 1280x720 was cut by 32px, 1024x768 by 13px and 1366x768 by 3px. */
+  .venue .flag:not([hidden]) ~ .then{ display:none; }
+}
+
+/* The running line ("On now: ... Next ...") is the one line that grows with
+   a long title, and on a short screen it is what ran off the bottom: at
+   2pm ("From Insights to Action: What lessons have we learned so far?",
+   then "Leaving No One Behind: ...") by up to 25px, at 1160x650. The list
+   beside the hero says the same thing, with the session on now lit up and
+   the next one marked "next", so there the line goes. So does the note: it
+   is the tallest thing in the hero, and under it 1024x600 was cut by 105px
+   (34px on the foyer link), 1160x660 by 44px and 1366x657 by 13px. The
+   three rows keep their "as published" chips, and the footnote keeps the
+   whole explanation.
+   The running line goes only while the day is running, which on this page
+   is exactly while the meter shows: "First up", the drinks with "Thursday
+   starts at 9am", "Still to come" and the sign-off are short, and they stay.
+   /nsw26 (d22c881) does this under 640px, and at up to 1100px wide under
+   1000px. Here 640px left the 2pm cuts above, and the width clause is not
+   needed: without it the line still clears by 38px at 1100x768. */
+@media (max-height:719px) and (orientation:landscape){
+  .venue .meter:not([hidden]) ~ .then{ display:none; }
+  .venue .flag{ display:none; }
+}
+/* And the note alone up to 739px on screens up to 1219px wide, where it
+   fits, but only just: 5px clear at 1100x720, 7px at 1080x720. */
+@media (max-height:739px) and (max-width:1219px) and (orientation:landscape){
+  .venue .flag{ display:none; }
+}
+
 /* ── The foyer list scrolls itself ──
    Thirteen rows do not fit a venue screen, and from about 3pm the row
    that is ON NOW is the ninth or later — below the fold, on a screen
@@ -740,7 +845,11 @@ button,select{ font:inherit; }
       <button type="button" id="viewDelegate" aria-pressed="true">A delegate's phone</button>
       <button type="button" id="viewVenue" aria-pressed="false">The foyer screen</button>
     </div>
-    <button class="btn clocking" type="button" id="play" aria-pressed="true">Pause</button>
+    <!-- No aria-pressed. The label already swaps between Play and Pause, so
+         a pressed state on top of it was heard as "Pause, pressed" while the
+         clock ran: the name says what a press will do, the state said it
+         had been done. -->
+    <button class="btn clocking" type="button" id="play">Pause</button>
     <label class="bar-label clocking" for="speed">Speed</label>
     <select id="speed" class="clocking">
       <option value="1">real time</option>
@@ -749,7 +858,10 @@ button,select{ font:inherit; }
       <option value="600">10 min / sec</option>
     </select>
     <input type="range" class="clocking" id="scrub" min="525" max="1015" step="1" value="690" aria-label="Move through the day">
-    <output id="scrubOut" class="clocking">--:--</output>
+    <!-- An <output> is a polite live region by default. At the default two
+         minutes a second it changes twice a second, so it is switched off; the
+         slider's aria-valuetext carries the same time to anyone on it. -->
+    <output id="scrubOut" class="clocking" aria-live="off">--:--</output>
   </div>
 
   <nav class="days" id="days" aria-label="Conference days"></nav>
@@ -770,8 +882,13 @@ button,select{ font:inherit; }
         <p class="kicker" id="kicker">&nbsp;</p>
         <h2 class="title" id="title">—</h2>
         <p class="window" id="window">&nbsp;</p>
-        <p class="left" id="left">&nbsp;</p>
-        <div class="meter" id="meter" hidden>
+        <!-- The card is a polite live region, so a change of phase, of what
+             is on now or of the "as published" note is announced. The
+             per-minute numbers are not: at the simulated clock's default
+             speed they change twice a second and would bury the changes
+             that matter. -->
+        <p class="left" id="left" aria-live="off">&nbsp;</p>
+        <div class="meter" id="meter" aria-live="off" hidden>
           <div class="meter-bar"><span id="meterBar" style="width:0%"></span></div>
           <div class="meter-legend">
             <span><i class="dot dot-elapsed"></i>Elapsed <b id="meterSpent">0</b></span>
@@ -836,10 +953,13 @@ button,select{ font:inherit; }
            Pause button that live mode does not render — the page
            contradicting itself three inches below the strip that had just
            said "Live". announce() rewrites it. -->
+      <!-- It names no button state. It used to say "press Pause", and the
+           same button reads Play whenever the clock is stopped: on every
+           ?at= link, and after any pause or slider drag. -->
       <span id="footClock">The clock is
       simulated so a day can be watched now rather than on the day itself:
-      press <strong>Pause</strong> and drag the slider to land anywhere between
-      the Welcome to Country and the close.</span></p>
+      drag the slider to land anywhere between the Welcome to Country and
+      the close.</span></p>
 
     <p>The two views are the same data. <strong>A delegate's phone</strong> is what
       someone in the room follows. <strong>The foyer screen</strong> is what a
@@ -864,8 +984,7 @@ button,select{ font:inherit; }
         are never re-sorted into clock order. Once an item has finished it moves
         to a <strong>Finished</strong> list after the one still running, so
         whatever is on is always the first row of the program; the published
-        order is kept inside each of the two lists. Nothing is reordered, renamed or
-        given a time it was not published with.</li>
+        order is kept inside each of the two lists. Nothing is reordered.</li>
       <li><strong>A row this page will not time shows a grey, empty plate</strong>
         rather than a pie — the Welcome to Country, the networking drinks and
         the Day 2 close. It is the same mark the large pie uses, for the same
@@ -896,9 +1015,8 @@ button,select{ font:inherit; }
         endorsed by or affiliated with the Neurodiversity Leadership Summit or
         The Leadership Institute, nobody has asked for it, and nothing on it is
         an official program. Speakers and session titles are reproduced from
-        the published agenda so the demonstration is of a real day rather than
-        an invented one. Pie Timers itself is in closed testing and has not
-        publicly launched.</p>
+        the published agenda. Pie Timers itself is in closed testing and has
+        not publicly launched.</p>
     </div>
 
     <!-- This line used to end "closing the tab leaves no trace of your having
@@ -1063,9 +1181,11 @@ button,select{ font:inherit; }
 
   /* Write only on change. The now-card is an aria-live region and paint()
      runs five times a second; assigning textContent replaces the text
-     node whether or not the string differs, so a screen reader was being
-     handed the whole card five times a second and the polite queue could
-     never drain. Most of those writes are the same string. */
+     node whether or not the string differs, so a screen reader would be
+     handed the same strings five times a second. This stops the identical
+     rewrites only. The numbers that really do change every simulated
+     minute, #left and the meter in the card and the slider's #scrubOut,
+     are set aria-live="off" in the markup, so they are not announced. */
   function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
 
   function esc(s) {
@@ -1180,6 +1300,12 @@ button,select{ font:inherit; }
       venue: get('display') === '1' || get('view') === 'venue'
     };
   }());
+  /* The head script adds .kiosk from the raw query, display=1 and live=1.
+     But a valid ?at= beats live=1 here, so ?display=1&live=1&at=10:00 is a
+     frozen preview whose footer says "Press Play, or drag the slider". It
+     keeps the bar that has them. Only a clock that is actually live is a
+     screen nobody touches. */
+  if (!mode.live) document.documentElement.classList.remove('kiosk');
 
   var startDay = PRESET.days[mode.dayIndex] || PRESET.days[0];
 
@@ -1302,13 +1428,25 @@ button,select{ font:inherit; }
     if (total <= 300) return 30;
     return 60;
   }
+  /* The ticks are rebuilt only when the count or the eaten/uneaten split
+     changes, not on every paint. They sit inside the card's live region,
+     and tearing them down five times a second was a stream of DOM changes
+     there with nothing in it to say: 135 in three seconds even on a
+     frozen ?at= clock. Their colour comes from --accent, so a change of
+     colour alone needs no rebuild. */
+  var tickKey = '';
   function setPie(kind, remaining, total) {
-    $('pie').setAttribute('d', kind ? wedge(remaining) : '');
+    var pie = $('pie'), d = kind ? wedge(remaining) : '';
+    if (pie.getAttribute('d') !== d) pie.setAttribute('d', d);
     var under = $('ticksUnder'), over = $('ticksOver');
+    var s = total ? step(total) : 0, eaten = 1 - remaining, split = 0, m;
+    if (kind && total) for (m = s; m < total && m / total < eaten; m += s) split++;
+    var key = kind && total ? total + '|' + split : '';
+    if (key === tickKey) return;
+    tickKey = key;
     under.textContent = ''; over.textContent = '';
-    if (!kind || !total) return;
-    var s = step(total), eaten = 1 - remaining;
-    for (var m = s; m < total; m += s) {
+    if (!key) return;
+    for (m = s; m < total; m += s) {
       var f = m / total, major = (m % (s * 2)) === 0, a = f * 2 * Math.PI;
       var inner = R - (major ? 11 : 6), o = point(f);
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1375,7 +1513,13 @@ button,select{ font:inherit; }
        midnight, onto a date the program knows nothing about — a demo
        somebody left open on a desk would be sitting on "Already over"
        inside a minute. Roll to the next day instead, and from the last
-       day back to the first. */
+       day back to the first.
+
+       At twenty minutes past the close, which is where the slider ends
+       (scrubRange), so a running clock never leaves it. The slider used
+       to stop at fifteen past, and for the last five minutes of each day
+       the thumb sat pinned at its end while the clock and
+       aria-valuetext ran on. */
     if (demo.running && !mode.live) {
       var cur = pickDay(dateOf(now()));
       if (demo.anchor > instant(cur.date, cur.end + 20)) {
@@ -1394,6 +1538,12 @@ button,select{ font:inherit; }
       { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }));
     setText($('clockZone'), PRESET.timeZone + ' · ' +
       zoneLabel(mode.live ? liveOffset() : PRESET.utcOffsetMinutes));
+    /* The strip prints the offset too. A live page left open across a
+       changeover (2am, 4 October; 3am, 4 April) would otherwise keep the
+       offset it opened with while the header moved on. Both of
+       announce()'s live writes go through setText, so this writes
+       nothing on an ordinary tick. */
+    if (mode.live) announce();
     setText($('scrubOut'), clock(mins));
 
     Array.prototype.forEach.call($('days').children, function (b) {
@@ -1401,10 +1551,18 @@ button,select{ font:inherit; }
     });
 
     if (!mode.live) {
-      var s = $('scrub'), v = Math.round(mins);
+      /* The thumb follows the clock whether it is running or not, so the
+         thumb, #scrubOut, aria-valuetext and the header always name the
+         same minute - and a day tab pressed on a stopped clock moves it
+         too. Floored, as clock() floors: rounded, a clock paused at
+         11:30:40 put the thumb on 11:31 while every readout said 11:30am,
+         and the next arrow key skipped a minute. The range covers any ?at=
+         and the loop's whole run (see scrubRange), so the value is never
+         clamped. */
+      var s = $('scrub'), v = String(Math.floor(mins));
       /* Spoken as a time, not as "690". */
       s.setAttribute('aria-valuetext', clock(mins));
-      if (demo.running && v >= +s.min && v <= +s.max) s.value = String(v);
+      if (s.value !== v) s.value = v;
     }
 
     paintNow(day, today, mins, state);
@@ -1909,32 +2067,62 @@ button,select{ font:inherit; }
 
   /* ─────────────────────────── Controls ─────────────────────────── */
 
-  /* Fifteen minutes of run-up and fifteen past the close, so both ends of
-     whichever day is showing are reachable on the slider. */
+  /* Fifteen minutes of run-up and twenty past the close, so both ends of
+     whichever day is showing are reachable on the slider. The running
+     clock rolls to the next day at that same twenty past (paint).
+
+     A ?at= outside that span widens it to take the frozen instant in, on
+     the day the instant is on (startDay) and only there: the two days end
+     at different times, 4:55pm and 4:35pm on this span. Left at the span,
+     ?at=8:00 put the thumb on 11:30am (the value in the markup) beside a
+     readout of "8am", and one arrow key moved the clock to 11:31am. The
+     instant itself is never clamped: ?at=8:00 is how the early morning
+     is looked at. */
   function scrubRange() {
     var day = pickDay(dateOf(now())), s = $('scrub');
-    s.min = String(Math.max(0, day.start - 15));
-    s.max = String(Math.min(1439, day.end + 15));
+    var lo = day.start - 15, hi = day.end + 20;
+    if (mode.at !== null && day === startDay) {
+      lo = Math.min(lo, mode.at);
+      hi = Math.max(hi, mode.at);
+    }
+    s.min = String(Math.max(0, lo));
+    s.max = String(Math.min(1439, hi));
   }
+
+  /* Once someone has touched the clock, a ?at= or ?demo=1 description of
+     it ("frozen at", "playing at 10 minutes a second") stops being true,
+     so the strip and the footer fall back to the plain preview wording. */
+  var touched = false;
 
   function pause() {
     demo.running = false;
     $('play').textContent = 'Play';
-    $('play').setAttribute('aria-pressed', 'false');
+  }
+  function touch() {
+    if (touched) return;
+    touched = true;
+    announce();
   }
 
   $('play').addEventListener('click', function () {
     demo.running = !demo.running;
     demo.last = Date.now();
     this.textContent = demo.running ? 'Pause' : 'Play';
-    this.setAttribute('aria-pressed', String(demo.running));
+    touch();
   });
 
-  $('speed').addEventListener('change', function () { demo.scale = parseFloat(this.value) || 1; });
+  /* Only ?demo=1's description ("playing at 10 minutes a second") is made
+     false by a new speed. Under ?at= the clock is still frozen at the
+     same instant, so "frozen at" stays until Play, a drag or a day tab. */
+  $('speed').addEventListener('change', function () {
+    demo.scale = parseFloat(this.value) || 1;
+    if (mode.fast) touch();
+  });
 
   $('scrub').addEventListener('input', function () {
     pause();
     demo.anchor = instant(pickDay(dateOf(now())).date, parseInt(this.value, 10) || 0);
+    touch();
     paint(true);
   });
 
@@ -1951,10 +2139,13 @@ button,select{ font:inherit; }
       '<span class="lab">' + esc(day.label) + '</span>';
     /* Jumping to a day moves the clock to just before it starts, rather
        than pinning a day the clock is not on — on a preview the useful
-       thing is watching that day run, not reading it standing still. */
+       thing is watching that day run, not reading it standing still.
+       Moving the clock is touching it: "frozen at 10:20am on Wednesday"
+       and "Conference Day 1 is playing" stop being true (see touch). */
     b.addEventListener('click', function () {
       demo.anchor = instant(day.date, Math.max(0, day.start - 10));
       scrubRange();
+      touch();
       paint(true);
     });
     $('days').appendChild(b);
@@ -1978,6 +2169,12 @@ button,select{ font:inherit; }
   /* ── Say which clock this is, in words, above the fold. A page whose
      time is not the real time has to announce that every single way it
      can be opened, or somebody screenshots it and believes it. ── */
+  /* Every write here is compared before it is made: setText, or the
+     innerHTML check before the footer's default is put back. paint()
+     calls this on every live tick (see there), and a bare assignment
+     would replace the strip's and the footer's text nodes five times a
+     second. */
+  var footDefault = $('footClock').innerHTML;
   function announce() {
     var unofficial = ' Nothing here is an official program.';
     var n = $('note'), f = $('footClock');
@@ -1986,29 +2183,31 @@ button,select{ font:inherit; }
         { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     };
     if (mode.live) {
-      n.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
-        ' clock, ' + zoneLabel(liveOffset()) + '.' + unofficial;
-      /* The footer describes the clock too, so it has to move with it. */
-      f.textContent = 'This page is running on the real Sydney clock, so it ' +
-        'shows the summit as it actually stands. The preview controls are not ' +
-        'shown while it is live, because a real clock cannot be paused or ' +
-        'dragged.';
+      setText(n, 'Live: this page is reading the real ' + PRESET.timeZone +
+        ' clock, ' + zoneLabel(liveOffset()) + '.' + unofficial);
+      /* The footer describes the clock too, so it has to move with it. It
+         knows the published times and the real clock, nothing about the
+         room: a talk that runs over still moves to Finished on time. */
+      setText(f, 'This page is running on the real Sydney clock against the ' +
+        'published times, so nothing on it moves if a session starts or ' +
+        'finishes late.');
       return;
     }
-    if (mode.at !== null) {
-      n.textContent = 'Preview clock — frozen at ' + clock(mode.at) + ' on ' +
-        dayName(startDay) + '. This is not the real time.' + unofficial;
-      f.textContent = 'The clock is frozen at ' + clock(mode.at) + ' on ' +
+    if (!touched && mode.at !== null) {
+      setText(n, 'Preview clock — frozen at ' + clock(mode.at) + ' on ' +
+        dayName(startDay) + '. This is not the real time.' + unofficial);
+      setText(f, 'The clock is frozen at ' + clock(mode.at) + ' on ' +
         startDay.label + ' so this moment can be looked at. Press Play, or drag ' +
-        'the slider, to move anywhere across the day.';
+        'the slider, to move anywhere across the day.');
       return;
     }
-    if (mode.fast) {
-      n.textContent = 'Preview clock — ' + startDay.label +
-        ' is playing at 10 minutes a second. This is not the real time.' + unofficial;
-      return;
+    if (!touched && mode.fast) {
+      setText(n, 'Preview clock — ' + startDay.label +
+        ' is playing at 10 minutes a second. This is not the real time.' + unofficial);
+    } else {
+      setText(n, 'Preview — the clock on this page is simulated, not the real time.' + unofficial);
     }
-    n.textContent = 'Preview — the clock on this page is simulated, not the real time.' + unofficial;
+    if (f.innerHTML !== footDefault) f.innerHTML = footDefault;
   }
 
   /* ─────────────────────────── Start ─────────────────────────── */
@@ -2027,7 +2226,7 @@ button,select{ font:inherit; }
     var s0 = $('scrub');
     if (mode.at !== null) {
       pause();
-      if (mode.at >= +s0.min && mode.at <= +s0.max) s0.value = String(mode.at);
+      s0.value = String(mode.at);   // inside the range: scrubRange took it in
     }
     if (mode.fast) $('speed').value = '600';
   }
