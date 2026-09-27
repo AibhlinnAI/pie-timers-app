@@ -32,6 +32,23 @@
   var pollTimer = null;
   var pendingPush = false;
   var statusListeners = [];
+  /* Pulls can overlap: the minute's poll, coming back to the tab, the
+     'online' event and Sync now each start one, and their answers can
+     come back in any order. Each pull is numbered as it starts. An answer
+     that comes back after a pull started later than it has been answered
+     is dropped, unless its row is newer than the one that answer held:
+     applied after it, an older row would put back what the newer one took
+     away (a break removed on another device, say), then push it. Nothing
+     is lost by dropping it: the newer answer has already been dealt with.
+     A newer row is still taken, in case the older request reached the
+     server last. */
+  var pullsStarted = 0;
+  var pullAnswered = 0;
+  var answeredRowAt = 0;
+  /* Counts the rows this copy has taken in. A push that fails once one
+     has been taken since it started carried a copy that is no longer
+     this one, so it leaves nothing waiting to go up (see push()). */
+  var rowsTaken = 0;
 
   /* A stable per-device id, so a device can recognise its own writes. */
   var deviceId = (function () {
@@ -72,6 +89,49 @@
     return Boolean(user) && syncedAccount === user.id;
   }
 
+  /* Whether timer_profiles has the breaks column: null until this copy
+     knows, then true or false. A column PostgREST does not know makes it
+     refuse the WHOLE upsert (PGRST204), which would stop every sync, so
+     `breaks` is only ever sent once the column has been seen (R12): on a
+     pulled row, or, before any row exists or before the first pull, by
+     asking for the column and getting 200 back. Each pull says again,
+     from its row. A "no" from asking is never kept: the next push asks
+     again, so one odd answer cannot hold the breaks back for good. */
+  var breaksColumn = null;
+
+  function knowBreaksColumn() {
+    if (breaksColumn !== null) return Promise.resolve(breaksColumn);
+    // A supabase.js from before breaks cannot ask, so nothing is sent.
+    if (typeof CT.db.probeBreaksColumn !== 'function') return Promise.resolve(false);
+    return CT.db.probeBreaksColumn().then(function (exists) {
+      if (exists) breaksColumn = true;
+      return exists;
+    });
+  }
+
+  /* The breaks this push may carry, with the savedAt they were saved
+     with, or null. An app.js from before breaks has none to give. Nor is
+     a blank record given, one that is empty and was never saved on this
+     device: it says nothing the row needs, so a lunch-only device sends
+     and asks exactly what it did before breaks, and its next pull brings
+     the account's. */
+  function breaksToPush() {
+    var offered = typeof CT.app.breaksToPush === 'function' ? CT.app.breaksToPush() : null;
+    return offered && !offered.blank ? offered : null;
+  }
+
+  /* Whether a pull has compared this copy with the row since the page
+     loaded, or since a push was last held back or failed. Until one has,
+     breaks saved here that no push has carried may be older than ones
+     another device has sent meanwhile, so the push pulls first and the
+     pull decides (CT.app.breaksNeedPull()). A copy with no such breaks
+     pushes as it always has. */
+  var compared = false;
+
+  function breaksNeedPull() {
+    return !compared && typeof CT.app.breaksNeedPull === 'function' && CT.app.breaksNeedPull();
+  }
+
   /* Appointments made before this device first signed in exist nowhere
      else, so they join the account's list rather than vanish with the
      rest of the local copy. Matched on id, which the conference agenda
@@ -110,15 +170,28 @@
     if (!manual && !CT.billing.isEntitled()) { setStatus('free'); return Promise.resolve(false); }
 
     setStatus('syncing');
+    var pullNumber = ++pullsStarted;
 
     return CT.db.getProfile().then(function (row) {
+      var rowAt = row ? Date.parse(row.updated_at) || 0 : 0;
+      // A newer pull's answer is in. The status is already that one's.
+      if (pullNumber < pullAnswered && rowAt <= answeredRowAt) return true;
+      pullAnswered = Math.max(pullAnswered, pullNumber);
+      answeredRowAt = rowAt;
       var user = CT.auth.getUser();
+      compared = true;
 
       if (!row) {
         // First device for this account — seed the server from local state.
         if (user) setSyncedAccount(user.id);
+        // Its breaks included: with no row, there are none newer anywhere.
+        if (typeof CT.app.confirmBreaks === 'function') CT.app.confirmBreaks();
         return push(true).then(function () { return true; });
       }
+
+      // select=* returns every column, so the row itself says.
+      var rowHasBreaks = Object.prototype.hasOwnProperty.call(row, 'breaks');
+      breaksColumn = rowHasBreaks;
 
       var local = CT.app.getState();
       var remoteAt = Date.parse(row.updated_at) || 0;
@@ -141,22 +214,52 @@
           kept = merged.added;
         }
 
-        CT.app.replaceState({
+        var incoming = {
           schedule: row.schedule,
           settings: row.settings,
           appointments: appointments,
           // Kept appointments make this copy newer than the row, even
           // on a clock running behind the one that wrote it.
           updatedAt: kept ? Math.max(Date.now(), remoteAt + 1) : remoteAt
-        }, { fromSync: true });
+        };
+        /* Passed exactly as the row has it, null included, and only when
+           the row has the column at all: replaceState() keeps this
+           copy's breaks when the key is missing (R11). Never
+           `row.breaks || local`, and never merged. On a first sign-in
+           the account's breaks replace the device's, as its schedule does.
+           Otherwise breaks saved here after the row was written, and not
+           yet sent, are newer than the row's: replaceState() keeps them,
+           and says so when it has also taken the week they were saved
+           with, and then they go up. */
+        if (rowHasBreaks) incoming.breaks = row.breaks;
+        var keptBreaks = CT.app.replaceState(incoming, {
+          fromSync: true, rowAt: inStepWith(user) ? remoteAt : undefined
+        }) === true;
+        rowsTaken++;
         if (user) setSyncedAccount(user.id);
 
-        if (kept) return push(true).then(function () { return true; });
+        if (kept || keptBreaks) return push(true).then(function () { return true; });
+        /* This copy is the row now, so nothing is waiting to go up. A push
+           held back offline, or one that failed, and then sent here by
+           push() to pull first, would otherwise stay pending: the next
+           'online' event would send this copy, stamp and all, over
+           whatever another device has sent since. */
+        pendingPush = false;
+        /* An edit's push still waiting out its debounce is older than
+           this row (remoteAt >= localAt above), so the row has won it; the
+           timer would only send the copy just taken in back up, blind. */
+        clearTimeout(pushTimer);
         setStatus('synced');
         return true;
       }
 
-      // Local is genuinely newer — send the row up.
+      /* Local is genuinely newer — send the row up. Its breaks, though, only
+         if this copy can vouch for them: an older copy of the app may have
+         stamped the week here without knowing the breaks exist. If not,
+         the row's breaks are taken first and go back up with the rest,
+         unless they are this device's own, saved after the row was
+         written: the row's time lets pulledBreaks() tell. */
+      if (rowHasBreaks && typeof CT.app.pulledBreaks === 'function') CT.app.pulledBreaks(row.breaks, remoteAt);
       return push(true).then(function () { return true; });
     }).catch(function (err) {
       setStatus('error', err.message);
@@ -172,6 +275,7 @@
 
     if (!navigator.onLine) {
       pendingPush = true;              // retried by the 'online' handler
+      compared = false;                // and the row may have moved on by then
       setStatus('offline');
       return Promise.resolve(false);
     }
@@ -189,23 +293,59 @@
     var user = CT.auth.getUser();
     if (user && !inStepWith(user)) return pull();
 
-    var local = CT.app.getState();
-    var stamp = local.updatedAt || Date.now();
+    /* Breaks saved here and not yet sent, with no pull since the page
+       loaded or since a push was held back or failed: another device may
+       have sent newer ones meanwhile, and this push would put these over
+       them. The pull compares, keeps whichever is newer, then pushes. The
+       'online' handler's push comes through here too. */
+    if (breaksNeedPull()) return pull();
 
     setStatus('syncing');
 
-    return CT.db.saveProfile({
-      schedule: local.schedule,
-      settings: local.settings,
-      appointments: local.appointments,
-      updated_at: new Date(stamp).toISOString(),
-      device_id: deviceId
+    /* The breaks travel in this payload and nowhere else (R10), and only
+       once the column is known to exist (R12). Then always the whole
+       record, the first device's seed included, never null or {} in its
+       place: either of those would wipe every device's breaks. If the
+       check itself fails, so does this push, and it is retried like any
+       other: sending without the breaks would stamp the row as newer
+       than breaks it does not have.
+
+       While app.js has no breaks it can vouch for, or only a blank record
+       (breaksToPush() gives null), the payload leaves `breaks` out
+       altogether, nothing is asked, and the column keeps what it has.
+       That covers every push, including the 'online' handler's, which
+       sends without pulling first unless breaksNeedPull() says above. */
+    var takenBefore = rowsTaken;
+    var asking = breaksToPush() ? knowBreaksColumn() : Promise.resolve(false);
+    return asking.then(function (known) {
+      var local = CT.app.getState();
+      var stamp = local.updatedAt || Date.now();
+      var payload = {
+        schedule: local.schedule,
+        settings: local.settings,
+        appointments: local.appointments,
+        updated_at: new Date(stamp).toISOString(),
+        device_id: deviceId
+      };
+      var sent = known ? breaksToPush() : null;
+      if (sent) payload.breaks = sent.breaks;
+      return CT.db.saveProfile(payload).then(function () {
+        if (sent && typeof CT.app.breaksPushed === 'function') CT.app.breaksPushed(sent.savedAt);
+      });
     }).then(function () {
       pendingPush = false;
       setStatus('synced');
       return true;
     }).catch(function (err) {
-      pendingPush = true;
+      /* Retried by the 'online' handler, unless a pull has taken in a
+         row since this push set out: this copy is that row now, and
+         sending it by itself would put it, stamp and all, over whatever
+         another device has sent since. The next pull or edit sends
+         anything newer. */
+      if (rowsTaken === takenBefore) {
+        pendingPush = true;
+        compared = false;
+      }
       setStatus('error', err.message);
       return false;
     });

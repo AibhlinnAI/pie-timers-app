@@ -264,6 +264,25 @@
         .then(function (rows) { return rows && rows.length ? rows[0] : null; });
     },
 
+    /* Does timer_profiles have the breaks column? limit=0 asks for no row,
+       so this works before this user has one. 200 is the only yes. The
+       only no is PostgREST saying the column is not there: a 400 whose
+       code is Postgres's undefined_column (42703), or its own "no such
+       column in the schema cache" (PGRST204). Then sync leaves the breaks
+       out rather than have its whole upsert refused. Anything else is
+       thrown, a rate limit, a proxy's refusal, a network failure or a
+       rejected token alike, because nothing was learned about the column:
+       the push fails and is tried again, rather than go without breaks. */
+    probeBreaksColumn: function () {
+      return authedFetch('/timer_profiles?select=breaks&limit=0').then(function () {
+        return true;
+      }, function (err) {
+        var code = err && err.body && err.body.code;
+        if (err && err.status === 400 && (code === '42703' || code === 'PGRST204')) return false;
+        throw err;
+      });
+    },
+
     /* Insert-or-update this user's row. RLS pins the write to their own user_id. */
     saveProfile: function (payload) {
       var user = auth.getUser();

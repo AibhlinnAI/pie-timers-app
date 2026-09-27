@@ -15,18 +15,23 @@ contents in this order:
 | 3 | `schema-access-codes.sql` | **14-day free trial**, friends-and-family codes | Always |
 | 4 | `schema-ratelimit.sql` | sign-in throttle store | Always |
 | 5 | `schema-calendar.sql` | calendar feeds and events, **appointments column** | Always |
-| 6 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
-| 7 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
+| 6 | `schema-breaks.sql` | **breaks column** (extra breaks, lunch's length) | Always, before deploying functions |
+| 7 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
+| 8 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
 
-Steps 1–6 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
+Steps 1–7 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
 editing**, and only after the edge functions are deployed, because the file points at
 their URLs.
 
-Two of these are needed even if you skip the optional features:
+Three of these are needed even if you skip the optional features:
 
 - **Step 3** carries the free-trial trigger, not just the access codes.
 - **Step 5** adds the `appointments` column to `timer_profiles`. Without that column, manual
   appointments do not sync between devices.
+- **Step 6** adds the `breaks` column to `timer_profiles`, and must run before the edge
+  functions are deployed: `notify-milestones` asks for `breaks` by name, so without the
+  column it cannot read any profile and no pushes are sent for anyone. The live project
+  already has the column (added 27 Sep 2026).
 
 ## Checking the run worked
 

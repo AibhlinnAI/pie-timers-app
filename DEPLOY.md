@@ -117,6 +117,10 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
 - [ ] `schema-access-codes.sql`
 - [ ] `schema-ratelimit.sql`
 - [ ] `schema-calendar.sql`
+- [ ] `schema-breaks.sql` — always, and before the functions (5.3) or `cron.sql`:
+      `notify-milestones` asks for the `breaks` column by name, so without it the
+      function cannot read any profile and no pushes are sent for anyone. The live
+      project already has the column (added 27 Sep 2026).
 - [ ] `schema-google-calendar.sql`
 - [ ] `identity-schema.sql`
 - [ ] `cron.sql` — last, because the file schedules a job against edge functions that do
@@ -515,6 +519,10 @@ Pages redeploys in a minute or two.
 **When you change any file in `app/`, bump `CACHE` in `app/sw.js`.** Installed
 copies serve the old cached shell until the version string changes, so without
 the bump your fix reaches new visitors and nobody else.
+
+**As well as `CACHE`, bump the `?v=` of every changed js or css file, in
+`app/index.html` and in `SHELL` in `app/sw.js` together**, or a browser can pair
+the old file with the new page (see the comments beside `SHELL`).
 
 ## If you ever need to take the service down
 
