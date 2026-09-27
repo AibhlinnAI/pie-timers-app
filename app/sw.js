@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v109';
+var CACHE = 'countdown-timers-v110';
 
 var SHELL = [
   './',
@@ -55,7 +55,12 @@ self.addEventListener('install', function (event) {
       // addAll is all-or-nothing; cache individually so one 404 is survivable.
       .then(function (cache) {
         return Promise.all(SHELL.map(function (url) {
-          return cache.add(url).catch(function () { return null; });
+          /* cache:'reload' goes past the browser's HTTP cache to the server.
+             Pages keeps files for ten minutes, so a plain add() soon after
+             a deploy could store the OLD app.js under the NEW cache name,
+             and it would then be served until the next bump. */
+          return cache.add(new Request(url, { cache: 'reload' }))
+            .catch(function () { return null; });
         }));
       })
       .then(function () { return self.skipWaiting(); })
