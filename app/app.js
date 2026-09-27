@@ -180,6 +180,7 @@
   }
 
   var MILESTONES = [30, 15, 10, 5]; // minutes remaining
+  var DONE_ALERT_WINDOW_SEC = 120;   // "Time reached" is only announced this close to it
 
   /* The furthest ahead an appointment can be added. Far enough for any real
      one; near enough that a mistyped year (2206 for 2026) is caught at the
@@ -323,6 +324,7 @@
 
   var state = load();
   var firedAlerts = {}; // key -> true, reset each day
+  var lastSeenRunning = {}; // 'lunch|750' -> Date.now() this tab last saw it counting; not reset daily
 
   /* ─────────────────────────── Storage ─────────────────────────── */
 
@@ -407,19 +409,30 @@
     });
   }
 
-  /* Validate anything arriving from storage or the server before trusting any of that. */
+  function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  /* Validate anything arriving from storage or the server before trusting any of that.
+
+     Must never throw, whatever JSON it is handed: load() calls it at the
+     top of this file, so a throw there leaves nothing running at all, and
+     from sync it would fail every pull. `k in settings` once did exactly
+     that when settings arrived as a string. */
   function normalise(saved) {
-    saved = saved || {};
+    saved = isRecord(saved) ? saved : {};
+    var savedSchedule = isRecord(saved.schedule) ? saved.schedule : {};
+    var savedSettings = isRecord(saved.settings) ? saved.settings : {};
     var schedule = {};
     DAYS.forEach(function (day) {
       var base = DEFAULT_SCHEDULE[day];
-      var got = (saved.schedule || {})[day] || {};
+      var got = isRecord(savedSchedule[day]) ? savedSchedule[day] : {};
       /* "Head Home" is per day AND per slot: some days the hard part is
          stopping for lunch, other days leaving at all. A single
          global switch could not express that. */
-      // Coerced: the bare && yields undefined on a fresh install, which then
-      // serialises as a missing key rather than an explicit false.
-      var legacy = !!(saved.settings && saved.settings.includeHeadHome === true);
+      // Strictly true: anything else, including a missing key on a fresh
+      // install, becomes an explicit false rather than a missing key.
+      var legacy = savedSettings.includeHeadHome === true;
 
       schedule[day] = {
         working: typeof got.working === 'boolean' ? got.working : base.working,
@@ -430,9 +443,15 @@
         endHeadHome: typeof got.endHeadHome === 'boolean' ? got.endHeadHome : legacy
       };
     });
+    /* Each setting must be the same type as its default, which is the only
+       type the app ever stores. Anything else would reach the controls
+       as it is: an object for calcTarget threw on the way into its input,
+       every time the app started. */
     var settings = {};
     Object.keys(DEFAULT_SETTINGS).forEach(function (k) {
-      settings[k] = saved.settings && k in saved.settings ? saved.settings[k] : DEFAULT_SETTINGS[k];
+      var has = Object.prototype.hasOwnProperty.call(savedSettings, k);
+      settings[k] = has && typeof savedSettings[k] === typeof DEFAULT_SETTINGS[k]
+        ? savedSettings[k] : DEFAULT_SETTINGS[k];
     });
     if (THEMES.indexOf(settings.theme) === -1) settings.theme = DEFAULT_SETTINGS.theme;
     if (URGENT_CHOICES.indexOf(settings.urgentMinutes) === -1) {
@@ -493,6 +512,9 @@
     return list.filter(function (item) {
       return item &&
         typeof item.title === 'string' &&
+        // String first: the regex quietly stringifies, so ["2026-09-27"]
+        // passed and then broke date.split() on every render.
+        typeof item.date === 'string' &&
         /^\d{4}-\d{2}-\d{2}$/.test(item.date) &&
         isMinute(item.time) &&
         item.date >= cutoff;              // quietly forget the distant past
@@ -519,8 +541,10 @@
   function persist() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      return true;
     } catch (e) {
       toast('Could not save — device storage is unavailable.');
+      return false;
     }
   }
 
@@ -530,9 +554,10 @@
   function save(options) {
     options = options || {};
     if (!options.fromSync) state.updatedAt = Date.now();
-    persist();
+    var stored = persist();
     if (!options.fromSync && CT.sync) CT.sync.notifyLocalChange();
     if (CT.notify) CT.notify.syncScheduleToWorker(state);
+    return stored;
   }
 
   function isMinute(v) {
@@ -888,6 +913,9 @@
       totalSec: totalSec,
       elapsedSec: elapsedSec,
       remainingSec: remainingSec,
+      // How long ago the target passed, by the wall clock; 0 until it has.
+      overSec: Math.max(sinceStart - totalSec, 0),
+      targetMin: targetMin,
       notStarted: sinceStart < 0,
       done: remainingSec <= 0,
       progress: totalSec > 0 ? elapsedSec / totalSec : 1
@@ -2278,10 +2306,42 @@
       }
     });
 
-    var doneKey = todayKey + '|' + prefix + '|done';
-    if (timer.done && !firedAlerts[doneKey]) {
+    /* "Time reached" is news only at the moment it happens. Fired flags
+       live in memory, so this used to fire again on every open for the
+       rest of the day: a toast, and a chime with sound on, for a lunch
+       that ended hours ago. Now it is marked fired either way, and only
+       announced when either:
+       - this tab watched the timer running moments ago, in real time.
+         That covers the night the clocks go forward, when the wall clock
+         jumps from 1:59 to 3:00 and a 2:00 target looks an hour stale;
+       - or, just opened, the target passed by the wall clock moments ago.
+       "Moments" is two minutes, because a background tab's timers can
+       slow to once a minute.
+       The target is part of the key, so moving a finish time later, after
+       the old one passed, still gets its own "Time reached". */
+    var doneKey = todayKey + '|' + prefix + '|done|' + timer.targetMin;
+    /* Not tied to the date: where the clocks go forward at midnight, the
+       last moment the timer was seen running falls on the day before. Used
+       once, then dropped, so it can't vouch for tomorrow's timer too. */
+    var watchKey = prefix + '|' + timer.targetMin;
+    var realNow = Date.now();
+    if (!timer.done) {
+      lastSeenRunning[watchKey] = realNow;
+    } else if (!firedAlerts[doneKey]) {
       firedAlerts[doneKey] = true;
-      notify(label, 'Time reached.', tagFor(todayKey, prefix, 'done'));
+      var seen = lastSeenRunning[watchKey];
+      delete lastSeenRunning[watchKey];
+      var watchedLive = seen !== undefined && realNow - seen <= DONE_ALERT_WINDOW_SEC * 1000;
+      if (watchedLive || timer.overSec <= DONE_ALERT_WINDOW_SEC) {
+        /* The first one today keeps the plain tag, so it still merges with
+           the server's push. A later one, for a moved target, needs a tag
+           of its own: under the same tag the phone swaps it in silently. */
+        var announcedKey = todayKey + '|' + prefix + '|announced';
+        var tag = tagFor(todayKey, prefix, 'done');
+        if (firedAlerts[announcedKey]) tag += '|' + timer.targetMin;
+        firedAlerts[announcedKey] = true;
+        notify(label, 'Time reached.', tag);
+      }
     }
   }
 
@@ -2516,12 +2576,31 @@
     reader.onload = function () {
       try {
         var incoming = JSON.parse(reader.result);
-        localStorage.setItem(STORE_KEY, JSON.stringify(incoming));
-        state = load();
+        /* Only a file shaped like an export. Anything else used to go
+           straight into storage unchecked: a malformed one could stop the
+           app starting, and any other JSON file replaced the whole week
+           with the defaults. Validated before it is saved, never after. */
+        if (!isRecord(incoming) ||
+            !isRecord(incoming.schedule) || !isRecord(incoming.settings)) {
+          toast('That file is not a Pie Timers export.');
+          return;
+        }
+        state = normalise(incoming);
+        /* An edit like any other, so stamped now and synced. Keeping the
+           file's own updatedAt let the next pull, within a minute, quietly
+           put the server's copy back over what was just imported. */
+        var stored = save();
+        // Everything a sync pull refreshes, and the first-run panels, which
+        // the file's onboarded flags may now retire.
         syncSettingInputs();
         buildScheduleEditor();
+        buildAppointmentList();
+        renderAccount();
+        renderWelcome();
+        renderTesterInvite();
         render();
-        toast('Settings imported.');
+        // A storage failure has already said so; do not talk over it.
+        if (stored) toast('Settings imported.');
       } catch (e) {
         toast('That file could not be read.');
       }
@@ -2763,7 +2842,7 @@
 
     // New day → clear fired milestone alerts.
     if (todayKey !== lastDayKey) {
-      firedAlerts = {};
+      firedAlerts = {};   // lastSeenRunning deliberately survives: see checkAlerts
       lastDayKey = todayKey;
     }
 
