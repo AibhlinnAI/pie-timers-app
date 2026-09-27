@@ -311,6 +311,44 @@
     });
   }
 
+  /* The column the breaks sync through, asked for by name with limit=0,
+     the same request the app makes before it will send one. 200 is the
+     only yes: the app sends breaks only after seeing it, because
+     PostgREST refuses a whole upsert that names a column it does not
+     know, and every sync would stop. A table that refuses anonymous reads
+     cannot answer this from here, so that is a warning, not a failure:
+     the signed-in app asks again for itself. */
+  function checkBreaksColumn() {
+    var done = row('Column: timer_profiles.breaks');
+    var url = cfg.supabaseUrl + '/rest/v1/timer_profiles?select=breaks&limit=0';
+    return get(url, { headers: anonHeaders() }).then(function (res) {
+      return res.text().then(function (body) { return { res:res, body:body }; });
+    }).then(function (r) {
+      if (r.res.status === 200) {
+        done('pass', 'Answers 200. Breaks sync between devices and reach the alert function.');
+        return;
+      }
+      if (r.res.status === 401 || r.res.status === 403) {
+        done('warn', 'Could not tell (HTTP ' + r.res.status + ': the table refuses ' +
+          'anonymous reads). Signed in, the app checks for itself before it sends any breaks.');
+        return;
+      }
+      /* Worse than breaks not syncing: notify-milestones asks for this
+         column by name, and a request naming a missing column fails
+         whole, so it reads no profiles at all. */
+      if (r.res.status === 400 && /42703|PGRST204|breaks/.test(r.body)) {
+        done('fail', 'Missing. Breaks cannot sync, and the current notify-milestones ' +
+          'cannot read any profile, so no background alerts are sent for anyone. ' +
+          'Add it in the SQL editor: alter table public.timer_profiles add column ' +
+          'if not exists breaks jsonb;');
+        return;
+      }
+      done('fail', 'HTTP ' + r.res.status + ': ' + r.body.slice(0, 160));
+    }).catch(function (err) {
+      done('fail', err.message);
+    });
+  }
+
   /* Functions are checked with a deliberately empty POST. A deployed
      function replies 4xx ("that request made no sense"); an undeployed
      one replies 404. Neither does any work, so this is safe to repeat. */
@@ -564,6 +602,7 @@
              not entitlements. A check that names a table you never
              created reports a failure that no amount of fixing clears. */
           .then(function () { return checkTable('timer_profiles', 'schema.sql'); })
+          .then(checkBreaksColumn)
           .then(function () { return checkTable('push_subscriptions', 'schema.sql'); })
           .then(function () { return checkTable('notification_log', 'schema.sql'); })
           .then(function () { return checkTable('subscriptions', 'schema-billing.sql'); })

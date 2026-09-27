@@ -9,6 +9,28 @@
   var CT = window.CT = window.CT || {};
 
   var STORE_KEY = 'countdown-timers/v1';
+  /* Extra breaks, and how long each break lasts, live under a key of
+     their own and never inside STORE_KEY. An older copy of this app
+     rebuilds STORE_KEY from the fields it knows every time it saves, so
+     anything new written there would be dropped without a word, and the
+     schedule and settings it pushes are rebuilt the same way. See Breaks,
+     below load(). */
+  var BREAKS_KEY = 'countdown-timers/breaks/v1';
+  /* Lunch plus the extras, per day, as the Breaks box offers them. Six
+     covers a split shift with a break every hour or so; more than that is
+     a timetable, not breaks. A stored record is only held to six extras:
+     lunch can be set by an older copy that knows nothing of them, and
+     that must never cost a break. */
+  var MAX_BREAKS = 6;
+  var BREAK_MIN_MINUTES = 5;
+  var BREAK_MAX_MINUTES = 180;
+  /* The lengths on offer. A stored length outside this list (from another
+     device or an import) is still shown, as its own option, never changed. */
+  var BREAK_LENGTHS = [
+    [null, 'No set length'], [5, '5 min'], [10, '10 min'], [15, '15 min'],
+    [20, '20 min'], [30, '30 min'], [45, '45 min'], [60, '1 hour'],
+    [90, '1½ hours'], [120, '2 hours'], [180, '3 hours']
+  ];
   /* Dial geometry — must match the cx/cy/r in the SVG markup. */
   var DIAL_CX = 80, DIAL_CY = 80, DIAL_R = 70;
 
@@ -323,7 +345,40 @@
     if (accountHint) accountHint.textContent = 'Sign in, sync, delete your account.';
   }());
 
+  /* What load() found under STORE_KEY, for loadBreaks(): 'none' on a first
+     run, 'unreadable' when it could not be read or parsed, otherwise
+     'read', with the breaksMark it carried (see persist()). */
+  var loadedStore = { found: 'none', mark: undefined };
   var state = load();
+  /* The breaks record, { v: 1, days: {...} }. Deliberately not a field of
+     state: see BREAKS_KEY. breaksSavedAt is the savedAt this copy last
+     wrote or adopted, and breaksWritten the record as last written or
+     loaded, so a save that changed no break writes nothing (R8).
+     breaksPushedAt is the savedAt of the last record the server is known
+     to hold: one a push carried, or one a pull brought. */
+  var breaks = emptyBreaks();
+  var breaksSavedAt = 0;
+  var breaksPushedAt = 0;
+  var breaksWritten = JSON.stringify(breaks);
+  /* Whether these breaks can be sent. An older copy of the app rewrites
+     STORE_KEY without ever touching the breaks key, so a breaks key can
+     be older than the week beside it, and pushing it with that week's
+     newer stamp would put stale breaks over another device's. Until this
+     copy knows better (see loadBreaks()), its pushes leave the breaks out
+     and the server keeps its own; the next pull brings them, or, for
+     breaks saved here that no push has carried (breaksUnsent()), says
+     whether they are newer than the row's. */
+  var breaksConfirmed = true;
+  /* A pulled row held breaks in a format newer than this app can read.
+     They are left alone, here and on the server, for as long as this page
+     is open: this copy never sends breaks over them. */
+  var breaksFuture = false;
+  /* Restore defaults or an import set the breaks in this page. That is
+     the person's own word on them, sent even when it is the empty record
+     this copy already had, which breaksBlank() would otherwise leave out.
+     In memory only: a record that did not change is not written (R8). */
+  var breaksSaid = false;
+  loadBreaks();
   var firedAlerts = {}; // key -> true, reset each day except a night shift's own
   var lastSeenRunning = {}; // 'lunch|750' -> Date.now() this tab last saw it counting; not reset daily
 
@@ -337,6 +392,7 @@
     try {
       raw = localStorage.getItem(STORE_KEY);
     } catch (e) {
+      loadedStore.found = 'unreadable';
       return normalise({});
     }
     if (raw === null) return normalise(firstRunSeed());
@@ -344,7 +400,10 @@
     var saved = {};
     try {
       saved = JSON.parse(raw) || {};
+      loadedStore.found = 'read';
+      loadedStore.mark = isRecord(saved) ? saved.breaksMark : undefined;
     } catch (e) {
+      loadedStore.found = 'unreadable';
       saved = {};
     }
     return normalise(saved);
@@ -539,9 +598,31 @@
     return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
   }
 
+  /* The breaks key first, then STORE_KEY, so the two share one clock:
+     savedAt is the updatedAt that save() has just stamped. The breaks key
+     is only written when the record differs from what this copy last
+     wrote or loaded, never as a side effect of an unrelated edit (R8).
+     state never holds the breaks, so STORE_KEY cannot either.
+
+     STORE_KEY does carry breaksMark, the updatedAt it was saved with,
+     whenever this copy's breaks are confirmed: it says the breaks key is
+     as current as the week beside it. An older copy's normalise() keeps
+     only the fields it knows, so its next save drops the mark, and the
+     next copy of this app to load knows the breaks key may be behind. */
   function persist() {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      var record = JSON.stringify(breaks);
+      if (record !== breaksWritten) {
+        localStorage.setItem(BREAKS_KEY, JSON.stringify({
+          v: 1, days: breaks.days, savedAt: state.updatedAt, pushedAt: breaksPushedAt,
+          week: weekPrint(state)
+        }));
+        breaksWritten = record;
+        breaksSavedAt = state.updatedAt;
+      }
+      localStorage.setItem(STORE_KEY, JSON.stringify(breaksConfirmed && !breaksFuture
+        ? Object.assign({}, state, { breaksMark: state.updatedAt })
+        : state));
       return true;
     } catch (e) {
       toast('Could not save — device storage is unavailable.');
@@ -551,10 +632,16 @@
 
   /* Every local edit stamps updatedAt and queues a sync push.
      Changes arriving from the server pass { fromSync: true } so they
-     are stored without being echoed straight back up. */
+     are stored without being echoed straight back up. A break edit is an
+     edit like any other and comes through here too (R6). */
   function save(options) {
     options = options || {};
-    if (!options.fromSync) state.updatedAt = Date.now();
+    if (!options.fromSync) {
+      state.updatedAt = Date.now();
+      /* A break edit made here is the newest there is, so from now on
+         these breaks are sent, even if they started out unconfirmed. */
+      if (JSON.stringify(breaks) !== breaksWritten) breaksConfirmed = true;
+    }
     var stored = persist();
     if (!options.fromSync && CT.sync) CT.sync.notifyLocalChange();
     if (CT.notify) CT.notify.syncScheduleToWorker(state);
@@ -563,6 +650,262 @@
 
   function isMinute(v) {
     return typeof v === 'number' && isFinite(v) && v >= 0 && v < 1440;
+  }
+
+  /* ─────────────────────────── Breaks ───────────────────────────
+     Lunch stays exactly where it always was: its start in
+     schedule[day].lunch, its Head Home tick in schedule[day].lunchHeadHome
+     and its name in settings.lunchLabel. Older copies of the app, and the
+     server's alerts before this release, read those, so lunch is a fixed
+     slot and nothing is ever promoted into it. Everything new is in one
+     record beside the schedule:
+
+       { v: 1, days: { Monday: { lunchMinutes: null | 5..180,
+                                 extras: [{ id, start, minutes, name, headHome }] } } }
+
+     On this device it lives under BREAKS_KEY as { v, days, savedAt,
+     pushedAt } (see notePushed()); on the server in timer_profiles.breaks
+     as { v, days }. lunchMinutes null means lunch has no set length,
+     which is how every lunch starts, and is exactly the lunch the app has
+     always had. */
+
+  function emptyBreakDay() {
+    return { lunchMinutes: null, extras: [] };
+  }
+
+  function emptyBreaks() {
+    var days = {};
+    DAYS.forEach(function (day) { days[day] = emptyBreakDay(); });
+    return { v: 1, days: days };
+  }
+
+  /* A break's start, whole minutes past midnight, or null if there is no
+     way to read one. "10:30" is accepted as a repair, since that is what a
+     time input holds. */
+  function breakStart(value) {
+    if (typeof value === 'string' && /^\d{1,2}:\d{2}$/.test(value)) value = hhmmToMinutes(value);
+    if (!isMinute(value)) return null;
+    return Math.floor(value);
+  }
+
+  /* A length is null (no set length) or whole minutes, clamped into range
+     rather than refused: a stray 200 becomes 3 hours, not no break. */
+  function breakLength(value) {
+    if (typeof value !== 'number' || !isFinite(value)) return null;
+    var minutes = Math.round(value);
+    if (minutes <= 0) return null;
+    return Math.min(Math.max(minutes, BREAK_MIN_MINUTES), BREAK_MAX_MINUTES);
+  }
+
+  /* Validate a breaks record from storage, the server, another tab or an
+     import. Like normalise(), it must never throw: it runs at load, and on
+     every pull. Anything unreadable is the empty record. A readable record
+     is repaired, never pruned for where its breaks fall: a break on a day
+     off, before Start or after End of Day is still the person's entry and
+     is kept (R4). The only things dropped are extras beyond MAX_BREAKS a
+     day and a break with no readable start, which has nothing left to
+     keep. Lunch never counts against that here: an older copy can set
+     lunch on a day that already has six others, and a break must not
+     vanish for it. Add a break is what holds a day to six.
+
+     An id is kept whenever it is a usable string. Otherwise it is made
+     from the break itself, never at random: a random id here would be a
+     new id on every load. */
+  function normaliseBreaks(saved) {
+    try {
+      var out = emptyBreaks();
+      if (!isRecord(saved) || saved.v !== 1 || !isRecord(saved.days)) return out;
+      var used = Object.create(null);
+      DAYS.forEach(function (day) {
+        var got = isRecord(saved.days[day]) ? saved.days[day] : {};
+        var list = Array.isArray(got.extras) ? got.extras : [];
+        var extras = [];
+        for (var i = 0; i < list.length; i++) {
+          var item = list[i];
+          if (!isRecord(item)) continue;
+          var start = breakStart(item.start);
+          if (start === null) continue;
+          extras.push({
+            id: item.id,
+            start: start,
+            minutes: breakLength(item.minutes),
+            // Trimmed again after the cut, so a name is never left ending in a space.
+            name: typeof item.name === 'string' ? item.name.trim().slice(0, 30).trim() : '',
+            headHome: item.headHome === true
+          });
+        }
+        extras = extras.slice(0, MAX_BREAKS);
+        extras.forEach(function (extra, index) {
+          var id = extra.id;
+          if (typeof id !== 'string' || !id || id.length > 64 || used[id]) {
+            id = 'b_' + day + extra.start + index;
+            while (used[id]) id += '_';
+          }
+          used[id] = true;
+          extra.id = id;
+        });
+        out.days[day] = { lunchMinutes: breakLength(got.lunchMinutes), extras: extras };
+      });
+      return out;
+    } catch (e) {
+      return emptyBreaks();
+    }
+  }
+
+  /* Reads this device's breaks at boot. Never stamps, never writes and
+     never pushes (R7): a repaired record is only written by the next
+     real break edit. A first run, or a copy saved but reset to nothing
+     (updatedAt 0), cannot own a breaks key, since the first break edit
+     stamps updatedAt, so one found then is stray and is removed (R18).
+     A STORE_KEY that cannot be read is neither: it may still hold
+     someone's week, and the breaks key beside it is left where it is.
+
+     The breaks are confirmed, and so can be sent, when STORE_KEY's
+     breaksMark matches its updatedAt: this app wrote both keys last. A
+     missing or different mark means an older copy saved the week since,
+     and may have pulled a newer row without these breaks. That holds
+     even for edits of this device's own that no push has carried yet
+     (savedAt after pushedAt): the older copy may have taken in another
+     device's newer breaks meanwhile, and only the row can say which are
+     newer. So they are not sent until a pull has compared them with it
+     (see pulledBreaks() and replaceState()), and sync.js pulls before
+     its first push to do that. A record with no pushedAt is taken as
+     sent. */
+  function loadBreaks() {
+    var found = loadedStore.found;
+    try {
+      if (found === 'none' || (found === 'read' && !state.updatedAt)) {
+        localStorage.removeItem(BREAKS_KEY);
+        return;
+      }
+      var raw = localStorage.getItem(BREAKS_KEY);
+      if (raw !== null) {
+        var saved = JSON.parse(raw);
+        breaks = normaliseBreaks(saved);
+        breaksSavedAt = isRecord(saved) && typeof saved.savedAt === 'number' ? saved.savedAt : 0;
+        breaksPushedAt = isRecord(saved) && typeof saved.pushedAt === 'number' ? saved.pushedAt : breaksSavedAt;
+      }
+      breaksConfirmed = loadedStore.mark === state.updatedAt;
+    } catch (e) {
+      breaks = emptyBreaks();
+      breaksConfirmed = false;
+    }
+    breaksWritten = JSON.stringify(breaks);
+  }
+
+  /* A breaks record from a later version of the app: it names a version,
+     and not this one. */
+  function isFutureBreaks(value) {
+    try {
+      return isRecord(value) && value.v !== undefined && value.v !== 1;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* The server now holds the record saved at `at`: a push carried it, or
+     a pull showed the same breaks. Kept in the breaks key as pushedAt, so
+     a later load can tell this device's unsent edits from a record that
+     is merely old (see loadBreaks()). Only that one field is written, and
+     only while the key still holds that record, so a newer save from
+     another tab is never written over. */
+  function notePushed(at) {
+    if (!(typeof at === 'number' && at > breaksPushedAt)) return;
+    breaksPushedAt = at;
+    try {
+      var raw = localStorage.getItem(BREAKS_KEY);
+      if (raw === null) return;
+      var saved = JSON.parse(raw);
+      if (!isRecord(saved) || saved.savedAt !== at) return;
+      saved.pushedAt = at;
+      localStorage.setItem(BREAKS_KEY, JSON.stringify(saved));
+    } catch (e) { /* kept in memory; the next break save writes it */ }
+  }
+
+  /* Breaks saved on this device, here or in another tab, that no push has
+     carried yet. */
+  function breaksUnsent() {
+    return breaksSavedAt > breaksPushedAt;
+  }
+
+  /* No breaks, and none ever saved on this device or set by the person
+     here (breaksSaid): the lunch-only week every copy starts with. There
+     is nothing here the row needs to hear. */
+  function breaksBlank() {
+    return !breaksSaid && !breaksSavedAt && JSON.stringify(breaks) === JSON.stringify(emptyBreaks());
+  }
+
+  /* A short fingerprint of a copy's week: its schedule, settings and
+     appointments. The breaks key keeps the one of the week its breaks
+     were saved with (persist()), so a copy holding them can tell whether
+     a week is that one (weekForBreaks()). Taken of the week as
+     normalise() rebuilds it, in its own key order, so the same week
+     reads the same whether it came from this page or back from the
+     server, whose jsonb orders keys its own way. */
+  function weekPrint(copy) {
+    var week = normalise(copy);
+    var text = JSON.stringify([week.schedule, week.settings, week.appointments]);
+    var hash = 5381;
+    for (var i = 0; i < text.length; i++) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+    return text.length.toString(36) + '.' + hash.toString(36);
+  }
+
+  /* The week to send the breaks this copy holds with, when another tab
+     saved them and this copy took only them (the storage listener takes
+     only the breaks key), or null: see replaceState(). `rowWeek` is the
+     row's, normalised. Only while that tab's save is still the one in the
+     breaks key, and then:
+     - the week STORE_KEY holds, when it was written with those breaks or
+       after them by a copy that knows breaks (its breaksMark), never by an
+       older one, whose week may carry another device's newer breaks;
+     - otherwise the row's own week, when it is the week those breaks were
+       saved with (the save changed only breaks), under their stamp. That
+       is the very copy the tab that saved them would send. */
+  function weekForBreaks(rowWeek) {
+    try {
+      var savedBreaks = JSON.parse(localStorage.getItem(BREAKS_KEY));
+      if (!isRecord(savedBreaks) || savedBreaks.savedAt !== breaksSavedAt) return null;
+      var saved = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (isRecord(saved) && typeof saved.updatedAt === 'number' &&
+          saved.updatedAt >= breaksSavedAt && saved.breaksMark === saved.updatedAt) return normalise(saved);
+      if (savedBreaks.week !== weekPrint(rowWeek)) return null;
+      var paired = Object.assign({}, rowWeek);
+      paired.updatedAt = breaksSavedAt;
+      return paired;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* No breaks at all, as on a fresh install: after Delete account, here or
+     in another tab. Nothing is written; the key has already gone. */
+  function resetBreaks() {
+    breaks = emptyBreaks();
+    breaksWritten = JSON.stringify(breaks);
+    breaksSavedAt = 0;
+    breaksPushedAt = 0;
+    breaksConfirmed = true;
+    breaksFuture = false;
+    breaksSaid = false;
+  }
+
+  /* A copy of the record for export and sync, so nothing outside this file
+     holds a live reference into it. */
+  function breaksRecord() {
+    return JSON.parse(JSON.stringify(breaks));
+  }
+
+  /* A day's entry, deep. Copy a day asks for fresh ids, because two
+     breaks sharing an id would share a row in the Breaks box. */
+  function cloneBreakDay(entry, freshIds) {
+    var copy = JSON.parse(JSON.stringify(entry || emptyBreakDay()));
+    if (freshIds) copy.extras.forEach(function (extra) { extra.id = makeBreakId(); });
+    return copy;
+  }
+
+  /* Made once, when a person adds a break, and never again (R5). */
+  function makeBreakId() {
+    return 'b_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
   /* ─────────────────────────── Time helpers ─────────────────────────── */
@@ -760,18 +1103,27 @@
      only when the minute changes. */
 
   var lastAnnounced = '';
+  /* What the break card showed at the last render: see paintBreakCard(). */
+  var breakCard = { mode: 'classic' };
 
   function announceRemaining() {
     var region = $('srClock');
     if (!region) return;
 
     var parts = [];
-    [['lunch', lunchLabel()], ['end', endLabel()], ['appt', 'Next appointment']]
+    // The cards' own day: see applyLunchLabel().
+    var shiftDay = currentShift(new Date()).day;
+    [['lunch', breakCardLabel(shiftDay)], ['end', endLabel(shiftDay)], ['appt', 'Next appointment']]
       .forEach(function (pair) {
         var big = $(pair[0] + 'Big');
         var card = $(pair[0] === 'lunch' ? 'cardLunch' : pair[0] === 'end' ? 'cardEnd' : 'cardAppt');
         if (!big || !card || card.classList.contains('is-off')) return;
         if (pair[0] === 'appt' && !$('apptEmpty').hidden) return;
+        // During a break the number is time left of the break, not until one.
+        if (pair[0] === 'lunch' && breakCard.mode === 'during') {
+          parts.push(pair[1] + ': ' + big.textContent + ' left of your break');
+          return;
+        }
         parts.push(pair[1] + ': ' + big.textContent + ' remaining');
       });
 
@@ -823,13 +1175,18 @@
     return (cfg && cfg.endHeadHome) ? 'End of Day | Head Home' : 'End of Day';
   }
 
-  /* Two flavours of label. The composed one carries today's "Head Home"
-     and belongs on the dashboard. Table headings use the plain name,
-     because "Head Home" now has a column of its own and varies by day. */
+  /* Two flavours of label. The composed one carries the day's "Head Home"
+     and belongs on the dashboard: on the cards, the day of the shift on
+     the pies, which past midnight on a night shift is still the day it
+     started, as its alerts are; on the strip, today, whose hours it
+     lists. Table headings use the plain name, because "Head Home" now has
+     a column of its own and varies by day. */
   function applyLunchLabel() {
     var base = state.settings.lunchLabel || 'Lunch';
-    $$('[data-lunch-label]').forEach(function (el) { el.textContent = lunchLabel(); });
-    $$('[data-end-label]').forEach(function (el) { el.textContent = endLabel(); });
+    var shiftDay = currentShift(new Date()).day;
+    var dayOf = function (el) { return el.closest('.timer-card') ? shiftDay : undefined; };
+    $$('[data-lunch-label]').forEach(function (el) { el.textContent = lunchLabel(dayOf(el)); });
+    $$('[data-end-label]').forEach(function (el) { el.textContent = endLabel(dayOf(el)); });
     $$('[data-lunch-name]').forEach(function (el) { el.textContent = base; });
     $$('[data-end-name]').forEach(function (el) { el.textContent = 'End of Day'; });
   }
@@ -984,6 +1341,141 @@
       lunch: working ? computeTimer(shift.sec, cfg.start, cfg.lunch) : { available: false },
       end: working ? computeTimer(shift.sec, cfg.start, cfg.end) : { available: false }
     };
+  }
+
+  /* ─────────────────────────── A day's breaks ───────────────────────────
+     Derived the same way here and in notify-milestones, because the alert
+     keys come out of it and the two must file each alert under the same
+     tag. Lunch keeps the key 'lunch', which older copies and the server's
+     notification_log already use. An extra's key is its start, and its
+     finish when it has a length, so moving a break makes a new alert
+     rather than one already marked as sent. */
+  function breakKey(extra) {
+    return 'brk' + extra.start + (extra.minutes ? '-' + ((extra.start + extra.minutes) % 1440) : '');
+  }
+
+  /* Minutes after the day's start, wrapping past midnight, so a night
+     shift's 2am break sorts after its 11pm one. */
+  function relMinute(cfg, minute) {
+    return (minute - cfg.start + 1440) % 1440;
+  }
+
+  /* Every break on one day's hours, in the order the day meets them. cfg
+     is that day's hours (currentShift's cfg on the dashboard, the weekly
+     schedule on the Schedule tab), and day names its breaks entry. */
+  function dayBreaks(cfg, day) {
+    var entry = breaks.days[day] || emptyBreakDay();
+    var list = [];
+    if (cfg && isMinute(cfg.lunch)) {
+      /* A length belongs to the day's lunch. An older copy can take lunch
+         away without knowing about lengths, so a day whose schedule has no
+         lunch reads as having no lunch length, whatever the record says. */
+      var own = state.schedule[day];
+      list.push({
+        key: 'lunch', start: cfg.lunch, minutes: own && isMinute(own.lunch) ? entry.lunchMinutes : null,
+        name: state.settings.lunchLabel || 'Lunch', headHome: !!cfg.lunchHeadHome, isLunch: true
+      });
+    }
+    entry.extras.forEach(function (extra) {
+      list.push({
+        key: breakKey(extra), start: extra.start, minutes: extra.minutes,
+        name: extra.name || 'Break', headHome: !!extra.headHome, id: extra.id
+      });
+    });
+    if (!cfg || !isMinute(cfg.start)) return list;
+    return list.sort(function (a, b) {
+      var gap = relMinute(cfg, a.start) - relMinute(cfg, b.start);
+      if (gap) return gap;
+      return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+    });
+  }
+
+  /* Whether this shift is still on the pies when the clock reaches a
+     break. currentShift() keeps a shift until midnight, or, for one that
+     runs past midnight, until NIGHT_SHIFT_HOLD_SEC after its lunch or End
+     of Day. A break outside that is never counted to, which is what the
+     Schedule tab's "Before Start" note tells the person. */
+  function breakReachable(cfg, minute) {
+    var length = shiftLengthSec(cfg);
+    var limit = cfg.start * 60 + length >= 86400
+      ? length + NIGHT_SHIFT_HOLD_SEC
+      : 86400 - cfg.start * 60;
+    return relMinute(cfg, minute) * 60 < limit;
+  }
+
+  /* What the break pie shows now. The walk starts at the day's start and
+     goes break by break: before a break, the pie counts from the last
+     boundary to it; during one with a length, it counts that break down,
+     until it ends or the next break starts; then the boundary moves to
+     where the break ended. Past the last break, a break with no length
+     leaves its "time reached" up, exactly as lunch always has, and one
+     with a length gives way to the quiet "No more breaks today".
+
+     Worked in seconds after the day's start rather than the wall clock:
+     after midnight on a night shift a boundary like 1:30am is smaller
+     than the 10pm start, which computeTimer() would read as a whole day
+     away. The alerts do not need this, because they always count from
+     the day's start, as lunch does.
+
+     'classic' is a day whose only break is a lunch with no set length.
+     paintBreakCard() and the focus view draw it with the same call as
+     before breaks existed, so that day looks exactly as it always has. */
+  function breakPhase(pies, list) {
+    if (!pies.working) return { mode: 'off' };
+    var cfg = pies.shift.cfg;
+    var walk = list.filter(function (b) { return breakReachable(cfg, b.start); });
+    var classic = function (w) { return w.length === 1 && w[0].isLunch && !w[0].minutes; };
+    /* A break at Start itself is left out, as one before Start is: there
+       is nothing to count to it from, so it never counts down, never runs
+       and never alerts (see checkBreakAlerts()). Not the classic lunch,
+       which keeps the timer it has always had, wherever it falls. */
+    if (!classic(walk)) walk = walk.filter(function (b) { return relMinute(cfg, b.start) > 0; });
+    if (!walk.length) return { mode: 'none', list: list };
+    if (classic(walk)) return { mode: 'classic', list: list };
+
+    var nowRel = pies.shift.sec - cfg.start * 60;   // negative before the day starts
+    var boundary = 0;
+    var before = 0;
+    for (var i = 0; i < walk.length; i++) {
+      var brk = walk[i];
+      var at = relMinute(cfg, brk.start);
+      if (nowRel < at * 60) {
+        return { mode: 'before', brk: brk, list: list, timer: computeTimer(nowRel, boundary, at) };
+      }
+      if (brk.minutes) {
+        var until = at + brk.minutes;
+        var next = walk[i + 1];
+        if (next) until = Math.min(until, relMinute(cfg, next.start));
+        if (nowRel < until * 60) {
+          return { mode: 'during', brk: brk, list: list,
+                   timer: computeTimer(nowRel, at, (at + brk.minutes) % 1440) };
+        }
+      }
+      before = boundary;
+      boundary = at + (brk.minutes || 0);
+    }
+
+    var last = walk[walk.length - 1];
+    if (last.minutes) return { mode: 'done', brk: last, list: list };
+    /* The pie it counted down on. When the break before it ran into it,
+       there was none, so it is measured from the day's start instead: any
+       span that has already ended reads as "time reached". */
+    var lastAt = relMinute(cfg, last.start);
+    return { mode: 'reached', brk: last, list: list,
+             timer: computeTimer(nowRel, before < lastAt ? before : 0, lastAt) };
+  }
+
+  /* A break's clock time when it has a length, formatted like the rest of
+     the app, for "Back at 10:45 AM". */
+  function breakFinish(brk) {
+    return (brk.start + brk.minutes) % 1440;
+  }
+
+  /* The dashboard heading for a break: its name, with "Head Home" when
+     ticked. Lunch keeps lunchLabel(), which reads the same tick. */
+  function breakTitle(brk, day) {
+    if (brk.isLunch) return lunchLabel(day);
+    return brk.name + (brk.headHome ? ' | Head Home' : '');
   }
 
   /* ─────────────────────────── Appointments ───────────────────────────
@@ -1275,12 +1767,18 @@
 
   /* ─────────────────────────── Schedule editor ─────────────────────────── */
 
+  /* The table's own time inputs, by day and field, so the Breaks box can
+     move lunch in the table without rebuilding it. */
+  var scheduleInputs = {};
+
   function buildScheduleEditor() {
     // A rebuild means the schedule was replaced (sync, import, reset), so
     // an Undo from before it would restore days that no longer apply.
     clearCopyUndo();
+    clearBreaksUndo();
     var body = $('scheduleBody');
     body.innerHTML = '';
+    scheduleInputs = {};
 
     DAYS.forEach(function (day) {
       var cfg = state.schedule[day];
@@ -1308,13 +1806,59 @@
         input.value = isMinute(cfg[field]) ? minutesToHHMM(cfg[field]) : '';
         input.disabled = !cfg.working;
         input.setAttribute('aria-label', day + ' ' + field + ' time');
+        /* The Lunch cell, while it has focus: whether the day had lunch
+           when it took focus, and whether this focus has emptied the
+           cell since. See lunchEdited(). */
+        var lunchFocus = null;
         input.addEventListener('change', function () {
+          var hadLunch = lunchFocus ? lunchFocus.had : isMinute(state.schedule[day].lunch);
           state.schedule[day][field] = input.value ? hhmmToMinutes(input.value) : null;
+          if (field === 'lunch') {
+            lunchEdited(day, hadLunch, !!lunchFocus);
+            if (lunchFocus && !input.value) lunchFocus.emptied = true;
+          }
           save();
           completeOnboarding();
+          /* Typed times pass through times nobody chose here too ("1 5"
+             into 12:00's minutes is 12:01, then 12:15), and a lunch with
+             a length has a finish to announce for each. See
+             hushBreakAlerts(); a lunch with no length has none. */
+          if (field === 'lunch') hushBreakAlerts(day, ['lunch']);
           render();
           flashSaved();
+          buildBreaksBox();
         });
+        if (field === 'lunch') {
+          input.addEventListener('focus', function () {
+            // Back from another tab or window, it is the same focus as before.
+            if (!lunchFocus) lunchFocus = { had: isMinute(state.schedule[day].lunch), emptied: false };
+          });
+          /* Left empty: now the lunch is gone, and its length goes with it.
+             Only when this focus took the lunch away. Tabbing or clicking
+             through a cell that was already empty changes nothing, and
+             writes, stamps and sends nothing: a length left on a day with
+             no lunch already reads as none (dayBreaks()). Nor does a cell
+             the table's rebuild has just thrown away. */
+          input.addEventListener('blur', function () {
+            /* Another tab or window in front, or the screen locked, with the
+               cell still focused in the page: the edit is not over, and the
+               cell has focus again on the way back. */
+            if (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus())) return;
+            var focused = lunchFocus;
+            lunchFocus = null;
+            if (!input.isConnected || !focused || !focused.had || !focused.emptied ||
+                isMinute(state.schedule[day].lunch) || breaks.days[day].lunchMinutes === null) return;
+            breaks.days[day].lunchMinutes = null;
+            save();
+            render();
+            flashSaved();
+            /* The lunch's row went from the box when the cell was emptied,
+               so nothing in the rows moves. They are not rebuilt: this runs
+               as a click lands, perhaps on one of them, and a row rebuilt
+               under it would swallow the click. */
+            refreshBreakRows();
+          });
+        }
         inputs[field] = input;
         td.appendChild(input);
 
@@ -1358,12 +1902,16 @@
         applyLunchLabel();
         render();
         flashSaved();
+        buildBreaksBox();
       });
 
+      scheduleInputs[day] = inputs;
       tr.insertBefore(tdDay, tr.firstChild);
       tr.insertBefore(tdWork, tr.firstChild);
       body.appendChild(tr);
     });
+
+    buildBreaksBox();
   }
 
   /* ─────────────────────────── Copy a day ───────────────────────────
@@ -1464,11 +2012,17 @@
     if (!targets.length) return;
     var hadFocus = document.activeElement === $('copyApply');
 
-    var before = { source: source, days: {} };
+    /* The breaks go too, lengths and all, as copies with ids of their own,
+       and the Undo keeps each target's breaks as well as its hours. */
+    var before = { source: source, days: {}, breaks: {} };
+    var alertsBefore = shiftBreaksNow();
     targets.forEach(function (day) {
       before.days[day] = Object.assign({}, state.schedule[day]);
+      before.breaks[day] = cloneBreakDay(breaks.days[day]);
       state.schedule[day] = Object.assign({}, state.schedule[source]);
+      breaks.days[day] = cloneBreakDay(breaks.days[source], true);
     });
+    carryReplacedBreaks(alertsBefore);
 
     copyTargets = {};
     save();
@@ -1490,7 +2044,12 @@
     if (!copyUndo) return;
     var undo = copyUndo;
     var days = Object.keys(undo.days);
-    days.forEach(function (day) { state.schedule[day] = undo.days[day]; });
+    var alertsBefore = shiftBreaksNow();
+    days.forEach(function (day) {
+      state.schedule[day] = undo.days[day];
+      breaks.days[day] = undo.breaks[day];
+    });
+    carryReplacedBreaks(alertsBefore);
 
     save();
     buildScheduleEditor();
@@ -1512,21 +2071,681 @@
   var savedTimer;
   function flashSaved() {
     clearCopyUndo();   // every local schedule edit passes through here
+    clearBreaksUndo();
     var el = $('scheduleSaved');
     el.textContent = 'Saved.';
     clearTimeout(savedTimer);
     savedTimer = setTimeout(function () { el.textContent = 'Changes save automatically.'; }, 1800);
   }
 
+  /* Defaults have no breaks beyond lunch, and lunch no set length (R16).
+     That is the person's own word on the breaks, so it is sent even if
+     the breaks here were already empty and not yet confirmed. */
   $('resetSchedule').addEventListener('click', function () {
     DAYS.forEach(function (day) {
       state.schedule[day] = Object.assign({}, DEFAULT_SCHEDULE[day]);
     });
+    breaks = emptyBreaks();
+    breaksConfirmed = true;
+    breaksSaid = true;
     save();
     buildScheduleEditor();
     render();
     toast('Weekly schedule restored to defaults.');
   });
+
+  /* ─────────────────────────── Breaks box ───────────────────────────
+     One day's breaks at a time, lunch included, in the order the day
+     meets them. Lunch's row edits the same schedule[day].lunch as the
+     Lunch column in the table, so the two can never disagree, and nothing
+     added here ever becomes lunch.
+
+     index.html ships the box hidden and initBreaksBox() shows it, so an
+     older app.js running under the new page shows nothing it cannot run.
+
+     The rows are never rebuilt while one of their fields has focus (R21).
+     A sync pull arriving mid-edit would throw away what is being typed,
+     and re-sorting under the cursor would move the field being edited.
+     A rebuild asked for then waits until focus leaves the rows; notes and
+     "Back at" lines are brought up to date in place meanwhile. The day
+     picker and the buttons outside the rows are never rebuilt at all. */
+
+  var breaksDay = null;            // the day on show; null until initBreaksBox()
+  var breaksUndo = null;
+  var breaksRebuildPending = false;
+  var breakRowsMade = 0;           // numbers the ids of each row's notes and "Back at"
+
+  function isField(el) {
+    return !!el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
+  }
+
+  /* Whether one of the rows' fields has focus. document.activeElement
+     alone cannot say: Chrome and Edge fire a time input's change event,
+     as a keystroke finishes the hour and moves on to the minutes, while
+     activeElement is briefly <body>, though focus never left the field.
+     The list still matches :focus-within then. A focused Remove button
+     is not a field, so removing a row still rebuilds the rest at once. */
+  function rowFieldHasFocus(host) {
+    var active = document.activeElement;
+    if (active && active !== document.body && host.contains(active)) return isField(active);
+    if (typeof host.matches !== 'function') return false;
+    try {
+      return host.matches(':focus-within');
+    } catch (e) {
+      return false;      // no :focus-within; activeElement has said what it can
+    }
+  }
+
+  /* The row holding focus, or null, asked the same two ways. */
+  function focusedBreakRow(host) {
+    var active = document.activeElement;
+    var rows = host.children;
+    for (var i = 0; i < rows.length; i++) {
+      if (active && active !== document.body) {
+        if (rows[i].contains(active)) return rows[i];
+      } else if (typeof rows[i].matches === 'function') {
+        try {
+          if (rows[i].matches(':focus-within')) return rows[i];
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /* A row's controls, each found by what it is: the row is rebuilt as a
+     new element with the same data-break-id, and its controls with it. */
+  var BREAK_CONTROLS = ['.break-name-input', 'input[type="time"]', 'select', 'button'];
+
+  /* The row and control holding keyboard focus, to be given it back once
+     the rows are rebuilt (restoreBreakFocus()). */
+  function focusedBreakControl(host) {
+    var row = focusedBreakRow(host);
+    var active = document.activeElement;
+    if (!row) return null;
+    for (var i = 0; i < BREAK_CONTROLS.length; i++) {
+      if (row.querySelector(BREAK_CONTROLS[i]) === active) {
+        return { id: row.dataset.breakId, control: BREAK_CONTROLS[i] };
+      }
+    }
+    return null;
+  }
+
+  /* Focus back on the same control of the same row. If the row has gone
+     (another tab removed that break, say), focus stays in the box rather
+     than dropping to the page, where a keyboard user would have to find
+     their way back from the top. */
+  function restoreBreakFocus(host, held) {
+    var rows = host.children;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.breakId !== held.id) continue;
+      var control = rows[i].querySelector(held.control);
+      if (control && !control.disabled) {
+        control.focus();
+        return;
+      }
+    }
+    focusBreaksBox();
+  }
+
+  /* Where focus goes when the control holding it goes: Add a break, or
+     the day list when Add is off. Never the page. */
+  function focusBreaksBox() {
+    $(!$('breaksAdd').disabled ? 'breaksAdd' : 'breaksDay').focus();
+  }
+
+  /* A rebuild that was held back, once the rows' fields are let go. */
+  function rebuildBreaksWhenIdle() {
+    var host = $('breaksList');
+    if (breaksRebuildPending && host && !rowFieldHasFocus(host)) buildBreaksBox();
+  }
+
+  function initBreaksBox() {
+    var box = $('breaksBox');
+    if (!box) return;
+    var select = $('breaksDay');
+    DAYS.forEach(function (day) {
+      var option = document.createElement('option');
+      option.value = day;
+      option.textContent = day;
+      select.appendChild(option);
+    });
+    breaksDay = defaultBreaksDay(new Date());
+    select.value = breaksDay;
+
+    select.addEventListener('change', function () { showBreaksDay(select.value); });
+    $('breaksAdd').addEventListener('click', addBreak);
+    $('breaksUndo').addEventListener('click', undoBreakRemoval);
+    $('breaksList').addEventListener('focusout', function (event) {
+      /* A control let go is named by its break's time as it is now; the
+         row being typed in keeps its names meanwhile (refreshBreakRows()).
+         Before focus lands anywhere, so the new name is the one read out. */
+      refreshBreakRows(true);
+      if (!breaksRebuildPending || $('breaksList').contains(event.relatedTarget)) return;
+      // Once focus has landed, so the rebuild can see where it went.
+      setTimeout(rebuildBreaksWhenIdle, 0);
+    });
+
+    /* The dashboard's "Set breaks" also has data-goto, which opens this
+       tab; this brings up the day of the shift on the pies, the one the
+       card said has no breaks (after midnight, a night shift's is the day
+       before), and lands on Add a break, or on the day list when Add is
+       off. */
+    var setBreaks = $('breaksSet');
+    if (setBreaks) {
+      setBreaks.addEventListener('click', function () {
+        showBreaksDay(workPies(new Date()).shift.day);
+        focusBreaksBox();
+      });
+    }
+
+    // index.html ships the words from before breaks, for an older app.js.
+    var copyHint = $('copyHint');
+    if (copyHint) {
+      copyHint.textContent = 'Copies the whole day: its times, its breaks and their lengths, ' +
+        "its Head Home ticks, and whether it's a working day.";
+    }
+
+    box.hidden = false;
+    buildBreaksBox();
+  }
+
+  /* Today, or the next working day when today is off, because a day off's
+     breaks are the ones least likely to be wanted. */
+  function defaultBreaksDay(now) {
+    var index = DAYS.indexOf(dayNameOf(now));
+    for (var i = 0; i < DAYS.length; i++) {
+      var day = DAYS[(index + i) % DAYS.length];
+      if (state.schedule[day].working) return day;
+    }
+    return DAYS[index];
+  }
+
+  /* Switching day also points Copy a day at it, since copying the day
+     just set up is the likely next step. Not when days to copy onto are
+     already picked: that choice is the person's, half made. */
+  function showBreaksDay(day) {
+    breaksDay = day;
+    $('breaksDay').value = day;
+    clearBreaksUndo();
+    buildBreaksBox();
+    var picked = DAYS.some(function (d) { return copyTargets[d]; });
+    if (!picked) {
+      $('copyFrom').value = day;
+      renderCopyDay();
+    }
+  }
+
+  function showBreaksStatus(message, canUndo) {
+    var status = $('breaksStatus');
+    var undo = $('breaksUndo');
+    if (status) status.textContent = message;
+    if (!undo) return;
+    /* Undo hidden while it has focus, as another tab's save takes it
+       away: focus would drop to the page, and the next Tab start again
+       from the top. It moves first. */
+    if (!canUndo && !undo.hidden && document.activeElement === undo) focusBreaksBox();
+    undo.hidden = !canUndo;
+  }
+
+  function clearBreaksUndo() {
+    breaksUndo = null;
+    showBreaksStatus('', false);
+  }
+
+  function findExtra(day, id) {
+    var extras = breaks.days[day].extras;
+    for (var i = 0; i < extras.length; i++) if (extras[i].id === id) return extras[i];
+    return null;
+  }
+
+  function breakRowId(brk) {
+    return brk.isLunch ? 'lunch' : brk.id;
+  }
+
+  /* options.removing: this box's own Remove, which puts focus on Undo
+     itself once the row has gone. */
+  function buildBreaksBox(options) {
+    var host = $('breaksList');
+    if (!host || breaksDay === null) return;
+    var day = breaksDay;
+    var cfg = state.schedule[day];
+    var rows = dayBreaks(cfg, day);
+
+    var empty = $('breaksEmpty');
+    if (!cfg.working) {
+      empty.textContent = day + ' is time off. Tick Working in the table to use its breaks.';
+    } else {
+      empty.textContent = rows.length ? '' : 'No breaks on ' + day + '.';
+    }
+    empty.hidden = !empty.textContent;
+
+    /* Add a break is off on a day off, which the line above explains, and
+       once the day holds six. A seventh can arrive when an older copy sets
+       lunch on a day with six others; all seven stay, and so does this. */
+    var add = $('breaksAdd');
+    var full = cfg.working && rows.length >= MAX_BREAKS;
+    // Turned off with focus on it (another tab adds the sixth), focus moves first.
+    if ((!cfg.working || full) && document.activeElement === add) $('breaksDay').focus();
+    add.disabled = !cfg.working || full;
+    var fullNote = $('breaksFull');
+    if (fullNote) {
+      fullNote.textContent = !full ? ''
+        : rows.length > MAX_BREAKS ? "That's " + rows.length + ', more than the ' + MAX_BREAKS + ' a day can hold.'
+        : "That's " + MAX_BREAKS + ', the most a day can hold.';
+      fullNote.hidden = !full;
+      if (full) add.setAttribute('aria-describedby', 'breaksFull');
+      else add.removeAttribute('aria-describedby');
+    }
+
+    if (rowFieldHasFocus(host)) {
+      breaksRebuildPending = true;
+      refreshBreakRows();
+      return;
+    }
+    /* Any other control with focus, a Remove button reached by Tab, say,
+       goes with its row, and keyboard focus would drop to the page. It is
+       given back to the same control in the rebuilt row. */
+    var held = options && options.removing ? null : focusedBreakControl(host);
+    breaksRebuildPending = false;
+    host.innerHTML = '';
+    rows.forEach(function (brk) { host.appendChild(buildBreakRow(day, cfg, brk)); });
+    refreshBreakRows();
+    if (held) restoreBreakFocus(host, held);
+  }
+
+  /* One row: the name (lunch's is the "Break timer is called" name, shown
+     as text, since it is set there), the start time, the length and
+     Remove. On a phone the grid wraps it onto two lines. */
+  function buildBreakRow(day, cfg, brk) {
+    var li = document.createElement('li');
+    li.className = 'break-row';
+    li.dataset.breakId = breakRowId(brk);
+    var off = !cfg.working;
+
+    var controls = document.createElement('div');
+    controls.className = 'break-controls';
+
+    var name;
+    if (brk.isLunch) {
+      name = document.createElement('span');
+      name.className = 'break-name';
+      // applyLunchLabel() keeps this in step with the name as it is typed.
+      name.setAttribute('data-lunch-name', '');
+      name.textContent = state.settings.lunchLabel || 'Lunch';
+    } else {
+      name = document.createElement('input');
+      name.type = 'text';
+      name.className = 'break-name-input';
+      name.maxLength = 30;
+      name.placeholder = 'Break';
+      name.value = (findExtra(day, brk.id) || {}).name || '';
+      name.disabled = off;
+      name.addEventListener('input', function () {
+        var extra = findExtra(day, brk.id);
+        if (!extra) return;
+        extra.name = name.value.trim().slice(0, 30);
+        breakEdited(false);
+      });
+    }
+    controls.appendChild(name);
+
+    var time = document.createElement('input');
+    time.type = 'time';
+    time.value = minutesToHHMM(brk.start);
+    time.disabled = off;
+    /* A part-typed time reads as empty, and so does one cleared with
+       Backspace on the way to typing another. Nothing is written for
+       either: the break keeps its time while the field is being typed
+       in, and gets it back if the field is left empty. Remove is how a
+       break goes. Writing it back mid-typing snapped the other parts of
+       the time back under the keys. */
+    time.addEventListener('change', function () {
+      var minutes = time.value ? hhmmToMinutes(time.value) : null;
+      if (!isMinute(minutes)) return;
+      var moved;
+      if (brk.isLunch) {
+        if (minutes === state.schedule[day].lunch) return;
+        state.schedule[day].lunch = minutes;
+        var tableInput = scheduleInputs[day] && scheduleInputs[day].lunch;
+        if (tableInput) tableInput.value = minutesToHHMM(minutes);
+        moved = ['lunch'];
+      } else {
+        var extra = findExtra(day, brk.id);
+        if (!extra || extra.start === minutes) return;
+        moved = [breakKey(extra)];
+        extra.start = minutes;
+        moved.push(breakKey(extra));
+      }
+      breakEdited(true, day, moved);
+    });
+    time.addEventListener('blur', function () {
+      if (isMinute(time.value ? hhmmToMinutes(time.value) : null)) return;
+      var kept = brk.isLunch ? state.schedule[day].lunch : (findExtra(day, brk.id) || {}).start;
+      time.value = isMinute(kept) ? minutesToHHMM(kept) : '';
+    });
+    controls.appendChild(time);
+
+    var length = lengthSelect(brk.minutes);
+    length.disabled = off;
+    /* The arrow keys on a closed list step through every length on the
+       way, each one a change, so a length is hushed as a time is. */
+    length.addEventListener('change', function () {
+      var minutes = length.value === '' ? null : breakLength(parseInt(length.value, 10));
+      var changed;
+      if (brk.isLunch) {
+        breaks.days[day].lunchMinutes = minutes;
+        changed = ['lunch'];
+      } else {
+        var extra = findExtra(day, brk.id);
+        if (!extra) return;
+        changed = [breakKey(extra)];
+        extra.minutes = minutes;
+        changed.push(breakKey(extra));
+        carryBreakAlerts(day, changed[0], changed[1]);
+      }
+      breakEdited(false, day, changed);
+    });
+    controls.appendChild(length);
+
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn-quiet';
+    remove.textContent = 'Remove';
+    remove.disabled = off;
+    remove.addEventListener('click', function () { removeBreak(day, brk); });
+    controls.appendChild(remove);
+
+    li.appendChild(controls);
+
+    /* Ids of their own, never the break's id, which another copy may
+       have written with a space in it. The row's time and length name
+       them as their description (refreshBreakRows()). */
+    breakRowsMade++;
+    var back = document.createElement('p');
+    back.className = 'break-back';
+    back.id = 'breakBack' + breakRowsMade;
+    li.appendChild(back);
+
+    var notes = document.createElement('div');
+    notes.className = 'break-notes';
+    notes.id = 'breakNotes' + breakRowsMade;
+    li.appendChild(notes);
+    return li;
+  }
+
+  /* The lengths on offer, plus the break's own when it is not one of them. */
+  function lengthSelect(value) {
+    var select = document.createElement('select');
+    var listed = BREAK_LENGTHS.some(function (pair) { return pair[0] === value; });
+    var options = BREAK_LENGTHS.slice();
+    if (!listed && value !== null) {
+      options.push([value, lengthLabel(value)]);
+      options.sort(function (a, b) { return (a[0] || 0) - (b[0] || 0); });
+    }
+    options.forEach(function (pair) {
+      var option = document.createElement('option');
+      option.value = pair[0] === null ? '' : String(pair[0]);
+      option.textContent = pair[1];
+      select.appendChild(option);
+    });
+    select.value = value === null ? '' : String(value);
+    return select;
+  }
+
+  function lengthLabel(minutes) {
+    var h = Math.floor(minutes / 60);
+    var m = minutes % 60;
+    if (!h) return m + ' min';
+    return h + (h === 1 ? ' hour' : ' hours') + (m ? ' ' + m + ' min' : '');
+  }
+
+  /* Everything in a row that can change without the row being rebuilt:
+     its "Back at" line, its notes, and what its controls are called.
+     Except the names of the row that has focus, unless `relabelAll`: they
+     say the break's time, and a screen reader speaks a focused control's
+     new name, so typing "1 0 4 5 a" read out every time passed through on
+     the way. They are brought up to date as focus leaves (the list's
+     focusout). */
+  function refreshBreakRows(relabelAll) {
+    var host = $('breaksList');
+    if (!host || breaksDay === null) return;
+    var day = breaksDay;
+    var cfg = state.schedule[day];
+    var rows = dayBreaks(cfg, day);
+    var held = relabelAll ? null : focusedBreakRow(host);
+    Array.prototype.forEach.call(host.children, function (li) {
+      var brk = null;
+      rows.forEach(function (row) { if (breakRowId(row) === li.dataset.breakId) brk = row; });
+      if (!brk) return;
+
+      var back = li.querySelector('.break-back');
+      back.textContent = brk.minutes ? 'Back at ' + formatClock(breakFinish(brk)) : '';
+      back.hidden = !brk.minutes;
+
+      var notes = li.querySelector('.break-notes');
+      notes.textContent = '';
+      var said = cfg.working ? breakNotes(cfg, rows, brk) : [];
+      said.forEach(function (text) {
+        var note = document.createElement('p');
+        note.className = 'break-note';
+        note.textContent = text;
+        notes.appendChild(note);
+      });
+
+      /* The orange notes and "Back at" are read with the time and the
+         length, a screen reader's only way to hear that a time typed runs
+         into the next break or starts after End of Day. The row with focus
+         too: its names say a time, but these say what is wrong with it. */
+      var described = [];
+      if (brk.minutes) described.push(back.id);
+      if (said.length) described.push(notes.id);
+      [li.querySelector('input[type="time"]'), li.querySelector('select')].forEach(function (control) {
+        if (described.length) control.setAttribute('aria-describedby', described.join(' '));
+        else control.removeAttribute('aria-describedby');
+      });
+
+      if (li === held) return;
+      var which = brk.isLunch ? (state.settings.lunchLabel || 'Lunch')
+        : 'the ' + formatClock(brk.start) + ' break';
+      var nameInput = li.querySelector('.break-name-input');
+      if (nameInput) nameInput.setAttribute('aria-label', 'Name of ' + which);
+      li.querySelector('input[type="time"]').setAttribute('aria-label', 'Start of ' + which);
+      li.querySelector('select').setAttribute('aria-label', 'Length of ' + which);
+      li.querySelector('button').setAttribute('aria-label', 'Remove ' + which);
+    });
+  }
+
+  /* Orange notes, only when something needs saying. "Before Start" is a
+     break the shift never reaches (see breakReachable()), so it never
+     counts down and never alerts. */
+  function breakNotes(cfg, rows, brk) {
+    var notes = [];
+    var at = relMinute(cfg, brk.start);
+    var clash = rows.some(function (other) { return other !== brk && other.start === brk.start; });
+    if (clash) notes.push('Same time as another break.');
+    if (brk.minutes) {
+      var next = null;
+      rows.forEach(function (other) {
+        if (!next && relMinute(cfg, other.start) > at) next = other;
+      });
+      if (next && relMinute(cfg, next.start) < at + brk.minutes) {
+        notes.push('Runs into the ' + formatClock(next.start) + ' break.');
+      }
+    }
+    /* A lone lunch with no set length is the lunch timer the app has
+       always had, and counts down wherever it falls, Start included. */
+    var classic = brk.isLunch && !brk.minutes && rows.every(function (other) {
+      return other === brk || !breakReachable(cfg, other.start);
+    });
+    if (!breakReachable(cfg, brk.start)) {
+      notes.push("Before Start, so it won't count down.");
+    } else if (at === 0 && !classic) {
+      // The day's own start: nothing counts to it (see breakPhase()).
+      notes.push("Same time as Start, so it won't count down.");
+    } else if (isMinute(cfg.end) && at >= (relMinute(cfg, cfg.end) || 1440)) {
+      notes.push('Starts after End of Day.');
+    }
+    return notes;
+  }
+
+  /* Every edit in the box, like every edit in the table: saved, stamped
+     and synced by save() (R6). A new start can change the order, which
+     means a rebuild. Never straight away: this runs inside the field's
+     own change event, when the browser may not yet say where focus is
+     (see rowFieldHasFocus()). Once the event is over, a field that still
+     has focus holds the rebuild until focus leaves the rows (the list's
+     focusout); one already let go, as when a phone's time picker closes,
+     rebuilds then. A new start or length is also where typing and the
+     arrow keys pass through times nobody chose, so the alerts due for the
+     break moved (`changed`, its keys before and after) are hushed
+     (hushBreakAlerts()). A new name moves nothing. */
+  function breakEdited(reorder, day, changed) {
+    save();
+    completeOnboarding();
+    if (changed) hushBreakAlerts(day, changed);
+    render();
+    flashSaved();
+    refreshBreakRows();
+    if (reorder) {
+      breaksRebuildPending = true;
+      setTimeout(rebuildBreaksWhenIdle, 0);
+    }
+  }
+
+  /* Fifteen minutes, starting in the middle of the longest stretch of the
+     day with no break in it, from Start to End of Day. With no End of Day
+     there is no middle to find, so an hour after the last break ends. */
+  function suggestBreakStart(cfg, rows) {
+    var spans = rows.map(function (brk) {
+      var at = relMinute(cfg, brk.start);
+      return [at, at + (brk.minutes || 0)];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+
+    var at;
+    if (isMinute(cfg.end)) {
+      var dayEnd = relMinute(cfg, cfg.end) || 1440;
+      var best = null;
+      var cursor = 0;
+      spans.forEach(function (span) {
+        if (span[0] > dayEnd) return;
+        if (!best || span[0] - cursor > best[1] - best[0]) best = [cursor, span[0]];
+        cursor = Math.max(cursor, span[1]);
+      });
+      if (!best || dayEnd - cursor > best[1] - best[0]) best = [cursor, dayEnd];
+      at = (best[0] + best[1]) / 2;
+    } else {
+      at = spans.reduce(function (latest, span) { return Math.max(latest, span[1]); }, 0) + 60;
+    }
+    return Math.round(((cfg.start + at) % 1440) / 5) * 5 % 1440;
+  }
+
+  function addBreak() {
+    var day = breaksDay;
+    var cfg = state.schedule[day];
+    var rows = dayBreaks(cfg, day);
+    if (!cfg.working || rows.length >= MAX_BREAKS) return;
+
+    var extra = {
+      id: makeBreakId(), start: suggestBreakStart(cfg, rows),
+      minutes: 15, name: '', headHome: false
+    };
+    breaks.days[day].extras.push(extra);
+    save();
+    completeOnboarding();
+    // Its time is only a suggestion, there for the person to type over.
+    hushBreakAlerts(day, [breakKey(extra)]);
+    render();
+    flashSaved();
+    buildBreaksBox();
+
+    var rowsNow = $('breaksList').children;
+    for (var i = 0; i < rowsNow.length; i++) {
+      if (rowsNow[i].dataset.breakId === extra.id) {
+        rowsNow[i].querySelector('input[type="time"]').focus();
+      }
+    }
+  }
+
+  /* Removing lunch empties the lunch slot, in the table too, and its
+     length goes with it. Undo puts back exactly what went. */
+  function removeBreak(day, brk) {
+    /* The row may be waiting on a rebuild after its time changed, so the
+       start is read from the break itself, not from the row. */
+    var entry = breaks.days[day];
+    var undo = { day: day };
+    if (brk.isLunch) {
+      if (!isMinute(state.schedule[day].lunch)) return;
+      undo.start = undo.lunch = state.schedule[day].lunch;
+      undo.lunchMinutes = entry.lunchMinutes;
+      state.schedule[day].lunch = null;
+      entry.lunchMinutes = null;
+      var tableInput = scheduleInputs[day] && scheduleInputs[day].lunch;
+      if (tableInput) tableInput.value = '';
+    } else {
+      var index = -1;
+      entry.extras.forEach(function (extra, i) { if (extra.id === brk.id) index = i; });
+      if (index < 0) return;
+      undo.extra = entry.extras[index];
+      undo.index = index;
+      undo.start = undo.extra.start;
+      entry.extras.splice(index, 1);
+    }
+
+    save();
+    completeOnboarding();
+    render();
+    flashSaved();
+    buildBreaksBox({ removing: true });
+
+    // Set after flashSaved() above, which clears it, as applyCopyDay() does.
+    breaksUndo = undo;
+    showBreaksStatus('Removed the ' + formatClock(undo.start) + ' break.', true);
+    // The row and its button have gone; keep focus in this box.
+    $('breaksUndo').focus();
+  }
+
+  function undoBreakRemoval() {
+    if (!breaksUndo) return;
+    var undo = breaksUndo;
+    var entry = breaks.days[undo.day];
+    if (undo.extra) {
+      entry.extras.splice(Math.min(undo.index, entry.extras.length), 0, undo.extra);
+    } else {
+      state.schedule[undo.day].lunch = undo.lunch;
+      entry.lunchMinutes = undo.lunchMinutes;
+      var tableInput = scheduleInputs[undo.day] && scheduleInputs[undo.day].lunch;
+      if (tableInput) tableInput.value = minutesToHHMM(undo.lunch);
+    }
+
+    save();
+    render();
+    flashSaved();
+    buildBreaksBox();
+    showBreaksStatus('Put the ' + formatClock(undo.start) + ' break back.', false);
+    focusBreaksBox();
+  }
+
+  /* After the Lunch column changes. A lunch that is taken away takes its
+     length with it, and a lunch put on a day that had none starts with no
+     set length: a length still in the record then was left by an older
+     copy taking the last lunch away (see dayBreaks()). A day that already
+     had six other breaks keeps every one of them; the box shows all seven
+     and Add a break stays off until one goes.
+
+     While the cell has focus (`typing`), an empty time is only one being
+     typed: a part-typed time reads as empty, and so does one cleared with
+     Backspace on the way to another, and Chrome commits both. Lunch is
+     emptied as it always was, but its length waits, and goes only if the
+     cell is left empty (its blur, in buildScheduleEditor()); dayBreaks()
+     reads no length for a day with no lunch meanwhile. hadLunch is then
+     whether the day had lunch when the cell took focus, so a time typed
+     back keeps the length it had. */
+  function lunchEdited(day, hadLunch, typing) {
+    var lunch = state.schedule[day].lunch;
+    if (isMinute(lunch) ? !hadLunch : !typing) breaks.days[day].lunchMinutes = null;
+  }
 
   /* ─────────────────────────── Appointments editor ─────────────────────────── */
 
@@ -2146,6 +3365,13 @@
     var body = $('weekPreview').querySelector('tbody');
     body.innerHTML = '';
 
+    /* The column is Lunch until some day lists a break besides lunch; from
+       then on it lists every break, so its heading says so. Set once the
+       rows are built, from what they list, so a break left off (one
+       before Start) never turns it to Breaks over plain lunch times.
+       Written only when it changes, since applyLunchLabel() also sets it. */
+    var anyStacked = false;
+
     DAYS.forEach(function (day) {
       // Today's row matches the pies above it.
       var cfg = day === today ? dayConfig(now) : state.schedule[day];
@@ -2153,8 +3379,16 @@
       if (day === today) tr.className = 'is-today';
       else if (!cfg.working) tr.className = 'is-off';
 
+      // Each break's start, one per line, on a day with more than lunch.
+      var dayList = cfg.working ? listedBreaks(cfg, day) : [];
+      var stacked = listsBreaks(dayList);
+      if (stacked) anyStacked = true;
+      var lunchCell = stacked
+        ? dayList.map(function (brk) { return formatClock(brk.start); }).join('\n')
+        : formatClock(cfg.lunch);
+
       var cells = cfg.working
-        ? [day, formatClock(cfg.start), formatClock(cfg.lunch), formatClock(cfg.end)]
+        ? [day, formatClock(cfg.start), lunchCell, formatClock(cfg.end)]
         : [day, freedomFor(day, 'start'), freedomFor(day, 'lunch'), freedomFor(day, 'end')];
 
       cells.forEach(function (text, i) {
@@ -2163,12 +3397,18 @@
         else if (!cfg.working) {
           td.className = 'is-freedom';
           td.title = freedomTitle(day, FREEDOM_COLUMNS[i - 1]);   // names the language
+        } else if (i === 2 && stacked) {
+          td.className = 'breaks-cell';
         }
         td.textContent = text;
         tr.appendChild(td);
       });
       body.appendChild(tr);
     });
+
+    var head = $('weekPreview').querySelector('[data-lunch-name]');
+    var headText = anyStacked ? 'Breaks' : (state.settings.lunchLabel || 'Lunch');
+    if (head && head.textContent !== headText) head.textContent = headText;
   }
 
   /* ─────────────────────────── Dial rendering ───────────────────────────
@@ -2354,6 +3594,119 @@
     return cfg ? cfg.start : null;
   }
 
+  /* The purple card is the break card. A day whose only break is a lunch
+     with no set length, and a day off, go through exactly the paintTimer()
+     call the card has always had, so nothing about them changes. Any
+     other day shows whichever break breakPhase() says is current.
+
+     The heading is normally applyLunchLabel()'s to set. The card only
+     takes it over while it is showing some other break, and hands it back
+     the moment the day is plain lunch again, so the same heading as ever
+     is on the card whenever breaks are not in use. */
+  var breakHeadingOwned = false;
+
+  function paintBreakCard(pies, list) {
+    var shift = pies.shift;
+    var phase = breakPhase(pies, list);
+    var card = $('cardLunch');
+    var heading = $('lunchHeading');
+    var setBreaks = $('breaksSet');
+
+    card.classList.toggle('is-break', phase.mode === 'during');
+    if (setBreaks) setBreaks.hidden = phase.mode !== 'none';
+    setBreakDialLabel(phase);
+
+    if (phase.mode === 'classic' || phase.mode === 'off') {
+      if (breakHeadingOwned && heading) heading.textContent = lunchLabel(shift.day);
+      breakHeadingOwned = false;
+      paintTimer('lunch', pies.lunch, pies.working ? shift.cfg.lunch : null, lunchLabel(shift.day));
+      return phase;
+    }
+
+    /* Past the last break, or with none, the card is about the day's
+       breaks as a whole, so it takes their plain name. */
+    var hasExtras = list.some(function (b) { return !b.isLunch; });
+    if (phase.mode === 'none' || (phase.mode === 'done' && hasExtras)) phase.label = 'Breaks';
+    else if (phase.mode === 'done') phase.label = state.settings.lunchLabel || 'Lunch';
+    else phase.label = breakTitle(phase.brk, shift.day);
+    if (heading && heading.textContent !== phase.label) heading.textContent = phase.label;
+    breakHeadingOwned = true;
+
+    if (phase.mode === 'before' || phase.mode === 'reached') {
+      paintTimer('lunch', phase.timer, phase.brk.start, phase.label);
+      return phase;
+    }
+
+    if (phase.mode === 'during') {
+      var brk = phase.brk;
+      var timer = phase.timer;
+      phase.back = formatClock(breakFinish(brk));
+      /* Refills, then counts the break itself down. No urgent state: the
+         end of a break is not something to be hurried towards. */
+      card.classList.remove('is-off', 'is-urgent', 'is-done');
+      $('lunchPie').setAttribute('d', wedgePath(1 - timer.progress));
+      renderNotchPair('lunch', brk.minutes);
+      $('lunchBig').textContent = formatCompact(timer.remainingSec);
+      $('lunchSmall').textContent = 'left of your break';
+      $('lunchBar').style.width = (timer.progress * 100).toFixed(1) + '%';
+      $('lunchTarget').textContent = 'Back at ' + phase.back;
+      $('lunchElapsed').textContent = Math.floor(timer.elapsedSec / 60);
+      $('lunchRemaining').textContent = Math.ceil(timer.remainingSec / 60);
+      $('lunchStatus').textContent = brk.name + ' | ' +
+        formatDuration(timer.remainingSec) + ' left, back at ' + phase.back;
+      return phase;
+    }
+
+    /* Nothing left to count: the day's breaks are over, or there are none
+       on a working day. Quiet grey, like a day off, and nothing that reads
+       as missed or late. */
+    var over = phase.mode === 'done';
+    card.classList.remove('is-urgent', 'is-done');
+    card.classList.add('is-off');
+    $('lunchPie').setAttribute('d', '');
+    renderNotchPair('lunch', 0);
+    $('lunchBig').textContent = over ? 'Done' : 'None';
+    $('lunchSmall').textContent = over ? 'no more breaks today' : 'no breaks today';
+    $('lunchBar').style.width = '0%';
+    $('lunchTarget').textContent = '—';
+    $('lunchElapsed').textContent = '0';
+    $('lunchRemaining').textContent = '0';
+    $('lunchStatus').textContent = over ? 'No more breaks today' : 'No breaks today';
+    return phase;
+  }
+
+  /* What the card's pie is called to a screen reader: index.html's words
+     for lunch, until the card shows some other break, and back to them
+     the moment it is plain lunch or a day off again. */
+  var dialLabelOwned = false;
+  var dialLabelShipped = null;
+
+  function setBreakDialLabel(phase) {
+    var el = $('lunchDialLabel');
+    if (!el) return;
+    if (dialLabelShipped === null) dialLabelShipped = el.textContent;
+    var text = phase.mode === 'during' ? 'Proportion of your break left'
+      : phase.mode === 'before' || phase.mode === 'reached' ? 'Proportion of time remaining until ' + phase.brk.name
+      : phase.mode === 'done' ? 'No more breaks today'
+      : phase.mode === 'none' ? 'No breaks today'
+      : null;
+    if (text === null) {
+      if (dialLabelOwned) el.textContent = dialLabelShipped;
+      dialLabelOwned = false;
+      return;
+    }
+    if (el.textContent !== text) el.textContent = text;
+    dialLabelOwned = true;
+  }
+
+  /* The name the screen reader line gives the break card, whose shift
+     started on `day`. */
+  function breakCardLabel(day) {
+    if (breakCard.mode === 'during') return breakCard.brk.name;
+    if (breakCard.mode === 'classic' || breakCard.mode === 'off' || !breakCard.label) return lunchLabel(day);
+    return breakCard.label;
+  }
+
   /* ─────────────────────────── Milestone alerts ─────────────────────────── */
 
   // todayKey is the day the shift started (currentShift), so after
@@ -2406,9 +3759,217 @@
         var tag = tagFor(todayKey, prefix, 'done');
         if (firedAlerts[announcedKey]) tag += '|' + timer.targetMin;
         firedAlerts[announcedKey] = true;
-        notify(label, 'Time reached.', tag);
+        /* A lunch with a set length says when it ends instead. render()
+           puts those words on the timer, because this function is also
+           run on its own, without the breaks, by tools/shift-alerts-sim.js. */
+        notify(label, timer.doneBody || 'Time reached.', tag);
       }
     }
+  }
+
+  /* Alerts for the breaks beyond lunch's own. Lunch's 30/15/10/5 ladder
+     and its start stay with checkAlerts() above, unchanged; this adds
+     lunch's finish when it has a length, and for every extra break a
+     five-minute heads-up, its start and its finish.
+
+     notify-milestones sends the same alerts, with the same keys, words
+     and timing, so the two collapse into one notification. Every timer
+     counts from the day's start, like lunch's. The heads-up is skipped
+     when it would land at or before the previous break's finish, which
+     would interrupt that break to announce the next; a finish at or after
+     End of Day is skipped too, because End of Day's own alert covers it.
+     Nothing repeats and nothing nags: no "still on break".
+
+     `hushing`, from hushBreakAlerts() only, names the breaks whose alerts
+     are marked without a word; the rest are left exactly as they were.
+     The whole list is still what a heads-up is measured against. */
+  function checkBreakAlerts(shift, list, hushing) {
+    var cfg = shift.cfg;
+    if (!state.settings.alerts || !worksOn(cfg)) return;
+    var todayKey = shift.key;
+    // End of Day at Start is a 24-hour day, ending at the next Start.
+    var endAt = isMinute(cfg.end) ? (relMinute(cfg, cfg.end) || 1440) : null;
+
+    list.forEach(function (brk, i) {
+      if (hushing && !hushing[brk.key]) return;
+      var title = brk.name + (brk.headHome ? ' | Head Home' : '');
+
+      /* A break at Start itself is never counted to (breakPhase() leaves
+         it out), so it has no heads-up and no start either: on a shift
+         still on the pies a day later, they would come 24 hours late, the
+         heads-up on its own. */
+      if (!brk.isLunch && relMinute(cfg, brk.start) > 0) {
+        var toStart = computeTimer(shift.sec, cfg.start, brk.start);
+        var prev = list[i - 1];
+        var prevFinish = prev ? relMinute(cfg, (prev.start + (prev.minutes || 0)) % 1440) : null;
+        var headsUpKey = todayKey + '|' + brk.key + '|5';
+        if (toStart.available && !toStart.notStarted && !firedAlerts[headsUpKey] &&
+            (prevFinish === null || relMinute(cfg, brk.start) - 5 > prevFinish)) {
+          var remainingMin = Math.ceil(toStart.remainingSec / 60);
+          if (remainingMin <= 5 && remainingMin > 4) {
+            firedAlerts[headsUpKey] = true;
+            notify(title, 'Starts in 5 minutes.', tagFor(todayKey, brk.key, '5'));
+          }
+        }
+        announceReached(toStart, todayKey + '|' + brk.key + '|start', brk.key + '|start', title,
+          brk.minutes ? 'Break time. Back at ' + formatClock(breakFinish(brk)) + '.' : 'Break time.',
+          tagFor(todayKey, brk.key, 'start'));
+      }
+
+      if (brk.minutes) {
+        var finish = breakFinish(brk);
+        if (endAt !== null && relMinute(cfg, finish) >= endAt) return;
+        /* A break that starts before the day's Start and runs past it, or
+           starts at Start itself, was never counted to and never had its
+           "Break time", so its end is not news either: "Break over" for a
+           break nobody was told about reads as a mistake. The Schedule tab
+           says so beside it (breakNotes()). */
+        var startAt = relMinute(cfg, brk.start);
+        if (startAt === 0 || startAt + brk.minutes >= 1440) return;
+        /* Lunch's key does not move with its times, so its finish is
+           remembered by the time too: a lunch moved later after its old
+           finish passed still gets a finish of its own. That later one
+           gets a tag of its own as well, as checkAlerts() gives a second
+           "Time reached": under the same tag the phone swaps it in
+           silently, and the server has already sent that tag today. */
+        var suffix = brk.isLunch ? '|' + finish : '';
+        var tag = tagFor(todayKey, brk.key, 'finish');
+        var announcedKey = todayKey + '|lunch|finish|announced';
+        if (brk.isLunch && firedAlerts[announcedKey]) tag += '|' + finish;
+        var announced = announceReached(computeTimer(shift.sec, cfg.start, finish),
+          todayKey + '|' + brk.key + '|finish' + suffix, brk.key + '|finish' + suffix,
+          brk.name, 'Break over. Ease back in.', tag);
+        // A finish hushed was never said, so it does not take the plain tag.
+        if (announced && brk.isLunch && !hushing) firedAlerts[announcedKey] = true;
+      }
+    });
+  }
+
+  /* A break on `day` was just moved, lengthened or shortened, added, or
+     changed in another tab. Typing a new time, Chrome commits every whole
+     time it passes through on the way ("1 4 5" is 1:00, then 2:00, then
+     2:05), and each is saved; the arrow keys on a closed Length list step
+     through every length on the way, each one a change; Add a break puts
+     in a time of its own choosing for the person to type over. Any of
+     those that lands just before now would announce a heads-up, a start
+     or a finish for a time nobody chose. So whatever those breaks' alerts
+     have due at this instant is marked, as fired or as seen running,
+     without a word, and only the alerts genuinely due later are
+     announced. The keys carry the break's times, so the time it ends up
+     at still gets its own.
+
+     Only the breaks named by `keys` (their keys from before the edit and
+     after it): any other break's alert due now is still announced by the
+     next tick, as it would have been without the edit. And only on the
+     day on the pies, since another day's break can share a key with one
+     of today's. Lunch's 30 to 5 minutes (checkAlerts()) are keyed by
+     lunch, not its time, so hushing them would lose the real ones:
+     lunch's own alerts stay exactly as the Lunch column in the table has
+     always sent them, and a lunch with no length has nothing here to
+     hush. */
+  function hushBreakAlerts(day, keys) {
+    var pies = workPies(new Date());
+    if (!pies.working || pies.shift.day !== day || !keys.length) return;
+    var hushing = {};
+    keys.forEach(function (key) { hushing[key] = true; });
+    alertsHushed = true;
+    try {
+      checkBreakAlerts(pies.shift, dayBreaks(pies.shift.cfg, pies.shift.day), hushing);
+    } finally {
+      alertsHushed = false;
+    }
+  }
+
+  /* A new length gives an extra break a new key (breakKey()), and with it
+     alerts never sent. Its heads-up and its start are the same moments
+     as before, so whatever was sent for them under the old key counts
+     for the new one too, and neither is sent twice. Its finish has
+     moved, and is left to be announced at the new time. Only on the day
+     on the pies, whose alerts these are. */
+  function carryBreakAlerts(day, from, to) {
+    var shift = workPies(new Date()).shift;
+    if (from === to || shift.day !== day) return;
+    ['5', 'start'].forEach(function (mark) {
+      if (firedAlerts[shift.key + '|' + from + '|' + mark]) firedAlerts[shift.key + '|' + to + '|' + mark] = true;
+    });
+  }
+
+  /* Copy a day, its Undo, an import or a pull puts a day's breaks in
+     whole. A break there that still starts where one did, but with a new
+     length, has a new key, so its heads-up and its start would be
+     announced a second time: they are carried across as the Length list
+     carries them (carryBreakAlerts()). The same break is one with the
+     same start and the same id, or, since Copy a day and an import give
+     their breaks new ids, the same name: a different break put in at that
+     time is news, and is announced. Nothing is hushed either: a break
+     that is genuinely due now is still announced. `before` is from
+     shiftBreaksNow(), taken before the breaks were put in. */
+  function carryReplacedBreaks(before) {
+    var after = shiftBreaksNow();
+    if (!before || !after || before.day !== after.day) return;
+    after.list.forEach(function (brk) {
+      if (brk.isLunch) return;
+      before.list.forEach(function (old) {
+        if (!old.isLunch && old.start === brk.start && (old.id === brk.id || old.name === brk.name)) {
+          carryBreakAlerts(after.day, old.key, brk.key);
+        }
+      });
+    });
+  }
+
+  /* The day on the pies and its breaks, before an edit made in another
+     tab is taken in, for hushChangedBreaks() to compare with after. */
+  function shiftBreaksNow() {
+    var pies = workPies(new Date());
+    return pies.working ? { day: pies.shift.day, list: dayBreaks(pies.shift.cfg, pies.shift.day) } : null;
+  }
+
+  /* After another tab's edit is taken in: the breaks it added, moved or
+     changed the length of, on the day on the pies, are hushed as the tab
+     that made it hushed them. It has already decided what is announced
+     at this instant, and this tab would otherwise announce every time it
+     passed through. A break that only changed length keeps what was sent
+     for its heads-up and start, as it does in that tab. */
+  function hushChangedBreaks(before) {
+    var after = shiftBreaksNow();
+    if (!before || !after || before.day !== after.day) return;
+    var sig = function (brk) { return brk.key + '@' + brk.start + '+' + (brk.minutes || 0); };
+    var had = {};
+    var has = {};
+    before.list.forEach(function (brk) { had[sig(brk)] = true; });
+    after.list.forEach(function (brk) { has[sig(brk)] = true; });
+    var keys = [];
+    after.list.forEach(function (brk) {
+      if (had[sig(brk)]) return;
+      keys.push(brk.key);
+      before.list.forEach(function (old) {
+        if (!old.isLunch && !brk.isLunch && old.id === brk.id && old.start === brk.start) carryBreakAlerts(after.day, old.key, brk.key);
+      });
+    });
+    before.list.forEach(function (brk) { if (!has[sig(brk)]) keys.push(brk.key); });
+    hushBreakAlerts(after.day, keys);
+  }
+
+  /* The "only if it is happening now" rule from checkAlerts(), for a
+     break's start and finish: marked fired either way, but announced only
+     when this tab watched it running moments ago, or it passed by the wall
+     clock moments ago. Opening the app at 3pm says nothing about a break
+     that ended at noon. True when it was announced. */
+  function announceReached(timer, firedKey, watchKey, title, body, tag) {
+    if (!timer.available || timer.notStarted) return false;
+    var realNow = Date.now();
+    if (!timer.done) {
+      lastSeenRunning[watchKey] = realNow;
+      return false;
+    }
+    if (firedAlerts[firedKey]) return false;
+    firedAlerts[firedKey] = true;
+    var seen = lastSeenRunning[watchKey];
+    delete lastSeenRunning[watchKey];
+    var watchedLive = seen !== undefined && realNow - seen <= DONE_ALERT_WINDOW_SEC * 1000;
+    if (!watchedLive && timer.overSec > DONE_ALERT_WINDOW_SEC) return false;
+    notify(title, body, tag);
+    return true;
   }
 
   /* Must match the tag the edge function sends, so an in-app alert and a
@@ -2419,7 +3980,11 @@
     return iso + '|' + prefix + '|' + milestone;
   }
 
+  /* True only while hushBreakAlerts() runs the break alerts. */
+  var alertsHushed = false;
+
   function notify(title, body, tag) {
+    if (alertsHushed) return;
     toast(title + ' — ' + body);
     if (state.settings.sound) chime();
     if (CT.notify) CT.notify.show(title, body, tag);
@@ -2623,8 +4188,12 @@
     });
   });
 
+  /* The breaks ride along as a top-level sibling of schedule and settings
+     (R15), the same shape as the server's column, so a file exported here
+     imports its breaks and an older app importing it simply ignores them. */
   $('exportData').addEventListener('click', function () {
-    var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    var file = Object.assign({}, state, { breaks: breaksRecord() });
+    var blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'countdown-timers-settings.json';
@@ -2651,7 +4220,15 @@
           toast('That file is not a Pie Timers export.');
           return;
         }
+        var alertsBefore = shiftBreaksNow();
         state = normalise(incoming);
+        /* The file's breaks, or none: a file from before breaks existed
+           holds a week with lunch only, so that is the week it restores.
+           Either way they are the person's choice, and are sent. */
+        breaks = normaliseBreaks(incoming.breaks);
+        breaksConfirmed = true;
+        breaksSaid = true;
+        carryReplacedBreaks(alertsBefore);
         /* An edit like any other, so stamped now and synced. Keeping the
            file's own updatedAt let the next pull, within a minute, quietly
            put the server's copy back over what was just imported. */
@@ -2715,6 +4292,7 @@
     state.settings.lunchLabel = this.value.trim().slice(0, 30) || 'Lunch';
     save();
     applyLunchLabel();
+    refreshBreakRows();
     render();
   });
 
@@ -2800,10 +4378,21 @@
     var candidates = [];
 
     if (pies.working) {
-      var lunch = pies.lunch;
-      if (lunch.available && !lunch.done && !lunch.notStarted) {
-        candidates.push({ timer: lunch, label: lunchLabel(day), tone: 'is-lunch',
-                          totalMin: Math.round(lunch.totalSec / 60), forced: null });
+      /* The break pie takes part, whichever break it is counting. A plain
+         lunch day offers lunch exactly as it always has. */
+      var phase = breakPhase(pies, dayBreaks(pies.shift.cfg, day));
+      var lunch = phase.mode === 'classic' ? pies.lunch : phase.timer;
+      if (phase.mode === 'classic' || phase.mode === 'before') {
+        if (lunch.available && !lunch.done && !lunch.notStarted) {
+          candidates.push({ timer: lunch,
+                            label: phase.mode === 'classic' ? lunchLabel(day) : breakTitle(phase.brk, day),
+                            tone: 'is-lunch', totalMin: Math.round(lunch.totalSec / 60), forced: null });
+        }
+      } else if (phase.mode === 'during') {
+        var back = formatClock(breakFinish(phase.brk));
+        candidates.push({ timer: lunch, label: phase.brk.name + ' · back at ' + back,
+                          tone: 'is-break', totalMin: phase.brk.minutes, forced: null,
+                          title: 'Back in ' + formatCompact(lunch.remainingSec) + ' · ' + phase.brk.name });
       }
       var end = pies.end;
       if (end.available && !end.done && !end.notStarted) {
@@ -2838,13 +4427,13 @@
       renderNotchPair('focus', 0);
       $('focusTime').textContent = freedomFor(dayNameOf(now), 'end');
       $('focusLabel').textContent = 'Nothing running right now.';
-      view.classList.remove('is-urgent', 'is-lunch', 'is-end', 'is-appt');
+      view.classList.remove('is-urgent', 'is-lunch', 'is-end', 'is-appt', 'is-break');
       view.classList.add('is-off');
       document.title = 'Pie Timers';
       return;
     }
 
-    view.classList.remove('is-off', 'is-lunch', 'is-end', 'is-appt');
+    view.classList.remove('is-off', 'is-lunch', 'is-end', 'is-appt', 'is-break');
     view.classList.add(pick.tone);
     pie.setAttribute('d', wedgePath(1 - pick.timer.progress));
     renderNotchPair('focus', pick.totalMin, pick.forced);
@@ -2852,11 +4441,12 @@
     $('focusTime').textContent = formatCompact(pick.timer.remainingSec);
     $('focusLabel').textContent = pick.label;
 
-    view.classList.toggle('is-urgent', isUrgent(pick.timer.remainingSec));
+    // A break running out is not urgent, same as on the dashboard.
+    view.classList.toggle('is-urgent', pick.tone !== 'is-break' && isUrgent(pick.timer.remainingSec));
 
     // The window is often snapped narrow enough that the title bar is
     // all you can read, so put the countdown there too.
-    document.title = formatCompact(pick.timer.remainingSec) + ' · ' + pick.label;
+    document.title = pick.title || formatCompact(pick.timer.remainingSec) + ' · ' + pick.label;
   }
 
   if (FOCUS) {
@@ -2898,6 +4488,67 @@
   /* ─────────────────────────── Main render loop ─────────────────────────── */
 
   var lastDayKey = null;
+  var lastLabelShift = null;
+
+  /* Whether a day's breaks need listing, rather than the single lunch time
+     the strip and the week table have always shown. A day with one lunch,
+     with or without a length, keeps that plain time. */
+  function listsBreaks(list) {
+    return list.length > 1 || (list.length === 1 && !list[0].isLunch);
+  }
+
+  /* The breaks the strip and the week table list: those the shift
+     reaches. One before Start never counts down (see breakReachable()),
+     so it is left out rather than shown all day as still to come, and so
+     is one at Start itself (see breakPhase()). A lone lunch there still
+     shows as the plain lunch time, as it always has: one lunch is never
+     listed. */
+  function listedBreaks(cfg, day) {
+    return dayBreaks(cfg, day).filter(function (brk) {
+      return breakReachable(cfg, brk.start) && relMinute(cfg, brk.start) > 0;
+    });
+  }
+
+  /* The strip's heading over the list says "Breaks", as the week table's
+     does. applyLunchLabel() owns it otherwise, and gets it back as soon as
+     the strip shows a single lunch time again. */
+  var stripKeyOwned = false;
+
+  function paintStripKey(listing) {
+    var key = $('stripLunchKey');
+    if (!key) return;
+    if (listing) {
+      if (key.textContent !== 'Breaks') key.textContent = 'Breaks';
+      stripKeyOwned = true;
+    } else if (stripKeyOwned) {
+      key.textContent = lunchLabel();
+      stripKeyOwned = false;
+    }
+  }
+
+  /* Today's break times in the strip, "10:30 AM · 12:30 PM · 3:00 PM".
+     A break that is over is muted AND drops to regular weight, so it
+     still reads as over to someone who cannot tell the two colours apart.
+     Rebuilt only when a break passes, not on every tick. */
+  function paintStripBreaks(now, cfg, list) {
+    var el = $('stripLunch');
+    var nowRel = secondsSinceMidnight(now) - cfg.start * 60;
+    var items = list.map(function (brk) {
+      var over = nowRel >= (relMinute(cfg, brk.start) + (brk.minutes || 0)) * 60;
+      return { text: formatClock(brk.start), over: over };
+    });
+    var signature = items.map(function (item) { return item.text + (item.over ? '/over' : ''); }).join('|');
+    if (el.dataset.sig === signature) return;
+    el.dataset.sig = signature;
+    el.textContent = '';
+    items.forEach(function (item, i) {
+      if (i) el.appendChild(document.createTextNode(' · '));
+      var span = document.createElement('span');
+      span.textContent = item.text;
+      if (item.over) span.className = 'is-past';
+      el.appendChild(span);
+    });
+  }
 
   function render() {
     var now = new Date();
@@ -2919,15 +4570,32 @@
       firedAlerts = kept;
       lastDayKey = todayKey;
     }
+    /* The headings carry the day's own "Head Home", and nothing else
+       rewrites them at midnight, or when a night shift leaves the pies:
+       a pull that brings nothing new leaves them alone (replaceState()),
+       and signed out there is no pull. */
+    if (todayKey + '|' + shift.key !== lastLabelShift) {
+      lastLabelShift = todayKey + '|' + shift.key;
+      applyLunchLabel();
+    }
 
     $('nowTime').textContent = formatNowTime(now);
     $('nowDate').textContent = formatLongDate(now);
 
     var working = cfg && cfg.working;
+    var todayBreaks = working ? listedBreaks(cfg, today) : [];
+    var stripListing = listsBreaks(todayBreaks);
 
     $('stripDay').textContent = today;
     $('stripStart').textContent = working ? formatClock(cfg.start) : freedomFor(today, 'start');
-    $('stripLunch').textContent = working && isMinute(cfg.lunch) ? formatClock(cfg.lunch) : freedomFor(today, 'lunch');
+    if (stripListing) {
+      paintStripBreaks(now, cfg, todayBreaks);
+    } else {
+      var stripLunch = $('stripLunch');
+      if (stripLunch.dataset.sig) delete stripLunch.dataset.sig;
+      stripLunch.textContent = working && isMinute(cfg.lunch) ? formatClock(cfg.lunch) : freedomFor(today, 'lunch');
+    }
+    paintStripKey(stripListing);
     $('stripEnd').textContent = working && isMinute(cfg.end) ? formatClock(cfg.end) : freedomFor(today, 'end');
 
     // A day off reads as one quiet colour across the strip, not as green
@@ -2941,12 +4609,22 @@
        last night's shift, so they take theirs from `shift`. */
     var lunchTimer = pies.lunch;
     var endTimer = pies.end;
+    var shiftBreaks = pies.working ? dayBreaks(shift.cfg, shift.day) : [];
 
-    paintTimer('lunch', lunchTimer, pies.working ? shift.cfg.lunch : null, lunchLabel(shift.day));
+    /* Lunch's own alert at its start says when it ends, once it has a
+       length. See checkAlerts(). */
+    shiftBreaks.forEach(function (brk) {
+      if (brk.isLunch && brk.minutes) {
+        lunchTimer.doneBody = 'Break time. Back at ' + formatClock(breakFinish(brk)) + '.';
+      }
+    });
+
+    breakCard = paintBreakCard(pies, shiftBreaks);
     paintTimer('end', endTimer, pies.working ? shift.cfg.end : null, endLabel(shift.day));
 
     checkAlerts('lunch', lunchTimer, lunchLabel(shift.day), shift.key);
     checkAlerts('end', endTimer, endLabel(shift.day), shift.key);
+    checkBreakAlerts(shift, shiftBreaks);
 
     renderAppointment(now, todayKey);
     refreshAppointmentList(now, todayKey);
@@ -2956,9 +4634,18 @@
     // Speak only on the minute, not on every tick.
     if (now.getSeconds() === 0 || lastAnnounced === '') announceRemaining();
 
-    document.title = pies.working && lunchTimer.available && !lunchTimer.done
-      ? formatCompact(lunchTimer.remainingSec) + ' · Pie Timers'
-      : 'Pie Timers';
+    /* The tab counts down the same thing as the break card. A plain lunch
+       day, or a day off, reads exactly as it always has. */
+    var titleTimer = breakCard.mode === 'classic' || breakCard.mode === 'off'
+      ? (pies.working ? lunchTimer : null)
+      : (breakCard.mode === 'before' ? breakCard.timer : null);
+    if (breakCard.mode === 'during') {
+      document.title = 'Back in ' + formatCompact(breakCard.timer.remainingSec) + ' · Pie Timers';
+    } else {
+      document.title = titleTimer && titleTimer.available && !titleTimer.done
+        ? formatCompact(titleTimer.remainingSec) + ' · Pie Timers'
+        : 'Pie Timers';
+    }
 
     /* Last, so its title wins. The rest of the render still runs in a
        focus window: the elements are hidden, not absent, and the layout keeps
@@ -3501,8 +5188,13 @@
         return CT.auth.deleteAccount();
       }).then(function () {
         // Local data would otherwise be re-uploaded on the next sign-in.
-        try { localStorage.removeItem(STORE_KEY); } catch (e) { /* nothing to clear */ }
+        // The breaks key goes too (R18), so nothing of the account is left.
+        try {
+          localStorage.removeItem(STORE_KEY);
+          localStorage.removeItem(BREAKS_KEY);
+        } catch (e) { /* nothing to clear */ }
         state = normalise({});
+        resetBreaks();
         save({ fromSync: true });
         CT.sync.forgetAccount();
 
@@ -3561,24 +5253,238 @@
   CT.app = {
     getState: function () { return state; },
 
-    /* Adopt a copy from the server and rebuild everything that reads from there. */
+    /* The whole breaks record, { v: 1, days }. A copy, so nothing outside
+       this file can change it in place. */
+    getBreaks: function () { return breaksRecord(); },
+
+    /* For sync.js's push: the whole record and the savedAt it was saved
+       with, or null while these breaks must not be sent: unconfirmed (see
+       breaksConfirmed), or the account's are in a newer format. The push
+       then leaves `breaks` out and the server keeps its own. `blank` says
+       the record is empty and was never saved here (breaksBlank()): sync.js
+       leaves those out too, so a lunch-only device sends and asks nothing
+       it did not before breaks, and its next pull brings the row's. */
+    breaksToPush: function () {
+      if (!breaksConfirmed || breaksFuture) return null;
+      return { breaks: breaksRecord(), savedAt: breaksSavedAt, blank: breaksBlank() };
+    },
+
+    /* Whether sync.js must pull before it pushes: this copy holds breaks
+       saved here that no push has carried, and has not compared them with
+       the row since it loaded, or since a push was held back or failed.
+       Another device may have saved newer ones meanwhile, and the pull is
+       what says (see pulledBreaks() and replaceState()). */
+    breaksNeedPull: function () {
+      return !breaksFuture && breaksUnsent();
+    },
+
+    /* A push that carried the record saved at `savedAt` has landed. */
+    breaksPushed: function (savedAt) { notePushed(savedAt); },
+
+    /* The account has no row yet, so this copy's breaks will be its
+       first, whatever an older copy did to the week here meanwhile. A
+       blank record is not sent either way, so nothing is written for it:
+       a lunch-only device's storage stays as it was before breaks. */
+    confirmBreaks: function () {
+      if (breaksConfirmed) return;
+      breaksConfirmed = true;
+      if (!breaksBlank()) persist();
+    },
+
+    /* A pulled row older than this copy, about to be overwritten by this
+       copy's push; rowAt is the row's updated_at. Confirmed breaks go up
+       with the rest, as part of the newer copy. Unconfirmed ones holding
+       edits saved here after the row was written, that no push has
+       carried, are this device's own and newer than the row's: they are
+       confirmed and go up too. Any others are swapped for the row's first
+       (a record, or null for none), so the push carries the account's
+       breaks, not stale ones. So is a blank record (breaksBlank()), which
+       has nothing to say; if it stays blank, nothing is written for it.
+
+       A record in a newer format stops this copy sending breaks
+       (breaksFuture), but only while the page is open. So STORE_KEY is
+       written again the first time, without its breaksMark: after a
+       reload these breaks load unconfirmed, and cannot be sent over it
+       until a pull has seen the row again. */
+    pulledBreaks: function (value, rowAt) {
+      if (isFutureBreaks(value)) {
+        if (!breaksFuture) {
+          breaksFuture = true;
+          if (breaksConfirmed) persist();
+        }
+        return;
+      }
+      var blank = breaksBlank();
+      if (breaksConfirmed && !blank) return;
+      if (!breaksConfirmed && breaksUnsent() && typeof rowAt === 'number' && breaksSavedAt > rowAt) {
+        breaksConfirmed = true;
+        persist();
+        return;
+      }
+      var next = normaliseBreaks(value);
+      var confirming = !breaksConfirmed;
+      breaksConfirmed = true;
+      if (JSON.stringify(next) === JSON.stringify(breaks)) {
+        notePushed(breaksSavedAt);
+        if (confirming && !blank) persist();
+        return;
+      }
+      var alertsBefore = shiftBreaksNow();
+      breaks = next;
+      carryReplacedBreaks(alertsBefore);
+      breaksPushedAt = state.updatedAt;     // the record about to be written is the row's
+      save({ fromSync: true });
+      clearCopyUndo();
+      clearBreaksUndo();
+      buildBreaksBox();
+      render();
+    },
+
+    /* Adopt a copy from the server and rebuild everything that reads from
+       there. options.rowAt is the row's updated_at, passed only when this
+       copy is in step with the account. True when this copy kept breaks
+       newer than the row's, and took the week saved with them, which
+       sync.js then pushes. */
     replaceState: function (incoming, options) {
+      options = options || {};
       var next = normalise(incoming);
       next.updatedAt = incoming.updatedAt || Date.now();
       // Calendar events are local cache, not synced state — a pull must
       // not blank them just because the server row has no such field.
       if (!incoming.calendarEvents) next.calendarEvents = state.calendarEvents;
+
+      /* The breaks are adopted only from a row that has the column (R11).
+         There a record is taken as it is, and null means the account has
+         none. A row without the key comes from a server without the
+         column, so this copy's own are kept. Never merged: the account's
+         breaks replace these, the same as its weekly schedule does. A
+         record in a newer format than this app's is not taken at all: this
+         copy keeps its own and stops sending breaks (breaksFuture), so it
+         never writes the older format over the newer one. */
+      var hasBreaks = isRecord(incoming) && Object.prototype.hasOwnProperty.call(incoming, 'breaks');
+      var future = false;                   // first seen on this pull
+      if (hasBreaks && isFutureBreaks(incoming.breaks)) {
+        future = !breaksFuture;
+        breaksFuture = true;
+        hasBreaks = false;
+      }
+      /* Except breaks saved on this device after the row was written, that
+         no push has carried: a tab closed before its push went, say, whose
+         record another tab took in. Those are newer than the row's, so
+         they are kept, confirmed, and never swapped for the row's.
+
+         They were saved with a week, and this copy is taking the row's
+         older one, so they cannot go up beside it under their stamp: a
+         Copy a day made there, hours and breaks in one save, would lose
+         its hours to the row's, for good, on every device. The storage
+         listener only ever takes the breaks key, so the week saved with
+         them is found (weekForBreaks()), and this copy takes that whole
+         and sends it. When it cannot be found, the breaks are kept and not
+         sent from here: the tab that saved them sends them with its week,
+         or they go with this copy's next edit.
+         Never on a first sign-in (no rowAt), where the account's win. */
+      var keepOwn = hasBreaks && typeof options.rowAt === 'number' &&
+        breaksUnsent() && breaksSavedAt > options.rowAt;
+      var sendOwn = false;
+      if (keepOwn) {
+        hasBreaks = false;
+        var theirs = weekForBreaks(next);
+        if (theirs) {
+          next = theirs;
+          sendOwn = true;
+        }
+      }
+      var nextBreaks = hasBreaks ? normaliseBreaks(incoming.breaks) : breaks;
+      var sameBreaks = JSON.stringify(nextBreaks) === JSON.stringify(breaks);
+      // Taken from the row, or kept as newer than it, they are as confirmed as breaks can be.
+      var confirming = (hasBreaks || keepOwn) && !breaksConfirmed;
+      if (hasBreaks || keepOwn) breaksConfirmed = true;
+      if (hasBreaks && sameBreaks) notePushed(breaksSavedAt);
+
+      /* A pull that brings nothing new rebuilds nothing (R21). Every
+         minute's pull used to rebuild the Schedule tab, and that took the
+         Copy a day Undo with it, and anything being typed in the box. */
+      var synced = function (s) {
+        return JSON.stringify([s.schedule, s.settings, s.appointments, s.calendarEvents]);
+      };
+      if (synced(next) === synced(state) && sameBreaks) {
+        if (next.updatedAt !== state.updatedAt || confirming) {
+          state.updatedAt = next.updatedAt;
+          save({ fromSync: true });
+        } else if (future && breaksConfirmed) {
+          persist();                        // without breaksMark: see pulledBreaks()
+        }
+        /* Every pull has always redrawn the account panel, and with it
+           "Last updated", which save() leaves alone: an edit made here
+           since the last pull shows there once a pull has seen it. */
+        renderAccount();
+        return sendOwn;
+      }
+
+      var alertsBefore = shiftBreaksNow();
       state = next;
+      if (!sameBreaks) {
+        breaks = nextBreaks;
+        breaksPushedAt = state.updatedAt;   // the record about to be written is the row's
+      }
+      carryReplacedBreaks(alertsBefore);
       save({ fromSync: true });
       syncSettingInputs();
       buildScheduleEditor();
       buildAppointmentList();
       renderAccount();
       render();
+      return sendOwn;
     },
 
     render: render
   };
+
+  /* Another tab on this device saved breaks (R9). Only the breaks key is
+     listened to: it carries its own savedAt, so a newer record can be
+     told from an older one, and adopting it is all this tab needs to
+     count the same breaks. Nothing is stamped or pushed; the tab that
+     made the edit has done both. Every copy that writes the key has
+     confirmed what it wrote, so what is adopted here is confirmed too.
+
+     The key taken away is Delete account in another tab (or storage
+     cleared): this tab forgets its breaks as well, so a later edit here
+     cannot write the deleted account's back. Copy a day's Undo goes
+     whenever the breaks change under it, since it would put back the
+     breaks from before.
+
+     The other tab saves a record for every time its typing passes
+     through, so the breaks each one changed are hushed here as they were
+     there (hushChangedBreaks()): a focus window, or the app open twice,
+     would otherwise announce every time passed through. */
+  window.addEventListener('storage', function (event) {
+    if (event.key !== BREAKS_KEY) return;
+    if (event.newValue === null) {
+      resetBreaks();
+    } else {
+      var saved;
+      try { saved = JSON.parse(event.newValue); } catch (e) { return; }
+      if (!isRecord(saved)) return;
+      var savedAt = typeof saved.savedAt === 'number' ? saved.savedAt : 0;
+      var pushedAt = typeof saved.pushedAt === 'number' ? saved.pushedAt : savedAt;
+      if (savedAt <= breaksSavedAt) {
+        // The same record, now known to be on the server.
+        if (savedAt === breaksSavedAt && pushedAt > breaksPushedAt) breaksPushedAt = pushedAt;
+        return;
+      }
+      var before = shiftBreaksNow();
+      breaks = normaliseBreaks(saved);
+      breaksSavedAt = savedAt;
+      breaksPushedAt = pushedAt;
+      breaksWritten = JSON.stringify(breaks);
+      breaksConfirmed = true;
+      hushChangedBreaks(before);
+    }
+    clearCopyUndo();
+    clearBreaksUndo();
+    buildBreaksBox();
+    render();
+  });
 
   /* ─────────────────────────── Fullscreen toggle ─────────────────────────── */
   // Feature-detected rather than assumed: iOS Safari has no
@@ -3625,6 +5531,7 @@
   syncSettingInputs();
   buildScheduleEditor();
   buildCopyDay();
+  initBreaksBox();
   primeAppointmentForm();
   buildAppointmentList();
   renderAppointmentsPlanGate();

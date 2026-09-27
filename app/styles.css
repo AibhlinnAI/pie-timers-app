@@ -720,6 +720,23 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .timer-card.is-off .meter-legend b{ color:var(--off); }
 
 .daystrip-item .v.is-off{ color:var(--off); }
+/* A break that is over, in the strip's list of today's breaks: muted AND
+   regular weight, so it reads as over without telling colours apart. */
+.daystrip-item .v .is-past{ color:var(--ink-muted); font-weight:400; }
+/* The list wraps between breaks, never inside a time: "3:56" and "PM"
+   on separate lines read as two things. */
+.daystrip-item .v span{ white-space:nowrap; }
+
+/* ── During a break ──
+   The pie refills in the lighter purple and counts the break down.
+   --purple-lift clears 3:1 against the plate in both themes (4.5:1 on
+   the light plate, 6.0:1 on the dark one), and the pie keeps its edge.
+   Never urgent: the end of a break is nothing to hurry towards, so app.js
+   never adds is-urgent while this is on. */
+.timer-card.is-break .dial-pie{ fill:var(--purple-lift); }
+
+/* "Set breaks", on a working day that has none. */
+.break-set{ display:block; margin:12px auto 0; }
 
 /* ── Urgent ──
    A halo spilling off the pie onto the card behind, in whichever
@@ -1016,6 +1033,8 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
   color:var(--off); font-weight:600; letter-spacing:.01em;
 }
 .grid td.day-name{ font-weight:600; }
+/* A day with more breaks than lunch lists each start, one per line. */
+.grid td.breaks-cell{ white-space:pre-line; }
 
 /* Set fields are green: this is decided, nothing wanted from you. */
 .grid--edit input[type="time"]{
@@ -1134,6 +1153,75 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 /* The day being copied from: present so the row still reads as a week,
    dashed and faded so it is plainly not a choice. */
 .day-chip:disabled{ cursor:default; opacity:.5; border-style:dashed; }
+
+/* ── Breaks ──
+   Purple, like the break card on the Dashboard, so the two read as one
+   thing. The fields are set fields, green like the table's times: these
+   are decisions already made, not questions. */
+.breaks-box{
+  margin-top:18px; padding:16px clamp(12px,3vw,18px);
+  background:var(--purple-tint); border-radius:var(--radius-sm);
+}
+.breaks-box h3{ font-size:.95rem; margin-bottom:12px; }
+/* The global 150px floor on fields would push a row wider than a phone. */
+.breaks-box .field input,
+.breaks-box .field select{ min-width:0; }
+.breaks-day{ max-width:14rem; }
+
+/* minmax(0,1fr), not the grid's auto track: an auto track is as wide as
+   a row's widest content, and the name field's own width would push the
+   rows out of the box below about 350px. */
+.breaks-list{
+  list-style:none; margin:14px 0 0; padding:0;
+  display:grid; grid-template-columns:minmax(0,1fr); gap:10px;
+}
+.breaks-list:empty{ display:none; }
+.break-row{
+  padding:10px 12px; background:var(--card);
+  border:1px solid var(--line); border-radius:var(--radius-sm);
+}
+/* Two lines on a phone, name and start, then length and Remove; one line
+   once there is room. Wrapped rather than gridded, so every control keeps
+   its own width and only the name gives way: squeezed into a grid column,
+   the length lost the end of "No set length" on a phone. */
+.break-controls{
+  display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center;
+}
+.break-controls > *{ flex:none; }
+.break-controls > .break-name,
+.break-controls > .break-name-input{ flex:1 1 5rem; min-width:0; }
+.break-controls input,
+.break-controls select{
+  font:inherit; font-variant-numeric:tabular-nums;
+  padding:6px 9px; border:1px solid var(--field-border); border-radius:8px;
+  background:var(--green-mid); color:var(--forest); font-weight:600;
+  min-width:0; max-width:100%;
+}
+.break-controls input::placeholder{ color:var(--ink-muted); font-weight:400; }
+.break-controls input:focus,
+.break-controls select:focus{ outline:2px solid var(--forest); outline-offset:1px; border-color:var(--forest); }
+.break-controls :disabled{ opacity:.55; cursor:not-allowed; }
+.break-name{ font-weight:700; color:var(--purple); overflow-wrap:anywhere; }
+.break-back{ margin:6px 0 0; font-size:.8rem; color:var(--ink-muted); }
+.break-note{ margin:4px 0 0; font-size:.8rem; font-weight:600; color:var(--orange-text); }
+
+.breaks-empty{ margin:12px 0 0; font-size:.85rem; color:var(--ink-muted); }
+.breaks-actions{
+  display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap;
+  margin-top:14px;
+}
+.breaks-status{ margin:0; font-size:.85rem; color:var(--ink); }
+.breaks-status:empty{ display:none; }
+/* Add a break when it is off, at six or on a day off: faded, and no hover
+   flip, so it never looks like it will do something. .breaks-full beside
+   it says why. Kept to this box; other buttons keep their own disabled
+   looks. */
+.breaks-actions .btn:disabled{ opacity:.5; cursor:not-allowed; }
+.breaks-actions .btn:disabled:hover{
+  background:transparent; color:var(--forest); border-color:var(--field-border);
+}
+.breaks-full{ margin:0; font-size:.85rem; color:var(--ink-muted); }
+.breaks-box .hint{ margin-top:10px; }
 .setting--inline{ flex:1 1 280px; padding:0; border:0; align-items:center; }
 
 /* ───────────────────────── Buttons ───────────────────────── */
@@ -1581,6 +1669,10 @@ body.is-focus{
 .focus.is-appt{
   --accent:var(--appt); --accent-fill:var(--appt-fill);
   --accent-soft:var(--appt-soft); --urgent:var(--urgent-appt);
+}
+/* During a break: the Dashboard's lighter purple pie, never urgent. */
+.focus.is-break{
+  --accent:var(--purple); --accent-fill:var(--purple-lift); --accent-soft:var(--purple-tint);
 }
 
 /* Lunch and End escalate to green in the focus window too — see the

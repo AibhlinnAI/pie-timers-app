@@ -165,8 +165,8 @@ grant execute on function public.claim_push_subscription(text, jsonb, text) to a
 create table if not exists public.notification_log (
   user_id    uuid        not null references auth.users (id) on delete cascade,
   day        date        not null,
-  timer_key  text        not null,   -- 'lunch' | 'end'
-  milestone  text        not null,   -- '30' | '15' | '10' | '5' | 'done'
+  timer_key  text        not null,   -- 'lunch' | 'end' | 'brk<start>[-<finish>]' (schema-breaks.sql)
+  milestone  text        not null,   -- '30' | '15' | '10' | '5' | 'done' | 'start' | 'finish'
   sent_at    timestamptz not null default now(),
   primary key (user_id, day, timer_key, milestone)
 );

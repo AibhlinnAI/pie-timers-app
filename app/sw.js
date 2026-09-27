@@ -6,8 +6,18 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v112';
+var CACHE = 'countdown-timers-v113';
 
+/* Versioned URLs: a file changed in a release is loaded by index.html as
+   file.js?v=<release>, and listed here by EXACTLY that URL. The cache
+   matches the whole URL, query included, so an unversioned entry here
+   would cache a copy index.html never asks for, and leave the one it does
+   ask for uncached: the app would not start offline. Bump the ?v= in both
+   files together, for each file the release changes.
+
+   styles.css is listed both ways: index.html asks for the versioned URL,
+   while terms.html and privacy.html, precached below, ask for the plain
+   one. */
 var SHELL = [
   './',
   'index.html',
@@ -16,6 +26,7 @@ var SHELL = [
      is deliberately absent: a cached health check is a lie. */
   'terms.html',
   'privacy.html',
+  'styles.css?v=113',
   'styles.css',
   /* The self-hosted face. Precached because styles.css asks for these
      and nothing else fetches them offline — without both the app still
@@ -32,12 +43,12 @@ var SHELL = [
   'identity/identity-ui.css',
   /* Drawn by identity-ui.css as the Google sign-in button. */
   'identity/google-signin-light-pill.svg',
-  'supabase.js',
+  'supabase.js?v=113',
   'billing.js',
   'notify.js',
-  'sync.js',
+  'sync.js?v=113',
   'qrcode.js',
-  'app.js',
+  'app.js?v=113',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',

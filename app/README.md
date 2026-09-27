@@ -382,13 +382,18 @@ supabase/schema-billing.sql     subscriptions + entitlement
 supabase/schema-access-codes.sql 14-day trial + friends-and-family codes
 supabase/schema-ratelimit.sql   sign-in throttle store
 supabase/schema-calendar.sql    calendar feeds + expanded events
+supabase/schema-breaks.sql      breaks column (extra breaks, lunch length)
 supabase/schema-google-calendar.sql  Google one-click columns
 ```
 
-Two of these matter even if you skip the optional features:
-`schema-access-codes.sql` carries the **14-day free trial trigger**, and
+Three of these matter even if you skip the optional features:
+`schema-access-codes.sql` carries the **14-day free trial trigger**,
 `schema-calendar.sql` adds the **`appointments` column** without which manual
-appointments do not sync between devices.
+appointments do not sync between devices, and `schema-breaks.sql` adds the
+**`breaks` column**, which `notify-milestones` asks for by name: without it the
+function cannot read any profile and no pushes are sent for anyone. Run it
+before `notify-milestones` is deployed (step 5). The live project has had the
+column since 27 Sep 2026.
 
 `cron.sql` is deliberately not in this list — the file is the only one with placeholders
 to fill in, and must wait until the edge functions exist. See step 6 below.
@@ -596,6 +601,53 @@ always.
 Signed out, everything stays in `localStorage` under `countdown-timers/v1` and
 nothing leaves the device. Signed in, your schedule and settings are stored in
 the project's own Supabase instance rather than being pooled with anyone else's.
+
+**Breaks** are stored apart from all of that, never inside the schedule or the
+settings, so older copies of the app never read or overwrite them. Lunch itself
+has not moved: its start is still `schedule[day].lunch`, its Head Home tick
+`schedule[day].lunchHeadHome` and its name `settings.lunchLabel`. Everything
+new is one record, `{ v: 1, days: { Monday: { lunchMinutes, extras: [...] } } }`:
+lunch's length (`null` means no set length, which is how every lunch starts)
+and the other breaks, each with an id, start, optional length (5 to 180
+minutes), name and Head Home flag. Add a break allows six a day counting lunch;
+a stored day keeps up to six extras, so a lunch set by an older copy never
+costs a break.
+
+- On the device it is `countdown-timers/breaks/v1`, holding the record plus
+  `savedAt`, the `updatedAt` it was saved with, and `pushedAt`, the `savedAt`
+  of the last record the server is known to hold (a push carried it, or a pull
+  showed the same). `savedAt` after `pushedAt` means breaks saved here that no
+  push has carried yet. `countdown-timers/v1` never contains the record. Other
+  tabs pick up a newer record through the `storage` event.
+- `countdown-timers/v1` does carry `breaksMark`, the `updatedAt` it was saved
+  with, while the breaks key is known to be as current as the week beside it.
+  An older copy of the app drops the mark when it saves (it keeps only the
+  fields it knows), and may have pulled another device's newer breaks without
+  writing them here. So a copy that loads with no mark, or a stale one, holds
+  **unconfirmed** breaks: its pushes leave `breaks` out and the server keeps
+  its own, until a pull confirms them. That pull takes the row's breaks,
+  unless the device's own hold edits no push has carried and were saved after
+  the row was written: those are newer, and are kept and sent. On any copy,
+  the first push after the page loads, or after a push was held back offline
+  or failed, pulls first while there are unsent edits, so they are compared
+  with the row before they can go over another device's newer breaks.
+- On the server it is the `timer_profiles.breaks` jsonb column. `sync.js` sends
+  it only once it has seen that the column exists (a pulled row that has it, or
+  `select=breaks&limit=0` answering 200), because PostgREST refuses a whole
+  upsert that names an unknown column. A pulled row's `breaks` replaces the
+  device's, apart from the unsent edits newer than the row above; a row without
+  the key leaves the device's alone. A device whose
+  record is empty and has never been saved, as on any device that has only
+  ever had one lunch with no set length, leaves `breaks` out of its pushes and
+  never asks about the column, so it makes no request it did not make before
+  breaks; its next pull brings the row's. Restore defaults and import are the
+  person's own word on the breaks, and are sent even then.
+- Export writes it as `breaks` beside `schedule` and `settings`; import takes it
+  from the file, or clears the breaks when the file has none. Restore defaults
+  and Delete account clear it too.
+- `notify-milestones` reads the same column and derives the same alerts, keyed
+  `lunch` for lunch and `brk<start>[-<finish>]` for the others, so the in-app
+  alert and the push collapse into one. `tools/breaks-sim.js` checks the app side.
 
 That is a statement about **where the rows live, not about how few companies are
 involved**. Supabase is a processor, and so are the others named in the
