@@ -145,13 +145,22 @@ function wallTimeToUtc(y, mo, d, h, mi, s, timeZone) {
   return guess;
 }
 
+/* Cached for the same reason as the formatters, and it was the one
+   place still building a formatter per call: every parseDate asked,
+   and each answer cost the same fifth of a millisecond. On a calendar
+   with years of moved meetings that was about 40% of a sync's CPU. */
+var knownZones = {};
+
 function isKnownZone(timeZone) {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: timeZone });
-    return true;
-  } catch (e) {
-    return false;
+  if (knownZones[timeZone] === undefined) {
+    try {
+      formatterFor(timeZone);
+      knownZones[timeZone] = true;
+    } catch (e) {
+      knownZones[timeZone] = false;
+    }
   }
+  return knownZones[timeZone];
 }
 
 /* ─────────────────────────── Dates ─────────────────────────── */
@@ -390,9 +399,18 @@ function expandRule(start, rule, windowStartMs, windowEndMs) {
     else if (rule.freq === 'YEARLY') { probeMo = 1; probeD = 1; }
     else if (rule.freq === 'WEEKLY') { probeD = cursorD - 6; }  // BYDAY can precede the cursor
 
-    var probe = wallTimeToUtc(probeY, probeMo, probeD, start.h, start.mi, start.s, start.zone);
-    if (probe > windowEndMs) break;
-    if (rule.untilMs !== null && probe > rule.untilMs) break;
+    /* The exact conversion is only needed near a boundary. No zone is
+       more than fourteen hours from UTC, so a probe a whole day short of
+       both limits as a naive UTC time is short of them in any zone. A
+       weekly series running since 2015 used to pay two zone lookups for
+       each of its six hundred weeks just to learn "not yet". */
+    var roughProbe = Date.UTC(probeY, probeMo - 1, probeD, start.h, start.mi, start.s);
+    if (roughProbe + 86400000 >= windowEndMs ||
+        (rule.untilMs !== null && roughProbe + 86400000 >= rule.untilMs)) {
+      var probe = wallTimeToUtc(probeY, probeMo, probeD, start.h, start.mi, start.s, start.zone);
+      if (probe > windowEndMs) break;
+      if (rule.untilMs !== null && probe > rule.untilMs) break;
+    }
   }
 
   return out;
@@ -433,14 +451,40 @@ export function parseCalendar(text, windowStartMs, windowEndMs, maxEvents) {
      reaching the error handler -- the feed row was left with a null
      last_error and a null last_synced, saying nothing at all.
 
-     A block is kept if it recurs (RRULE), overrides an occurrence
-     (RECURRENCE-ID), or starts near enough to the window. Everything
-     else is dropped before it costs anything but the lines it occupied. */
-  var KEEP_SLACK_MS = 400 * 24 * 60 * 60 * 1000;   // generous: DTSTART of a long series predates its occurrences
+     A block is kept if it recurs (RRULE), or if it starts near the
+     window, or if it overrides an occurrence (RECURRENCE-ID) that falls
+     near the window. Everything else is dropped before it costs anything
+     but the lines it occupied.
+
+     "Near" is two days either side. Only an instant inside the window is
+     ever emitted, and no zone is more than fourteen hours from UTC, so a
+     block further out than that cannot contribute. This used to keep
+     every override ever made, and every one-off event from the past 400
+     days: a meeting moved once a week for years is hundreds of overrides,
+     each paying for three zone conversions to change nothing. The old
+     edge also had no slack at the far end, which dropped early-morning
+     events on the window's last day in zones east of UTC. */
+  var NEAR_MS = 2 * 24 * 60 * 60 * 1000;
+  var nearWindow = function (ms) {
+    return ms !== null && ms >= windowStartMs - NEAR_MS && ms <= windowEndMs + NEAR_MS;
+  };
+
+  /* Deliberately crude: pull YYYYMMDD straight out and treat it as UTC.
+     This decides only whether a block is worth keeping, and the slack
+     above absorbs being a day out either way. A real parseDate here costs
+     two zone lookups and runs once per event in the file -- on a calendar
+     with years of history that alone was several seconds of CPU spent on
+     events about to be discarded. */
+  var crudeMs = function (value) {
+    var ymd = /(\d{4})(\d{2})(\d{2})/.exec(value);
+    return ymd ? Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]) : null;
+  };
+
   var blocks = [];
   var current = null;
-  var currentKeep = false;
+  var currentRecurs = false;
   var currentStartMs = null;
+  var currentRecurrenceMs = null;
 
   for (i = 0; i < lines.length; i++) {
     var prop = parseLine(lines[i]);
@@ -448,29 +492,18 @@ export function parseCalendar(text, windowStartMs, windowEndMs, maxEvents) {
 
     if (prop.name === 'BEGIN' && prop.value.toUpperCase() === 'VEVENT') {
       current = [];
-      currentKeep = false;
+      currentRecurs = false;
       currentStartMs = null;
+      currentRecurrenceMs = null;
     } else if (prop.name === 'END' && prop.value.toUpperCase() === 'VEVENT') {
-      if (current) {
-        var near = currentStartMs !== null &&
-          currentStartMs <= windowEndMs &&
-          currentStartMs >= windowStartMs - KEEP_SLACK_MS;
-        if (currentKeep || near) blocks.push(current);
+      if (current && (currentRecurs || nearWindow(currentStartMs) || nearWindow(currentRecurrenceMs))) {
+        blocks.push(current);
       }
       current = null;
     } else if (current) {
-      if (prop.name === 'RRULE' || prop.name === 'RDATE' || prop.name === 'RECURRENCE-ID') currentKeep = true;
-      if (prop.name === 'DTSTART' && currentStartMs === null) {
-        /* Deliberately crude: pull YYYYMMDD straight out and treat it as
-           UTC. This decides only whether a block is worth keeping, and
-           the slack around the window is measured in months, so being a
-           day out either way changes nothing. A real parseDate here costs
-           a fifth of a millisecond and runs once per event in the file --
-           on a calendar with years of history that alone was several
-           seconds of CPU spent on events about to be discarded. */
-        var ymd = /(\d{4})(\d{2})(\d{2})/.exec(prop.value);
-        if (ymd) currentStartMs = Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]);
-      }
+      if (prop.name === 'RRULE' || prop.name === 'RDATE') currentRecurs = true;
+      if (prop.name === 'DTSTART' && currentStartMs === null) currentStartMs = crudeMs(prop.value);
+      if (prop.name === 'RECURRENCE-ID' && currentRecurrenceMs === null) currentRecurrenceMs = crudeMs(prop.value);
       current.push(prop);
     }
   }

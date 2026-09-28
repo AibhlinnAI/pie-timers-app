@@ -92,6 +92,21 @@ select jobname, status, return_message, start_time
   from cron.job_run_details order by start_time desc limit 20;
 ```
 
+`succeeded` there only means the request was queued. What the function
+answered is in `net._http_response`, which keeps about six hours. On
+27–28 Sep 2026 every calendar-sync run answered 546 for at least that long
+while `cron.job_run_details` said `succeeded` every time:
+
+```sql
+select status_code, count(*), min(created), max(created)
+  from net._http_response group by 1 order by 1;
+```
+
+A healthy calendar-sync run answers 200 with counts only, for example
+`{"ok":true,"due":8,"synced":8,"failed":0,"died":0,"deferred":0}`. `died` is
+a feed whose own worker was killed or timed out; that feed's row says so in
+`last_error`, which the person sees in the app.
+
 ## If a run fails partway
 
 Every file can simply be run again. The common causes:

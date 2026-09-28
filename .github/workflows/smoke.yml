@@ -72,3 +72,9 @@ jobs:
       # script fails to load or comes up short.
       - name: Run the smoke test
         run: node tools/smoke.js
+
+      # The calendar-sync edge function: its parser, its scheduled run, and
+      # index.ts itself with Deno and the network stubbed. Type stripping is
+      # what lets Node run the .ts file as it ships. Nothing is deployed.
+      - name: Run the calendar-sync tests
+        run: node --experimental-strip-types tools/calendar-sync-test.mjs
