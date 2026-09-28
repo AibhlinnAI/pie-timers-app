@@ -128,6 +128,13 @@ html{ -webkit-text-size-adjust:100%; }
   --wash-a:      #E8EFEA;
   --wash-b:      #F1EAF5;
 
+  /* The logo's own three colours (app/icon.svg), for the row pies. Set
+     once and never per theme: the logo is the same on a white card as on
+     a dark one, and so are the pies that copy it. */
+  --logo-plate:  #32493C;   /* the plate, Government Green */
+  --logo-rim:    #3E5A4A;   /* the plate's rim */
+  --logo-pie:    #FF8A00;   /* the pie, the time still to come */
+
   --radius:      16px;
   --radius-sm:   10px;
   --shadow:      0 1px 2px rgba(46,24,56,.06), 0 8px 24px rgba(46,24,56,.07);
@@ -364,6 +371,10 @@ button,select{ font:inherit; }
 .ticks.over line.major{ stroke-opacity:.75; }
 
 .now-text{ min-width:0; flex:1; }
+/* Two halves of the words, for the stall's band, where they stand side by
+   side. Everywhere else they are not boxes at all, so every other view
+   lays the six lines out exactly as it did before the halves existed. */
+.now-a, .now-b{ display:contents; }
 .kicker{ margin:0; font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--accent); }
 .title{ margin:6px 0 0; font-size:clamp(1.25rem,3vw,1.85rem); line-height:1.18; }
 .window{ margin:8px 0 0; font-size:.9rem; color:var(--ink-muted); }
@@ -461,6 +472,18 @@ button,select{ font:inherit; }
    emptying one after another, is the thing worth looking at. */
 .item .rowtimer{ width:88px; align-self:center; text-align:center; }
 .item .rowdial{ width:52px; height:52px; display:block; margin:0 auto; }
+/* Every row pie is the logo: orange on a Government Green plate with its
+   darker-green rim, for every kind of item and in both themes. (Mal, 27
+   September: "Can all the mini pies be orange on a green plate, like the
+   logo?") Full for a block still to come, a shrinking wedge for the one
+   on now, an empty plate once it is over. The pie sits inside the plate
+   the way the logo's does; paintRows sets how far in, by size, as the
+   app's own marks do. These rules outrank the per-kind colours the rows
+   used to take from --accent-fill, which now colours nothing on a row.
+   The hero's day pie is not a .rowdial and is untouched. */
+.rowdial .plate{ fill:var(--logo-plate); }
+.rowdial .rim{ stroke:var(--logo-rim); stroke-width:1.52; stroke-opacity:1; }
+.rowdial .pie{ fill:var(--logo-pie); stroke:rgba(0,0,0,.3); stroke-width:1.14; }
 /* One line, never two. It sits directly under its own pie, and a label
    that wraps pushes the pie off the vertical centre of the row and makes
    the whole column jump. The column is sized to the longest countdown
@@ -684,6 +707,257 @@ button,select{ font:inherit; }
   .known dl{ grid-template-columns:1fr; gap:2px 0; }
   .known dd{ margin-bottom:6px; }
 }
+
+/* ───────────────────── The stall: the foyer view, full screen ─────────────────────
+   Mal, 27 September, looking at the foyer view full screen on the 3440px
+   monitor for the Expo stall: "can this view be scaled up to have the
+   pies as big as possible with each session, upcoming or passed being
+   visible on this screen?" The 1120px column above filled a third of it.
+
+   So on a landscape screen from 1200x650 up the foyer view stops being a
+   page and becomes the screen: exactly 100vw x 100vh, nothing to scroll,
+   the whole program on it at once and in its published order. A block
+   that has finished keeps its place and says "Finished" under an empty
+   plate rather than moving to a list of its own, so the row reads left to
+   right as the day does. Below that size (a phone turned sideways, a
+   small laptop window) every rule above still applies, unchanged.
+
+   Everything is sized from one unit, --u: 1% of the height of a 16:9
+   screen, and on anything wider than 16:9 a little more, up to 1.1% of
+   its height, so a 21:9 monitor's spare width buys some of the size a
+   room needs to read the words. Small text has a floor so a 1280x720
+   laptop stays readable up close.
+
+   How big the pies are is left to the grid rather than guessed. The
+   program is one grid; each card is a subgrid of it, four rows deep
+   (pie, status, times, words), so every card's words share the height of
+   the longest and every pie row is the same size. The pie row may grow
+   up to the width of its column and no further: the text rows are sized
+   first, the pies take what is left up to that cap, and only then does
+   the day pie's band get whatever remains. Six identical circles, as
+   large as the screen allows, whatever the wording on the cards.
+
+   --stall is read by the script (stallOn), so the layout and the list
+   that fills it are decided by one media query, this one, and never by a
+   second copy of it in JS. */
+@media (orientation:landscape) and (min-width:1200px) and (min-height:650px){
+  :root.venue{
+    --stall:1;
+    --u:min(1.1vh, .5625vw);
+    --sp:calc(1.1 * var(--u));           /* the one spacing step */
+    --cardpad:calc(1.1 * var(--u));
+    --bt:max(4px, calc(.45 * var(--u))); /* a card's accent bar */
+  }
+  .venue .wrap{
+    max-width:none; height:100vh; margin:0;
+    padding:var(--sp); gap:var(--sp);
+  }
+  /* The footer is on the phone view. The screen is the screen. */
+  .venue .foot{ display:none; }
+
+  /* A slim header: the name and the clock, both big enough for the room. */
+  .venue .head{
+    flex:none; flex-wrap:nowrap; align-items:center; gap:calc(2 * var(--u));
+    padding:calc(.8 * var(--u)) calc(1.8 * var(--u));
+  }
+  .venue .brand{ gap:calc(1.4 * var(--u)); }
+  .venue .mark{ width:calc(5 * var(--u)); height:calc(5 * var(--u)); }
+  .venue .brand > div{ display:flex; flex-wrap:wrap; align-items:baseline; column-gap:calc(1.8 * var(--u)); min-width:0; }
+  .venue .brand h1{ flex-basis:100%; font-size:max(18px, calc(2.8 * var(--u))); line-height:1.15; }
+  .venue .brand p{ margin:0; font-size:max(12px, calc(1.45 * var(--u))); }
+  /* The product's name, and its maker's (paint writes " from AibhlínnAI"
+     in here), big enough to read from the aisle: at his own stall a
+     visitor should be able to tell what this is. */
+  .venue .brand .strap{ margin:0; font-size:max(12px, calc(1.8 * var(--u))); opacity:.85; }
+  .venue .brand .strap-name{ font-weight:700; }
+  .venue .clock{ display:grid; grid-template-columns:auto auto; align-items:center; column-gap:calc(1.4 * var(--u)); }
+  .venue .clock-time{ grid-column:2; grid-row:1 / span 2; font-size:max(30px, calc(5.6 * var(--u))); }
+  .venue .clock-date{ grid-column:1; grid-row:1; align-self:end; margin:0; font-size:max(12px, calc(1.5 * var(--u))); }
+  .venue .clock-zone{ grid-column:1; grid-row:2; align-self:start; margin:0; font-size:max(11.5px, calc(1.25 * var(--u))); }
+
+  .venue .note{ flex:none; padding:calc(.45 * var(--u)) calc(1.2 * var(--u)); font-size:max(12px, calc(1.3 * var(--u))); }
+  .venue .bar{ flex:none; padding-block:calc(.4 * var(--u)); }
+
+  .venue .main{ flex:1 1 0; min-height:0; gap:var(--sp); }
+  .venue .program{ min-height:0; min-width:0; }
+  /* The "no running order yet" card, for the next event copied from this
+     file: it takes the whole program area, not the first pie's cell. */
+  .venue .program > .known{ grid-column:1 / -1; grid-row:1 / -1; align-self:start; }
+  /* The day's heading stays for a screen reader; the header already
+     prints the date for everyone else. */
+  .venue #listhead{
+    position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
+    overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+  }
+
+  /* The day pie's card. IDs, because the short-screen rules above reach
+     it with five and six classes. */
+  .venue #now{
+    align-self:stretch; min-height:0; min-width:0; margin:0;
+    padding:calc(1.4 * var(--u)) calc(2.2 * var(--u));
+    gap:calc(2.4 * var(--u));
+  }
+  .venue #now .kicker{ font-size:max(12px, calc(1.5 * var(--u))); }
+  .venue #now .title{ margin-top:calc(.5 * var(--u)); font-size:max(20px, calc(3.7 * var(--u))); line-height:1.12; }
+  .venue #now .window{ margin-top:calc(.6 * var(--u)); font-size:max(12px, calc(1.8 * var(--u))); }
+  .venue #now .left{ margin:0; font-size:max(22px, calc(4.8 * var(--u))); line-height:1.1; }
+  .venue #now .meter{ max-width:none; margin:calc(1 * var(--u)) 0 0; }
+  .venue #now .meter-bar{ height:max(10px, calc(1.2 * var(--u))); margin-bottom:calc(.7 * var(--u)); }
+  .venue #now .meter-legend{ font-size:max(12px, calc(1.7 * var(--u))); }
+  .venue #now .dot{ width:.62em; height:.62em; }
+  /* On: the short-screen rules above take the running line away below
+     1100 wide or 700 tall. Here it has its own column and room for it. */
+  .venue #now .then{ display:block; margin-top:calc(1 * var(--u)); font-size:max(12px, calc(1.8 * var(--u))); }
+
+  /* The program: one card per block, in published order. */
+  /* gap:normal, because a subgrid only takes its parent's gutters while
+     its own gap is normal, and .timeline's 5px would otherwise override
+     them: the cards stood 5px apart and the live card's ring ran into its
+     neighbours. */
+  .venue #timeline{ display:grid; grid-template-rows:subgrid; grid-template-columns:subgrid; grid-row:1 / -1; grid-column:1 / -1; gap:normal; }
+  .venue #timeline .item{
+    grid-row:span 4; display:grid; grid-template-rows:subgrid; grid-template-columns:minmax(0,1fr);
+    row-gap:calc(.55 * var(--u)); align-items:start; justify-items:center; text-align:center;
+    padding:var(--cardpad); min-height:0; min-width:0;
+    /* The bar is there for its width (the live card's ring is drawn over
+       it) and is the card's own line colour. In the kind's colour the
+       closing card wore the live card's orange all day. */
+    border:1px solid var(--line); border-top:var(--bt) solid var(--line);
+    box-shadow:var(--shadow);
+  }
+  .venue #timeline .item .rowtimer{ display:contents; }
+  /* The pie fills its row; the circle drawn is the largest the row and
+     the column both allow, so all six come out the same. */
+  .venue #timeline .item .rowdial{ width:100%; height:100%; min-height:0; margin:0; justify-self:stretch; align-self:stretch; }
+  /* The status under each pie: the countdown on the one that is on, and
+     otherwise "Next" or "Finished" (paintRows writes them). One line on
+     every card, empty or not, so the pies stay level. */
+  .venue #timeline .item .rowleft{
+    margin:0; font-size:max(14px, calc(2.6 * var(--u))); line-height:1.2; min-height:1.2em;
+    color:var(--orange-text);
+  }
+  .venue #timeline .item .when{ min-width:0; font-size:max(14px, calc(2.4 * var(--u))); line-height:1.2; color:var(--ink); }
+  .venue #timeline .item .body{ gap:calc(.3 * var(--u)); align-items:center; min-width:0; max-width:100%; }
+  /* Read from a few metres. Balanced, so a name or title that needs two
+     lines breaks in the middle ("SHARON HARRIS & / SHARON STEWART"), not
+     one word short of the end. */
+  .venue #timeline .item .speaker{ font-size:max(12px, calc(1.9 * var(--u))); line-height:1.25; text-wrap:balance; }
+  .venue #timeline .item .name{ font-size:max(14px, calc(2.6 * var(--u))); line-height:1.15; font-weight:700; text-wrap:balance; }
+  /* "Session · 15 minutes": the times above already give the length, and
+     the "next" badge it carries on the phone is the status line here. */
+  .venue #timeline .item .kind{ display:none; }
+  /* On now: lit, ringed, and the only card with a number under its pie. */
+  .venue #timeline .item.on{
+    border-color:var(--orange);
+    box-shadow:0 0 0 calc(.35 * var(--u)) var(--orange), var(--shadow-lg);
+  }
+  .venue #timeline .item.on .when, .venue #timeline .item.on .kind{ color:var(--orange-text); }
+  /* Finished: said in words and shown by the empty plate, not faded. The
+     phone's .45 opacity would take this text under AA; ink-muted on the
+     card is 5.6:1 light and 7.2:1 dark. */
+  .venue #timeline .item.past{ opacity:1; box-shadow:none; }
+  .venue #timeline .item.past .when, .venue #timeline .item.past .name,
+  .venue #timeline .item.past .rowleft{ color:var(--ink-muted); }
+}
+
+/* Every stall size: the day on the left, the program stacked on the right.
+   Mal, 27 September, looking at six cards in a row under a band: "No, keep
+   the day on the left and stack the sessions on the right." Then, 28
+   September: the day two fifths of the width; the sessions to come in a
+   muted orange, the brand orange kept for the one that is on and, in the
+   gap before a block, the one about to start; and that block's row
+   "noticeably bigger than other sessions that are finished and to come,
+   almost to make the current session pop up from the rest".
+   So the program is a column of rows in published order. Every row is one
+   share of the column's height except the block to watch (on, or next in
+   a gap or before the doors), which takes --k shares. Each row's pie is as
+   tall as its row: #timeline is a size container, so one share is
+   (100cqh less five gaps) / (rows - 1 + k) while a block is to watch, and
+   / rows when none is. */
+@media (orientation:landscape) and (min-width:1200px) and (min-height:650px){
+  :root.venue{
+    --rows:6;
+    --k:2;              /* how many shares the block to watch takes */
+    --den:var(--rows);
+    --padb:calc(.55 * var(--u));
+    /* Blocks still to come, quieter than the brand orange, which is kept
+       for the block that is on and the one about to start. */
+    --soon-pie:#B9864F;
+  }
+  /* The day two fifths of the screen, the program three fifths. */
+  .venue .main{ display:grid; grid-template-columns:minmax(0,2fr) minmax(0,3fr); grid-template-rows:minmax(0,1fr); }
+  .venue #now{ grid-row:1; grid-column:1; flex-direction:column; text-align:center; justify-content:center; }
+  .venue #now::before{ align-self:center; width:min(200px,45%); height:max(4px, calc(.45 * var(--u))); }
+  /* As wide as the column and square, shrinking only if the words need
+     the height, so the pie and its words sit together in the middle. */
+  .venue #now .dialwrap{ flex:0 1 auto; min-height:0; width:100%; height:auto; aspect-ratio:1; }
+  .venue #now .now-text{ display:block; flex:none; width:100%; }
+  .venue #now .now-a, .venue #now .now-b{ display:block; min-width:0; }
+  .venue #now .meter{ margin-inline:auto; }
+  .venue .program{ grid-row:1; grid-column:2; display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .venue #timeline{
+    display:flex; flex-direction:column; grid-row:auto; grid-column:auto;
+    gap:var(--sp); flex:1 1 0; min-height:0; container-type:size;
+  }
+  .venue #timeline:has(> .item.on, > .item.lead){ --den:calc(var(--rows) - 1 + var(--k)); }
+  .venue #timeline .item{
+    --share:calc((100cqh - (var(--rows) - 1) * var(--sp)) / var(--den));
+    --pie:calc(var(--share) - 2 * var(--padb) - 2px);
+    /* Exactly one share (or --k of them) as the basis, not flex-grow: grow
+       shares out only the space left after each card's padding and border,
+       so the row to watch came out 1.86-1.90 times the others and its pie,
+       sized from --share, hung 2-6px past the card's foot. */
+    flex:0 1 var(--share); min-height:0;
+    padding-block:var(--padb);
+    grid-row:auto;
+    grid-template-columns:var(--pie) minmax(0,1fr) auto;
+    grid-template-rows:1fr auto auto 1fr;
+    /* No row gap: the empty 1fr rows above and below kept 0.75u of gaps
+       between them, enough to push a short row's last line 1-3px onto its
+       card's edge. The words keep their quarter-unit through a margin. */
+    column-gap:calc(2 * var(--u)); row-gap:0;
+    align-items:center; justify-items:start; text-align:left;
+    border-top:1px solid var(--line); border-left:var(--bt) solid var(--line);
+  }
+  .venue #timeline .item .rowdial{ grid-column:1; grid-row:1 / -1; width:var(--pie); height:var(--pie); align-self:center; }
+  .venue #timeline .item .when{ grid-column:2; grid-row:2; font-size:max(14px, calc(2.2 * var(--u))); }
+  .venue #timeline .item .body{ grid-column:2 / span 2; grid-row:3; align-items:flex-start; margin-top:calc(.25 * var(--u)); }
+  .venue #timeline .item .speaker{ font-size:max(12px, calc(1.7 * var(--u))); text-wrap:pretty; }
+  .venue #timeline .item .name{ font-size:max(14px, calc(2.4 * var(--u))); text-wrap:pretty; }
+  /* The status at the row's far end: the countdown on the block that is
+     on, "Starts in" before the next, "Next" and "Finished" on the others. */
+  .venue #timeline .item .rowleft{ grid-column:3; grid-row:2; justify-self:end; font-size:max(16px, calc(2.8 * var(--u))); }
+  /* On the ordinary rows the status line is no taller than its glyphs, so
+     it does not hold the times' row open past their own 1.2 lines. Not on
+     the row to watch: there the big status needs its line height or it
+     meets the panel's long speaker line. */
+  .venue #timeline .item:not(.on):not(.lead) .rowleft{ line-height:1; min-height:1em; }
+  .venue #timeline .item .rowdial .pie{ fill:var(--soon-pie); }
+
+  /* The block to watch: two shares tall, lit, and its words bigger. */
+  .venue #timeline .item.on, .venue #timeline .item.lead{
+    flex-basis:calc(var(--k) * var(--share));
+    --pie:calc(var(--k) * var(--share) - 2 * var(--padb) - 2px);
+    border-color:var(--orange);
+    box-shadow:0 0 0 calc(.35 * var(--u)) var(--orange), var(--shadow-lg);
+  }
+  /* Brand orange only while a block is on. In the lead-up the pie stays
+     muted (Mal, 28 Sep: "Mute the orange in session leadup, keep glow"). */
+  .venue #timeline .item.on .rowdial .pie{ fill:var(--logo-pie); }
+  /* Mal, 28 Sep: "Make the current session pie glow orange." The glow is
+     round the whole plate, so it holds while the wedge empties. */
+  .venue #timeline .item.on .rowdial, .venue #timeline .item.lead .rowdial{
+    overflow:visible;
+    filter:drop-shadow(0 0 calc(.6 * var(--u)) rgba(255,160,40,1)) drop-shadow(0 0 calc(1.8 * var(--u)) rgba(255,138,0,.95)) drop-shadow(0 0 calc(4 * var(--u)) rgba(255,138,0,.6));
+  }
+  .venue #timeline .item.on .when, .venue #timeline .item.lead .when{ font-size:max(18px, calc(3.4 * var(--u))); color:var(--orange-text); }
+  /* 19px floor: large bold text (3:1). The glow sits behind the start of
+     this line, and at 2.4u on a 1280x720 or 1366x768 screen (17-18px, so
+     4.5:1 needed) the dark theme's green on it measured 3.54:1. */
+  .venue #timeline .item.on .speaker, .venue #timeline .item.lead .speaker{ font-size:max(19px, calc(2.4 * var(--u))); }
+  .venue #timeline .item.on .name, .venue #timeline .item.lead .name{ font-size:max(20px, calc(4 * var(--u))); }
+  .venue #timeline .item.on .rowleft, .venue #timeline .item.lead .rowleft{ font-size:max(22px, calc(4.6 * var(--u))); }
+}
 @media (prefers-reduced-motion:reduce){
   *{ animation:none !important; transition:none !important; }
 }
@@ -700,7 +974,7 @@ button,select{ font:inherit; }
       <div>
         <h1 id="evName">Neurodivergent Entrepreneurs Expo</h1>
         <p id="evVenue">Woodville Town Hall, 74–76 Woodville Road, Woodville SA 5011</p>
-        <p class="strap">Pie Timers · A visual countdown to let you know where you are in your day.</p>
+        <p class="strap"><span class="strap-name">Pie Timers<span id="strapBy"></span></span> · A visual countdown to let you know where you are in your day.</p>
       </div>
     </div>
     <div class="clock">
@@ -749,9 +1023,12 @@ button,select{ font:inherit; }
         </svg>
       </div>
       <div class="now-text">
+        <div class="now-a">
         <p class="kicker" id="kicker">&nbsp;</p>
         <h2 class="title" id="title">—</h2>
         <p class="window" id="window">&nbsp;</p>
+        </div>
+        <div class="now-b">
         <!-- The card is a polite live region, so a change of phase or of
              what is on now is announced. The per-minute numbers are not:
              at the simulated clock's default speed they change twice a
@@ -765,10 +1042,11 @@ button,select{ font:inherit; }
           </div>
         </div>
         <p class="then" id="then">&nbsp;</p>
+        </div>
       </div>
     </section>
 
-    <section>
+    <section class="program">
       <h2 class="listhead" id="listhead">The day</h2>
       <ol class="timeline" id="timeline" hidden></ol>
 
@@ -776,7 +1054,9 @@ button,select{ font:inherit; }
            is happening now is always at the top of the screen. On a foyer
            display that matters more than it sounds: the live block stays
            in the same place all day instead of walking down the screen and
-           eventually off it. -->
+           eventually off it. Not in the stall layout (the foyer view on a
+           big landscape screen), where all six are on screen at once and
+           each keeps its place, marked "Finished" instead. -->
       <h2 class="listhead listhead-done" id="listheadDone" hidden>Finished</h2>
       <ol class="timeline timeline-done" id="timelineDone" hidden></ol>
 
@@ -1159,21 +1439,40 @@ button,select{ font:inherit; }
   /* ── The wedge of time still left, emptying clockwise from 12 o'clock.
      A solid reducing pie, not a ring: the point is that the filled AREA
      shrinks, so the time left can be judged without reading anything. ── */
-  function point(f) {
+  /* `r` is the pie's radius; the hero's fills its plate (R) and is left
+     out. The row pies sit inside theirs the way the logo's does. */
+  function point(f, r) {
     var a = f * 2 * Math.PI;
-    return { x: CX + R * Math.sin(a), y: CY - R * Math.cos(a) };
+    r = r || R;
+    return { x: CX + r * Math.sin(a), y: CY - r * Math.cos(a) };
   }
-  function wedge(remaining) {
+  function wedge(remaining, r) {
+    r = r || R;
     if (remaining <= 0) return '';
     if (remaining >= 0.99999) {
-      return 'M ' + CX + ' ' + (CY - R) + ' A ' + R + ' ' + R + ' 0 1 1 ' + CX + ' ' + (CY + R) +
-             ' A ' + R + ' ' + R + ' 0 1 1 ' + CX + ' ' + (CY - R) + ' Z';
+      return 'M ' + CX + ' ' + (CY - r) + ' A ' + r + ' ' + r + ' 0 1 1 ' + CX + ' ' + (CY + r) +
+             ' A ' + r + ' ' + r + ' 0 1 1 ' + CX + ' ' + (CY - r) + ' Z';
     }
-    var s = point(1 - remaining);
+    var s = point(1 - remaining, r);
     return 'M ' + CX + ' ' + CY + ' L ' + s.x.toFixed(3) + ' ' + s.y.toFixed(3) +
-           ' A ' + R + ' ' + R + ' 0 ' + (remaining > 0.5 ? 1 : 0) + ' 1 ' +
-           CX + ' ' + (CY - R) + ' Z';
+           ' A ' + r + ' ' + r + ' 0 ' + (remaining > 0.5 ? 1 : 0) + ' 1 ' +
+           CX + ' ' + (CY - r) + ' Z';
   }
+  /* How far inside its plate a row pie sits, copied from the brand's own
+     two sizes rather than chosen: pie 150 : plate 184 is app/icon.svg, for
+     the stall's pies, which are icon-sized and bigger; pie 11.1 : plate 15
+     is the small mark (app/index.html, and this page's header), for the
+     52-68px row pies, where the icon's thinner rim "drops below a pixel
+     and disappears". */
+  var R_ROW_BIG = R * 150 / 184, R_ROW_SMALL = R * 11.1 / 15;
+  /* The frame every dial is drawn in. 0 0 160 160 leaves 10 units round
+     the 70-unit plate, so the plate fills only 87.5% of its box. In the
+     stall each pie is sized by its box and nothing is drawn in that
+     margin (the day pie's ticks run inward from the plate's edge), so the
+     frame there keeps 5 units, enough for the rim and a major tick's
+     rounded end (71.75), and the plate fills 93.3%: 6.7% more pie across
+     for no change to the layout. Every other view keeps the full frame. */
+  var VB = '0 0 160 160', VB_STALL = '5 5 150 150';
   function step(total) {
     if (total <= 20) return 5;
     if (total <= 45) return 10;
@@ -1249,6 +1548,18 @@ button,select{ font:inherit; }
 
   var lastKey = '';
 
+  /* Whether the stall layout is on: the foyer view on a big enough
+     landscape screen. The stylesheet decides, with one media query, and
+     says so in --stall; this only reads the answer, so the two can never
+     disagree about the size where it starts. In the stall every block
+     stays in the one list in published order, finished or not. */
+  var stall = false;
+  function stallOn() {
+    try {
+      return getComputedStyle(document.documentElement).getPropertyValue('--stall').trim() === '1';
+    } catch (e) { return false; }
+  }
+
   function paint(force) {
     var real = Date.now();
     if (mode.live) demo.anchor = liveAnchor();
@@ -1302,12 +1613,24 @@ button,select{ font:inherit; }
     paintNow(day, today, mins, state);
 
     /* The finished count is in the key because it is what decides which
-       list a row sits in, and a row moving between lists is a rebuild. */
+       list a row sits in, and a row moving between lists is a rebuild.
+       So is the stall: a window resized across its threshold, or F11,
+       moves every finished row between the two lists. */
+    stall = stallOn();
+    /* The day pie takes the stall's tighter frame too (see VB_STALL). */
+    var hd = $('now').querySelector('.dial'), vb = stall ? VB_STALL : VB;
+    if (hd.getAttribute('viewBox') !== vb) hd.setAttribute('viewBox', vb);
+    /* The footer, the one place carrying the maker's name, is not on the
+       stall's screen, so the strap line names it there. Written, not
+       hidden with CSS, so every other view's header is word for word what
+       it was. The name keeps its fada. */
+    setText($('strapBy'), stall ? ' from AibhlínnAI' : '');
     var fin = 0;
     for (var fi = 0; fi < day.items.length; fi++) if (isFinished(day, day.items[fi], mins)) fin++;
-    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next + '|' + fin;
+    var key = day.date + '|' + state.phase + '|' + state.cur + '|' + state.next + '|' + fin +
+              (stall ? '|stall' : '');
     if (force || key !== lastKey) { lastKey = key; buildList(day, state, mins); }
-    paintRows(day, state, mins);
+    paintRows(day, state, mins, today);
   }
 
   function paintNow(day, today, mins, state) {
@@ -1426,7 +1749,8 @@ button,select{ font:inherit; }
      one that is finished is empty. Items with no real duration - a
      moment, an open-ended item, a doors-and-exhibits period - get no pie
      at all, exactly as the hero refuses to draw one for them. */
-  function paintRows(day, state, mins) {
+  function paintRows(day, state, mins, today) {
+    var r = stall ? R_ROW_BIG : R_ROW_SMALL;
     day.items.forEach(function (it, i) {
       /* By index, not by position: a row lives in whichever of the two
          lists it belongs to, and it moves between them during the day. */
@@ -1437,10 +1761,24 @@ button,select{ font:inherit; }
       var drawable = it.end !== null && !it.moment && !it.period && !it.open;
       var total = drawable ? it.end - it.time : 0;
       if (!total) { dial.setAttribute('d', ''); setText(label, ''); return; }
-      var live = state.phase !== 'other' && i === state.cur;
-      var remaining = live ? clamp((it.end - mins) / total) : (it.time > mins ? 1 : 0);
-      dial.setAttribute('d', wedge(remaining));
-      setText(label, live ? shortWords(it.end - mins) + ' left' : '');
+      var other = state.phase === 'other';
+      var live = !other && i === state.cur;
+      /* On any other date the time of day says nothing about the program:
+         read at 3pm the day before, it emptied every plate before 3pm and
+         a screen set up on the Monday looked as if the Expo had been. The
+         date decides instead - all still to come before it, all over
+         after. */
+      var remaining = live ? clamp((it.end - mins) / total)
+                    : other ? (day.date > today ? 1 : 0)
+                    : (it.time > mins ? 1 : 0);
+      var d = wedge(remaining, r);
+      if (dial.getAttribute('d') !== d) dial.setAttribute('d', d);
+      /* The phone says only the countdown; in the stall every card says
+         where it stands, because nothing moves to a Finished list there. */
+      setText(label, live ? shortWords(it.end - mins) + ' left'
+        : !stall || other ? ''
+        : isFinished(day, it, mins) ? 'Finished'
+        : i === state.next ? ((state.phase === 'in' || state.phase === 'before') && state.cur < 0 ? 'Starts in ' + shortWords(it.time - mins) : 'Next') : '');
     });
   }
 
@@ -1477,14 +1815,18 @@ button,select{ font:inherit; }
       var li = document.createElement('li');
       li.className = 'item';
       li.setAttribute('data-i', String(i));
+      /* The row's bar and speaker take the kind's colour. Its pie does
+         not: every row pie is the logo's orange (see .rowdial), so the
+         --accent-fill a row used to carry for it is no longer set. */
       li.style.setProperty('--accent', KINDS[it.kind].accent);
-      /* The row dial paints with --accent-fill, the same token the hero
-         pie uses. Without it the wedge inherits whatever the card had. */
-      li.style.setProperty('--accent-fill', KINDS[it.kind].fill);
       if (state.phase !== 'other') {
         if (i === state.cur) li.classList.add('on');
         else if (it.time <= mins) li.classList.add('past');
-        else if (i === state.next) li.classList.add('next');
+        else if (i === state.next) {
+          li.classList.add('next');
+          /* Between two blocks, the next one is the one to watch. */
+          if ((state.phase === 'in' || state.phase === 'before') && state.cur < 0) li.classList.add('lead');
+        }
       }
       var when = it.moment ? clock(it.time)
                : it.end === null ? clock(it.time) + ' →'
@@ -1493,7 +1835,7 @@ button,select{ font:inherit; }
          not here: buildList only runs when the program's position
          changes, and a countdown has to move between those moments. */
       li.innerHTML =
-        '<span class="rowtimer"><svg class="rowdial" viewBox="0 0 160 160" aria-hidden="true">' +
+        '<span class="rowtimer"><svg class="rowdial" viewBox="' + (stall ? VB_STALL : VB) + '" aria-hidden="true">' +
         '<circle class="plate" cx="80" cy="80" r="70"></circle>' +
         '<path class="pie" d=""></path>' +
         '<circle class="rim" cx="80" cy="80" r="70"></circle>' +
@@ -1505,7 +1847,7 @@ button,select{ font:inherit; }
         '<span class="kind">' + esc(KINDS[it.kind].word) +
         (it.end !== null && !it.moment ? ' · ' + words(it.end - it.time) : '') +
         '</span></span>';
-      (state.phase !== 'other' && isFinished(day, it, mins) ? done : list).appendChild(li);
+      (state.phase !== 'other' && isFinished(day, it, mins) && !stall ? done : list).appendChild(li);
     });
 
     /* Either list disappears, heading and all, when it has nothing in it -
@@ -1655,6 +1997,24 @@ button,select{ font:inherit; }
   announce();
   paint(true);
   setInterval(paint, 200);
+  /* F11, or a window dragged across the stall's threshold: rebuild the
+     list for the new layout now rather than on the next tick. */
+  window.addEventListener('resize', function () { paint(); });
+
+  /* The foyer link is a screen nobody touches all day, and a laptop left
+     alone turns its screen off within minutes. So that link asks the
+     browser to keep the screen on, and asks again each time the page is
+     shown, because the browser lets go whenever it is hidden. Refused or
+     not supported, nothing happens and the laptop's own power settings
+     decide, as they did before. */
+  if (document.documentElement.classList.contains('kiosk') && navigator.wakeLock) {
+    var keepAwake = function () {
+      if (document.visibilityState !== 'visible') return;
+      try { navigator.wakeLock.request('screen').catch(function () {}); } catch (e) { /* not allowed here */ }
+    };
+    keepAwake();
+    document.addEventListener('visibilitychange', keepAwake);
+  }
 }());
 </script>
 
