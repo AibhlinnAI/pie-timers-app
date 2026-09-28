@@ -7,13 +7,18 @@
    never reach the client again once saved, and expanding
    recurrence once per user beats repeating the work on every device.
 
-   Two entry points:
-     { feedId }  — one feed, authorised by the caller's own token
-     { all:true} — every active feed, authorised by CRON_SECRET
+   Three entry points:
+     { feedId }                  — one feed, authorised by the caller's own token
+     { all:true }                — the 15-minute run, authorised by CRON_SECRET.
+                                   It syncs nothing itself: it hands each due
+                                   feed to its own invocation (below).
+     { scheduled:true, feedId }  — one feed for the scheduled run, authorised
+                                   by CRON_SECRET
    ============================================================ */
 
 import { parseCalendar } from "./ical.js";
 import { fetchGoogleEvents, GrantExpiredError } from "./google.ts";
+import { fanOut, pickFeeds } from "./schedule.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -26,6 +31,29 @@ const WINDOW_FORWARD_MS = 21 * 24 * 60 * 60 * 1000; // three weeks ahead
 const MAX_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 20000;
 const MAX_EVENTS_PER_FEED = 400;
+
+/* The scheduled run. See schedule.js for why each feed gets its own
+   invocation.
+
+   - FEEDS_PER_RUN: Supabase allows one trace 30 function-to-function
+     calls a minute (docs: functions/recursive-functions), and every feed
+     here is one. Past 25 feeds a run takes the 25 stalest, so the refresh
+     interval stretches instead of failing: 50 feeds is every half hour.
+     That is the point to move the fan-out into the cron job itself,
+     where calls arrive as ordinary inbound requests and are not counted.
+   - The time limits keep a whole run under the 55 seconds pg_net waits
+     (cron.sql), so the counts it answers with are always recorded: no
+     new feed starts after 20 seconds, and a feed is given up on at 30,
+     which is the 20-second fetch plus room for the writes. On 27 Sep a
+     feed took one to four seconds, so eight at a time clears 25 feeds
+     well inside that. Feeds left over are the stalest, so they go first
+     next run. */
+const SELF_URL = `${SUPABASE_URL}/functions/v1/calendar-sync`;
+const FEEDS_PER_RUN = 25;
+const PARALLEL_FEEDS = 8;
+const RUN_BUDGET_MS = 20000;
+const FEED_WORKER_TIMEOUT_MS = 30000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -277,6 +305,93 @@ async function syncFeed(feed: FeedRow) {
   }
 }
 
+/* ─────────────────────────── Scheduled run ─────────────────────────── */
+
+function cronAuthorised(request: Request) {
+  return Boolean(CRON_SECRET) && request.headers.get("x-cron-secret") === CRON_SECRET;
+}
+
+/* One feed, synced by a fresh invocation of this function, so it has
+   the whole CPU and memory allowance to itself. */
+async function syncInOwnWorker(feedId: string): Promise<"synced" | "failed" | "died" | "deferred"> {
+  const startedAt = new Date().toISOString();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FEED_WORKER_TIMEOUT_MS);
+
+  let outcome: "synced" | "failed" | "died" | "deferred";
+  try {
+    const response = await fetch(SELF_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        // Only for the gateway, in case JWT verification is ever switched
+        // back on. The secret below is what authorises the call.
+        Authorization: `Bearer ${ANON_KEY}`,
+        "x-cron-secret": CRON_SECRET,
+      },
+      body: JSON.stringify({ scheduled: true, feedId }),
+    });
+    const result = await response.json().catch(() => null);
+
+    // Our own 404 only: the feed was deleted or switched off since the
+    // list was read. A gateway 404 (function missing) must look like a death.
+    if (response.status === 404 && result?.gone) outcome = "failed";
+    else if (response.status === 429) outcome = "deferred";    // refused by a rate limit, not tried
+    else if (response.ok && result) outcome = result.ok ? "synced" : "failed";
+    else outcome = "died";                                      // 546 and friends: no handler got to answer
+  } catch (error) {
+    /* The platform refused the call before any worker started, so the
+       feed was not tried and has nothing to report. It stays stalest. */
+    const RateLimitError = (Deno as unknown as { errors?: { RateLimitError?: Function } }).errors?.RateLimitError;
+    outcome = RateLimitError && error instanceof RateLimitError
+      ? "deferred"
+      : "died";                                                 // timed out, or never reached
+  } finally {
+    clearTimeout(timer);
+  }
+
+  /* A worker that dies never reaches syncFeed's own error handler, so
+     until now the feed recorded nothing at all: no error for the person
+     to see, and no timestamp to send it to the back of the queue. Say
+     what is known, honestly. The next successful sync clears it.
+
+     Only if the worker has written nothing since it was started, though:
+     one that finished just as its reply was given up on has already
+     recorded the truth, success or its own error, and must keep it. */
+  if (outcome === "died") {
+    // %22 quotes the timestamp: its dots and colons are reserved inside or=().
+    await rest(`/calendar_feeds?id=eq.${feedId}&or=(last_synced.is.null,last_synced.lt.%22${startedAt}%22)`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        last_synced: new Date().toISOString(),
+        last_error: "The last refresh did not finish, so these events may be out of date. It will try again shortly.",
+      }),
+    }).catch(() => {/* the count in the run's reply still records it */});
+  }
+
+  return outcome;
+}
+
+async function runScheduled() {
+  // Stalest first. Feeds never synced (null) are the stalest of all.
+  const feeds: { id: string; user_id: string }[] = await rest(
+    `/calendar_feeds?select=id,user_id&active=is.true&order=last_synced.asc.nullsfirst`,
+  );
+
+  // Only keep syncing for accounts that are actually entitled.
+  const due = await pickFeeds(feeds, isEntitled, FEEDS_PER_RUN);
+
+  const counts = await fanOut(due, syncInOwnWorker, {
+    parallel: PARALLEL_FEEDS,
+    budgetMs: RUN_BUDGET_MS,
+  });
+
+  // Counts only. This body is what pg_net keeps in net._http_response.
+  return { ok: true, due: due.length, ...counts };
+}
+
 /* ─────────────────────────── Entry ─────────────────────────── */
 
 Deno.serve(async (request) => {
@@ -285,35 +400,31 @@ Deno.serve(async (request) => {
   }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
-  let body: { feedId?: string; all?: boolean };
+  let body: { feedId?: string; all?: boolean; scheduled?: boolean };
   try {
     body = await request.json();
   } catch {
     body = {};
   }
 
-  /* ── Scheduled run: every active feed ── */
+  /* ── Scheduled run: hand each due feed to its own invocation ── */
   if (body.all) {
-    if (!CRON_SECRET || request.headers.get("x-cron-secret") !== CRON_SECRET) {
-      return json({ error: "Forbidden" }, 403);
-    }
+    if (!cronAuthorised(request)) return json({ error: "Forbidden" }, 403);
+    return json(await runScheduled());
+  }
+
+  /* ── One feed, for the scheduled run ──
+     Entitlement was checked when the run picked it. */
+  if (body.scheduled) {
+    if (!cronAuthorised(request)) return json({ error: "Forbidden" }, 403);
+    if (!body.feedId || !UUID.test(body.feedId)) return json({ error: "No calendar specified." }, 400);
 
     const feeds: FeedRow[] = await rest(
-      `/calendar_feeds?select=${FEED_COLUMNS}&active=is.true`,
+      `/calendar_feeds?select=${FEED_COLUMNS}&id=eq.${body.feedId}&active=is.true`,
     );
+    if (!feeds.length) return json({ error: "Calendar not found.", gone: true }, 404);
 
-    const results = [];
-    for (const feed of feeds) {
-      // Only keep syncing for accounts that are actually entitled.
-      if (!await isEntitled(feed.user_id)) continue;
-      results.push(await syncFeed(feed));
-    }
-
-    return json({
-      ok: true,
-      synced: results.filter((r) => r.ok).length,
-      failed: results.filter((r) => !r.ok).length,
-    });
+    return json(await syncFeed(feeds[0]));
   }
 
   /* ── User-triggered run: one of their own feeds ── */
@@ -328,7 +439,11 @@ Deno.serve(async (request) => {
     return json({ error: "Calendar sync is included with a plan." }, 402);
   }
 
-  if (!body.feedId) return json({ error: "No calendar specified." }, 400);
+  /* A real id or nothing. The id goes straight into the query string, and
+     until 28 Sep 2026 "<someone else's id>#" pushed the user_id filter
+     below into the URL fragment, which fetch never sends: the service key
+     then read and re-synced a feed that was not the caller's. */
+  if (!body.feedId || !UUID.test(body.feedId)) return json({ error: "No calendar specified." }, 400);
 
   // Scope by user_id as well as id, so one account cannot sync another's feed.
   const feeds: FeedRow[] = await rest(
