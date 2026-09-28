@@ -4,7 +4,7 @@
   "description": "QR codes for the Pie Timers stall at the Neurodivergent Entrepreneurs Expo.",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#16101B",
   "theme_color": "#1C1024",

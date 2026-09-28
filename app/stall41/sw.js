@@ -6,8 +6,11 @@
 /* global self, caches */
 'use strict';
 
-/* Bump when index.html changes, or an installed copy keeps the old page. */
-var CACHE = 'stall41-v1';
+/* Bump when index.html or the manifest changes, or an installed copy
+   keeps the old one: both are served from this cache. v2: the manifest
+   asks for fullscreen, so an installed phone copy hides Android's status
+   and navigation bars. */
+var CACHE = 'stall41-v2';
 
 var FILES = [
   './',
