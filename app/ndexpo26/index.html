@@ -121,6 +121,8 @@ html{ -webkit-text-size-adjust:100%; }
 
   --amber-tint:  #FFF2CC;
   --amber-line:  #E8CE8A;
+  --appt-soft:   #FFEAD1;   /* the app's amber card: its meter track */
+  --appt-glow:   rgba(241,138,16,.30);   /* the app's halo, in Marmalade */
   --today-bg:    #FFF2CC;
   --off:         #55645A;
   --off-plate:   #E4E8E5;
@@ -142,67 +144,63 @@ html{ -webkit-text-size-adjust:100%; }
 
   --font: "Instrument Sans", "Aptos", "Segoe UI Variable Text", "Segoe UI",
           system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  /* The app's face for its clock and its big countdowns. */
+  --numeric: "Aptos", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  /* The header's quiet text, as in the app's header. Not per theme: the
+     header is a dark gradient in both. */
+  --cream:       #F6D7B0;
 }
 
-/* Dark is the app's default, so it is what an un-stamped viewer gets. */
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --forest:      #7FB08C;
-    --purple:      #B07FE0;
-    --purple-lift: #E0BFF0;
-    --orange:      #FF8A00;
-    --orange-text: #FFB34D;
-    --appt:        #FFA333;
-    --appt-fill:   #F3921B;
-    --urgent:      #D91E48;
-    --urgent-text: #FF7A96;
+/* Dark unless light is asked for (?theme=light), as in the app, where
+   dark is "selected by absence rather than presence". It used to follow
+   the device's own setting, so a stall laptop set to light showed the
+   light page. Mal, 28 Sep: "Dark mode please". */
+:root:not([data-theme="light"]){
+  --forest:      #7FB08C;
+  --purple:      #B07FE0;
+  --purple-lift: #E0BFF0;
+  --orange:      #FF8A00;
+  --orange-text: #FFB34D;
+  --appt:        #FFA333;
+  --appt-fill:   #F3921B;
+  --urgent:      #D91E48;
+  --urgent-text: #FF7A96;
 
-    --plate:       #32493C;
-    --pie-edge:    rgba(0,0,0,.35);
-    --pie-edge-w:  1.5;
-    --tick-over:   #16101B;
-    --tick-under:  .4;
-    --tick-under-major: .6;
+  --plate:       #32493C;
+  --pie-edge:    rgba(0,0,0,.35);
+  --pie-edge-w:  1.5;
+  --tick-over:   #16101B;
+  --tick-under:  .4;
+  --tick-under-major: .6;
 
-    --shell:       #16101B;
-    --card:        #241730;
-    --ink:         #EFE6F5;
-    --ink-muted:   #B4A3C0;
-    --line:        #3A2A47;
-    --field-border:#4A3559;
-    --btn-fg:      #16101B;
+  --shell:       #16101B;
+  --card:        #241730;
+  --ink:         #EFE6F5;
+  --ink-muted:   #B4A3C0;
+  --line:        #3A2A47;
+  --field-border:#4A3559;
+  --btn-fg:      #16101B;
 
-    --header-from: #1C1024;
-    --header-mid:  #3A2147;
-    --header-to:   #2E4438;
+  --header-from: #1C1024;
+  --header-mid:  #3A2147;
+  --header-to:   #2E4438;
 
-    --amber-tint:  #3A2E14;
-    --amber-line:  #6B5522;
-    --today-bg:    #3A2E14;
-    --off:         #8B9A90;
-    --off-plate:   #272B29;
+  --amber-tint:  #3A2E14;
+  --amber-line:  #6B5522;
+  --appt-soft:   #3A2A18;
+  --appt-glow:   rgba(243,146,27,.55);
+  --today-bg:    #3A2E14;
+  --off:         #8B9A90;
+  --off-plate:   #272B29;
 
-    --wash-a:      #22332B;
-    --wash-b:      #2E1F3A;
+  --wash-a:      #22332B;
+  --wash-b:      #2E1F3A;
 
-    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
-    --shadow-lg:   0 2px 4px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.42);
-  }
+  --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
+  --shadow-lg:   0 2px 4px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.42);
+  color-scheme:dark;
 }
-:root[data-theme="dark"]{
-  --forest:#7FB08C; --purple:#B07FE0; --purple-lift:#E0BFF0; --orange:#FF8A00;
-  --orange-text:#FFB34D; --appt:#FFA333; --appt-fill:#F3921B;
-  --urgent:#D91E48; --urgent-text:#FF7A96;
-  --plate:#32493C; --pie-edge:rgba(0,0,0,.35); --pie-edge-w:1.5;
-  --tick-over:#16101B; --tick-under:.4; --tick-under-major:.6;
-  --shell:#16101B; --card:#241730; --ink:#EFE6F5; --ink-muted:#B4A3C0;
-  --line:#3A2A47; --field-border:#4A3559; --btn-fg:#16101B;
-  --header-from:#1C1024; --header-mid:#3A2147; --header-to:#2E4438;
-  --amber-tint:#3A2E14; --amber-line:#6B5522; --today-bg:#3A2E14;
-  --off:#8B9A90; --off-plate:#272B29; --wash-a:#22332B; --wash-b:#2E1F3A;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
-  --shadow-lg:0 2px 4px rgba(0,0,0,.44), 0 18px 44px rgba(0,0,0,.42);
-}
+:root[data-theme="light"]{ color-scheme:light; }
 
 *,*::before,*::after{ box-sizing:border-box; }
 
@@ -252,27 +250,44 @@ button,select{ font:inherit; }
   color:var(--on-dark);
   box-shadow:var(--shadow);
 }
+/* The header wears the app's header (app/styles.css .topbar), Mal, 28 Sep:
+   "match the header fonts and colours to the app". The title in brand
+   orange over a Government Green offset, the clock in orange in the app's
+   numeric face, the rest in cream. The mark sits in the app's soft socket. */
 .brand{ display:flex; align-items:center; gap:14px; min-width:0; }
-.mark{ width:44px; height:44px; flex:none; }
-.brand h1{ font-size:clamp(1.05rem,2.4vw,1.45rem); line-height:1.2; }
-.brand p{ margin:4px 0 0; font-size:.85rem; opacity:.82; }
+.mark{
+  width:44px; height:44px; flex:none; border-radius:50%;
+  box-shadow:0 0 0 3px rgba(62,90,74,.30), 0 0 9px 3px rgba(62,90,74,.18);
+}
+/* 1.17rem floor, where the app's is 1.15: #FF8A00 on the header's
+   lightest stop is 3.2:1, which passes only as large text, and bold text
+   is large from 18.67px. */
+.brand h1{
+  font-size:clamp(1.17rem,2.4vw,1.45rem); line-height:1.2;
+  color:var(--orange);
+  text-shadow:2px 2px 0 #32493C, 0 2px 10px rgba(0,0,0,.5);
+  letter-spacing:-.01em;
+}
+/* Cream at .92, the app's tagline. Over the light header's lightest stop
+   (#3E5A48) that is 5.0:1; the white at .68 it replaces was 4.55:1. */
+.brand p{ margin:4px 0 0; font-size:.85rem; color:var(--cream); opacity:.92; }
 /* The product's own line, carried on the product's own demonstration. It
    is the store listing's short description, word for word — one line used
-   everywhere is worth more than a fuller line used once. */
-.brand .strap{ margin-top:6px; font-size:.78rem; opacity:.68; }
+   everywhere is worth more than a fuller line used once. Smaller than the
+   venue line, not fainter: cream fades under 4.5:1 below .9. */
+.brand .strap{ margin-top:6px; font-size:.78rem; }
 .clock{ text-align:right; flex:none; }
 .clock-time{
+  font-family:var(--numeric);
   font-size:clamp(1.5rem,3.4vw,2.1rem); font-weight:700;
   font-variant-numeric:tabular-nums; line-height:1;
+  color:var(--orange);
 }
-.clock-date{ font-size:.82rem; opacity:.85; margin-top:4px; }
-/* .72, not .62. The zone line is 11.5px text, so it needs 4.5:1, and
-   white at .62 over the lightest stop of the light header (#3E5A48) is
-   4.08:1 (4.11:1 as painted at 1920 and 1366 wide, where the line sits
-   over that end of the gradient). At .72 the worst stop in either theme
-   is 4.87:1 (that same stop; 4.92:1 as painted), and it still sits a
-   step under the date. The /nsw26 fix. */
-.clock-zone{ font-size:.72rem; opacity:.72; margin-top:2px; }
+.clock-date{ font-size:.82rem; color:var(--cream); margin-top:4px; }
+/* A step under the date by size, not by fading: the zone line is 11.5px
+   text and needs 4.5:1, and cream at .92 on the lightest header stop is
+   5.0:1 (at .72 it would be 3.7:1). */
+.clock-zone{ font-size:.72rem; color:var(--cream); opacity:.92; margin-top:2px; }
 
 /* ───────────────────────── Preview strip ───────────────────────── */
 
@@ -341,7 +356,7 @@ button,select{ font:inherit; }
   border-radius:var(--radius);
   background:var(--card); border:1px solid var(--line);
   box-shadow:var(--shadow);
-  --accent:var(--forest); --accent-fill:var(--forest);
+  --accent:var(--forest); --accent-fill:var(--forest); --accent-soft:var(--appt-soft);
 }
 .now::before{ content:""; align-self:stretch; width:5px; flex:none; border-radius:99px; background:var(--accent); }
 .now.idle, .now.done{ --accent:var(--off); --accent-fill:var(--off); }
@@ -378,7 +393,26 @@ button,select{ font:inherit; }
 .kicker{ margin:0; font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:var(--accent); }
 .title{ margin:6px 0 0; font-size:clamp(1.25rem,3vw,1.85rem); line-height:1.18; }
 .window{ margin:8px 0 0; font-size:.9rem; color:var(--ink-muted); }
-.left{ margin:10px 0 0; font-size:clamp(1.1rem,2.4vw,1.45rem); font-weight:700; font-variant-numeric:tabular-nums; }
+/* The countdown as the app's timer cards print it (.dial-big and
+   .dial-small in app/styles.css): hours and minutes in the numeric face,
+   in the card's own colour, with a small word under it. No seconds, as
+   Mal asked. A screen reader hears whole words ("3 hours 40 min left"),
+   because "3:40" read aloud is a time of day. */
+.left{
+  margin:10px 0 0; font-family:var(--numeric);
+  font-size:clamp(1.5rem,5.6vw,2.05rem); font-weight:700; line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:var(--accent);
+}
+.left-big, .left-small{ display:block; }
+.left-big:empty, .left-small:empty{ display:none; }
+.left-small{
+  margin-top:6px; font-family:var(--font); font-size:.75rem; font-weight:600;
+  line-height:1.3; letter-spacing:0; color:var(--ink-muted);
+}
+.sr-only{
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
+  overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+}
 .then{ margin:12px 0 0; font-size:.86rem; color:var(--ink-muted); }
 
 /* ── Elapsed and remaining, shown together ──
@@ -387,26 +421,23 @@ button,select{ font:inherit; }
    pair computed from ONE rounded number — remaining rounded up, spent the
    difference — so the picture and the words can never contradict.
 
-   The colours are the brand asset's, not the app's. brand/pie-timers-
-   elapsed-remaining.png labels orange "Time remaining" and the plate
-   green "Time already spent", so the bar here is simply the pie unrolled:
-   the plate grows in from the left as time is spent and the orange left
-   on the right is what is still to come. The app's own bar fills with the
-   accent instead, which put two near-identical oranges side by side in
-   the legend the first time this was drawn — they were indistinguishable
-   in a screenshot at arm's length. */
+   The colours are the app's too, since Mal asked for them on 28 Sep: the
+   bar fills with the card's colour as time is spent, over a soft track of
+   the same hue, and the legend has a filled dot for elapsed and a hollow
+   one for remaining. It used to be the brand graphic's pie unrolled, the
+   plate green for time spent and orange for time left. */
 .meter{ margin:12px 0 0; }
 .meter-bar{
   height:9px; border-radius:999px; overflow:hidden; margin-bottom:9px;
-  background:var(--accent-fill);              /* what is left */
+  background:var(--accent-soft);              /* what is left */
   /* A real border, not a wash of black: at rgba(0,0,0,.18) the bar had no
      edge that reached 3:1 against the card in the light theme, and it is
      the one new graphic on the page. */
   border:1px solid var(--field-border);
 }
 .meter-bar span{
-  display:block; height:100%; border-radius:999px 0 0 999px;
-  background:var(--plate);                    /* what has gone */
+  display:block; height:100%; border-radius:999px;
+  background:var(--accent);                   /* what has gone */
   transition:width .6s cubic-bezier(.4,0,.2,1);
 }
 .meter-legend{
@@ -419,8 +450,8 @@ button,select{ font:inherit; }
   display:inline-block; width:8px; height:8px; border-radius:50%;
   margin-right:6px; vertical-align:1px; font-style:normal;
 }
-.dot-elapsed{ background:var(--plate); border:1px solid var(--field-border); }
-.dot-remaining{ background:var(--accent-fill); }
+.dot-elapsed{ background:var(--accent); }
+.dot-remaining{ background:var(--accent-soft); border:1px solid var(--accent); }
 @media (prefers-reduced-motion:reduce){
   .meter-bar span{ transition:none; }
 }
@@ -433,10 +464,7 @@ button,select{ font:inherit; }
    5.19-5.24:1 without it. Dark keeps the .75, where it measures 4.95:1.
    (/nls26's fix, 6099000.) */
 .listhead-done{ margin-top:18px; }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .listhead-done{ opacity:.75; }
-}
-:root[data-theme="dark"] .listhead-done{ opacity:.75; }
+:root:not([data-theme="light"]) .listhead-done{ opacity:.75; }
 .venue .listhead-done{ margin-top:14px; }
 .timeline{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; }
 .item{
@@ -756,19 +784,24 @@ button,select{ font:inherit; }
   .venue .foot{ display:none; }
 
   /* A slim header: the name and the clock, both big enough for the room. */
+  /* Edge to edge and square, as the app's top bar is (Mal, 28 Sep). It
+     takes the page margin above and beside it, and half of that margin
+     as padding top and bottom, so nothing under it moves. */
   .venue .head{
     flex:none; flex-wrap:nowrap; align-items:center; gap:calc(2 * var(--u));
-    padding:calc(.8 * var(--u)) calc(1.8 * var(--u));
+    margin:calc(-1 * var(--sp)) calc(-1 * var(--sp)) 0;
+    padding:calc(.8 * var(--u) + var(--sp) / 2) calc(1.8 * var(--u) + var(--sp));
+    border-radius:0; box-shadow:0 10px 30px rgba(35,48,31,.22);
   }
   .venue .brand{ gap:calc(1.4 * var(--u)); }
   .venue .mark{ width:calc(5 * var(--u)); height:calc(5 * var(--u)); }
   .venue .brand > div{ display:flex; flex-wrap:wrap; align-items:baseline; column-gap:calc(1.8 * var(--u)); min-width:0; }
-  .venue .brand h1{ flex-basis:100%; font-size:max(18px, calc(2.8 * var(--u))); line-height:1.15; }
+  .venue .brand h1{ flex-basis:100%; font-size:max(19px, calc(2.8 * var(--u))); line-height:1.15; }
   .venue .brand p{ margin:0; font-size:max(12px, calc(1.45 * var(--u))); }
   /* The product's name, and its maker's (paint writes " from AibhlínnAI"
      in here), big enough to read from the aisle: at his own stall a
      visitor should be able to tell what this is. */
-  .venue .brand .strap{ margin:0; font-size:max(12px, calc(1.8 * var(--u))); opacity:.85; }
+  .venue .brand .strap{ margin:0; font-size:max(12px, calc(1.8 * var(--u))); }
   .venue .brand .strap-name{ font-weight:700; }
   .venue .clock{ display:grid; grid-template-columns:auto auto; align-items:center; column-gap:calc(1.4 * var(--u)); }
   .venue .clock-time{ grid-column:2; grid-row:1 / span 2; font-size:max(30px, calc(5.6 * var(--u))); }
@@ -800,7 +833,8 @@ button,select{ font:inherit; }
   .venue #now .kicker{ font-size:max(12px, calc(1.5 * var(--u))); }
   .venue #now .title{ margin-top:calc(.5 * var(--u)); font-size:max(20px, calc(3.7 * var(--u))); line-height:1.12; }
   .venue #now .window{ margin-top:calc(.6 * var(--u)); font-size:max(12px, calc(1.8 * var(--u))); }
-  .venue #now .left{ margin:0; font-size:max(22px, calc(4.8 * var(--u))); line-height:1.1; }
+  .venue #now .left{ margin:0; font-size:max(28px, calc(5.6 * var(--u))); line-height:1; }
+  .venue #now .left-small{ margin-top:calc(.35 * var(--u)); font-size:max(12px, calc(1.7 * var(--u))); }
   .venue #now .meter{ max-width:none; margin:calc(1 * var(--u)) 0 0; }
   .venue #now .meter-bar{ height:max(10px, calc(1.2 * var(--u))); margin-bottom:calc(.7 * var(--u)); }
   .venue #now .meter-legend{ font-size:max(12px, calc(1.7 * var(--u))); }
@@ -880,14 +914,20 @@ button,select{ font:inherit; }
     --k:2;              /* how many shares the block to watch takes */
     --den:var(--rows);
     --padb:calc(.55 * var(--u));
-    /* Blocks still to come, quieter than the brand orange, which is kept
-       for the block that is on and the one about to start. */
+    /* Blocks still to come, quieter than the Marmalade of the block that
+       is on. */
     --soon-pie:#B9864F;
   }
-  /* The day two fifths of the screen, the program three fifths. */
-  .venue .main{ display:grid; grid-template-columns:minmax(0,2fr) minmax(0,3fr); grid-template-rows:minmax(0,1fr); }
+  /* The day four ninths of the screen, the program five ninths (Mal, 28 Sep). */
+  .venue .main{ display:grid; grid-template-columns:minmax(0,4fr) minmax(0,5fr); grid-template-rows:minmax(0,1fr); }
   .venue #now{ grid-row:1; grid-column:1; flex-direction:column; text-align:center; justify-content:center; }
-  .venue #now::before{ align-self:center; width:min(200px,45%); height:max(4px, calc(.45 * var(--u))); }
+  /* The card's colour as a bar across its whole top edge, as the app's
+     timer cards carry it (.timer-card::before), not a short dash. */
+  .venue #now{ position:relative; overflow:hidden; }
+  .venue #now::before{
+    position:absolute; inset:0 0 auto; width:auto; height:max(4px, calc(.45 * var(--u)));
+    border-radius:0; background:linear-gradient(90deg, var(--accent-fill), var(--accent));
+  }
   /* As wide as the column and square, shrinking only if the words need
      the height, so the pie and its words sit together in the middle. */
   .venue #now .dialwrap{ flex:0 1 auto; min-height:0; width:100%; height:auto; aspect-ratio:1; }
@@ -939,16 +979,21 @@ button,select{ font:inherit; }
     flex-basis:calc(var(--k) * var(--share));
     --pie:calc(var(--k) * var(--share) - 2 * var(--padb) - 2px);
     border-color:var(--orange);
-    box-shadow:0 0 0 calc(.35 * var(--u)) var(--orange), var(--shadow-lg);
+    box-shadow:0 0 0 calc(.35 * var(--u)) var(--orange), var(--shadow-lg),
+      0 0 calc(2.2 * var(--u)) calc(-.25 * var(--u)) var(--appt-glow);
   }
-  /* Brand orange only while a block is on. In the lead-up the pie stays
-     muted (Mal, 28 Sep: "Mute the orange in session leadup, keep glow"). */
-  .venue #timeline .item.on .rowdial .pie{ fill:var(--logo-pie); }
-  /* Mal, 28 Sep: "Make the current session pie glow orange." The glow is
-     round the whole plate, so it holds while the wedge empties. */
+  /* The app's Marmalade (--appt-fill, its pie orange) only while a block
+     is on (Mal, 28 Sep: "use Marmalade for the day and live pies"). In the
+     lead-up the pie stays muted ("Mute the orange in session leadup, keep
+     glow"). */
+  .venue #timeline .item.on .rowdial .pie{ fill:var(--appt-fill); }
+  /* Mal, 28 Sep: "Make the current session pie glow orange", then "a faint
+     orange halo for the period in leadup and during the session". The
+     app's halo (.timer-card.is-urgent .dial-pie) in Marmalade, round the
+     whole plate so it holds while the wedge empties. */
   .venue #timeline .item.on .rowdial, .venue #timeline .item.lead .rowdial{
     overflow:visible;
-    filter:drop-shadow(0 0 calc(.6 * var(--u)) rgba(255,160,40,1)) drop-shadow(0 0 calc(1.8 * var(--u)) rgba(255,138,0,.95)) drop-shadow(0 0 calc(4 * var(--u)) rgba(255,138,0,.6));
+    filter:drop-shadow(0 0 calc(.6 * var(--u)) var(--appt-glow));
   }
   .venue #timeline .item.on .when, .venue #timeline .item.lead .when{ font-size:max(18px, calc(3.4 * var(--u))); color:var(--orange-text); }
   /* 19px floor: large bold text (3:1). The glow sits behind the start of
@@ -957,6 +1002,23 @@ button,select{ font:inherit; }
   .venue #timeline .item.on .speaker, .venue #timeline .item.lead .speaker{ font-size:max(19px, calc(2.4 * var(--u))); }
   .venue #timeline .item.on .name, .venue #timeline .item.lead .name{ font-size:max(20px, calc(4 * var(--u))); }
   .venue #timeline .item.on .rowleft, .venue #timeline .item.lead .rowleft{ font-size:max(22px, calc(4.6 * var(--u))); }
+
+  /* Mal, 28 Sep: "less bold text where unnecessary", then "keep appearance
+     aligned to the Pie Timers app". So the weights follow app/styles.css:
+     700 for headings, the small uppercase labels and the big numbers; 600
+     for times and secondary text; 400 for what is past (the app's
+     .is-past). The app has no 500, so neither does this. The headings,
+     the kicker, the legend's numbers and the speaker line are the app's
+     700 already and stay;
+     the speaker must anyway, as its contrast over the watched row's glow
+     at small screens is met as large BOLD text. */
+  .venue .brand .strap-name{ font-weight:600; }
+  .venue #timeline .item .when{ font-weight:600; }
+  .venue #timeline .item .name{ font-weight:600; }
+  .venue #timeline .item .rowleft{ font-weight:600; }
+  .venue #timeline .item.past .name{ font-weight:400; }
+  .venue #timeline .item.on .name, .venue #timeline .item.lead .name,
+  .venue #timeline .item.on .rowleft, .venue #timeline .item.lead .rowleft{ font-weight:700; }
 }
 @media (prefers-reduced-motion:reduce){
   *{ animation:none !important; transition:none !important; }
@@ -1033,7 +1095,7 @@ button,select{ font:inherit; }
              what is on now is announced. The per-minute numbers are not:
              at the simulated clock's default speed they change twice a
              second and would bury the changes that matter. -->
-        <p class="left" id="left" aria-live="off">&nbsp;</p>
+        <p class="left" id="left" aria-live="off"><span class="left-big" id="leftBig" aria-hidden="true"></span><span class="left-small" id="leftSmall" aria-hidden="true"></span><span class="sr-only" id="leftSay"></span></p>
         <div class="meter" id="meter" aria-live="off" hidden>
           <div class="meter-bar"><span id="meterBar" style="width:0%"></span></div>
           <div class="meter-legend">
@@ -1262,11 +1324,11 @@ button,select{ font:inherit; }
     close:    { accent: 'var(--orange)',      fill: 'var(--orange)',      word: 'Close' }
   };
 
-  /* The whole-day pie's own colours. Deliberately the brand pair rather
-     than a session green: bright orange for the time remaining on the
-     plate, and the deep orange for text and the elapsed bar, which is
-     the one that has to stay readable on white. */
-  var DAY_KIND = { accent: 'var(--orange-text)', fill: 'var(--orange)', word: 'Expo' };
+  /* The whole-day pie's own colours, the app's orange card (its
+     appointment timer): Marmalade for the pie, and the text-safe --appt
+     for the words, the countdown and the bar. Mal, 28 Sep: "use
+     Marmalade for the day and live pies". */
+  var DAY_KIND = { accent: 'var(--appt)', fill: 'var(--appt-fill)', word: 'Expo' };
 
   /* The last ten minutes. This has to be a KIND rather than the `.urgent`
      class alone, because the class sets --accent on the card and the card
@@ -1403,9 +1465,17 @@ button,select{ font:inherit; }
     return 'UTC' + sign + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
   }
 
+  /* The app's clock (formatClock in app/app.js): "10:00 AM", minutes
+     always, never seconds (Mal, 28 Sep). It used to print "10am". */
   function clock(m) {
     var t = Math.floor(m), h = Math.floor(t / 60) % 24, mm = t % 60;
-    return (h % 12 === 0 ? 12 : h % 12) + (mm ? ':' + pad(mm) : '') + (h < 12 ? 'am' : 'pm');
+    return (h % 12 === 0 ? 12 : h % 12) + ':' + pad(mm) + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  /* The app's dial readout without seconds (formatCompact): "3:40".
+     Rounded up, as words() is, so it always agrees with the legend. */
+  function compact(m) {
+    var n = Math.max(0, Math.ceil(m));
+    return Math.floor(n / 60) + ':' + pad(n % 60);
   }
   /* Round up, never down. "1 minute left" with fifty seconds on the clock
      is a small lie in the reader's favour; "0 minutes" with fifty seconds
@@ -1581,8 +1651,9 @@ button,select{ font:inherit; }
     var day = pickDay(today), state = locate(day, today, mins);
 
     setText($('clockTime'), clock(mins));
-    setText($('clockDate'), n.toLocaleDateString('en-AU',
-      { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }));
+    /* "Tuesday, 29 September 2026", the app's formatLongDate. */
+    setText($('clockDate'), n.toLocaleDateString('en-AU', { weekday: 'long', timeZone: 'UTC' }) + ', ' +
+      n.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }));
     setText($('clockZone'), PRESET.timeZone + ' · ' +
       zoneLabel(mode.live ? liveOffset() : PRESET.utcOffsetMinutes));
     /* The strip prints the offset too. A live page left open across a
@@ -1645,7 +1716,10 @@ button,select{ font:inherit; }
       setText($('kicker'), kicker);
       setText($('title'), title);
       setText($('window'), window_);
-      setText($('left'), left);
+      left = left || { big: '', small: '', say: '' };
+      setText($('leftBig'), left.big);
+      setText($('leftSmall'), left.small);
+      setText($('leftSay'), left.say);
       setText($('then'), then);
     }
     /* The dial's accessible name has to follow what the dial is counting.
@@ -1690,7 +1764,7 @@ button,select{ font:inherit; }
          that has to be read at a glance. */
       set('', 'Starting soon', PRESET.name + ' opens at ' + clock(day.start),
         where + ' · ' + PRESET.venue.split(',')[0],
-        'Doors open in ' + words(until),
+        { big: compact(until), small: 'until the doors open', say: 'Doors open in ' + words(until) },
         'Free, and you can arrive whenever suits.');
       dialSays('How long until the doors open');
       setPie(DAY_KIND, clamp(until / runUp), runUp);
@@ -1704,7 +1778,8 @@ button,select{ font:inherit; }
       var urgent = leftMin <= 10;
       accent(urgent ? URGENT_KIND : DAY_KIND);
       set(urgent ? 'urgent' : '', 'On now · ' + DAY_KIND.word,
-        PRESET.name + ' is Open', where, words(leftMin) + ' left', running(day, state));
+        PRESET.name + ' is Open', where,
+        { big: compact(leftMin), small: 'remaining', say: words(leftMin) + ' left' }, running(day, state));
       meter(true, spentMin, total);
       dialSays('How much of the expo is left');
       setPie(urgent ? URGENT_KIND : DAY_KIND, clamp((day.end - mins) / total), total);
