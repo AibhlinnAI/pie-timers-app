@@ -41,15 +41,18 @@ const MAX_EVENTS_PER_FEED = 400;
      interval stretches instead of failing: 50 feeds is every half hour.
      That is the point to move the fan-out into the cron job itself,
      where calls arrive as ordinary inbound requests and are not counted.
-   - The time limits keep the run inside the 150-second request idle
-     timeout: no new feed starts after 60 seconds, and a feed is given up
-     on at 40, which is the 20-second fetch plus room for the writes.
-     Feeds left over are the stalest, so they go first next run. */
+   - The time limits keep a whole run under the 55 seconds pg_net waits
+     (cron.sql), so the counts it answers with are always recorded: no
+     new feed starts after 20 seconds, and a feed is given up on at 30,
+     which is the 20-second fetch plus room for the writes. On 27 Sep a
+     feed took one to four seconds, so eight at a time clears 25 feeds
+     well inside that. Feeds left over are the stalest, so they go first
+     next run. */
 const SELF_URL = `${SUPABASE_URL}/functions/v1/calendar-sync`;
 const FEEDS_PER_RUN = 25;
-const PARALLEL_FEEDS = 6;
-const RUN_BUDGET_MS = 60000;
-const FEED_WORKER_TIMEOUT_MS = 40000;
+const PARALLEL_FEEDS = 8;
+const RUN_BUDGET_MS = 20000;
+const FEED_WORKER_TIMEOUT_MS = 30000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const corsHeaders = {
@@ -311,6 +314,7 @@ function cronAuthorised(request: Request) {
 /* One feed, synced by a fresh invocation of this function, so it has
    the whole CPU and memory allowance to itself. */
 async function syncInOwnWorker(feedId: string): Promise<"synced" | "failed" | "died" | "deferred"> {
+  const startedAt = new Date().toISOString();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FEED_WORKER_TIMEOUT_MS);
 
@@ -330,7 +334,9 @@ async function syncInOwnWorker(feedId: string): Promise<"synced" | "failed" | "d
     });
     const result = await response.json().catch(() => null);
 
-    if (response.status === 404) outcome = "failed";           // deleted or switched off since the list was read
+    // Our own 404 only: the feed was deleted or switched off since the
+    // list was read. A gateway 404 (function missing) must look like a death.
+    if (response.status === 404 && result?.gone) outcome = "failed";
     else if (response.status === 429) outcome = "deferred";    // refused by a rate limit, not tried
     else if (response.ok && result) outcome = result.ok ? "synced" : "failed";
     else outcome = "died";                                      // 546 and friends: no handler got to answer
@@ -348,9 +354,14 @@ async function syncInOwnWorker(feedId: string): Promise<"synced" | "failed" | "d
   /* A worker that dies never reaches syncFeed's own error handler, so
      until now the feed recorded nothing at all: no error for the person
      to see, and no timestamp to send it to the back of the queue. Say
-     what is known, honestly. The next successful sync clears it. */
+     what is known, honestly. The next successful sync clears it.
+
+     Only if the worker has written nothing since it was started, though:
+     one that finished just as its reply was given up on has already
+     recorded the truth, success or its own error, and must keep it. */
   if (outcome === "died") {
-    await rest(`/calendar_feeds?id=eq.${feedId}`, {
+    // %22 quotes the timestamp: its dots and colons are reserved inside or=().
+    await rest(`/calendar_feeds?id=eq.${feedId}&or=(last_synced.is.null,last_synced.lt.%22${startedAt}%22)`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
@@ -411,7 +422,7 @@ Deno.serve(async (request) => {
     const feeds: FeedRow[] = await rest(
       `/calendar_feeds?select=${FEED_COLUMNS}&id=eq.${body.feedId}&active=is.true`,
     );
-    if (!feeds.length) return json({ error: "Calendar not found." }, 404);
+    if (!feeds.length) return json({ error: "Calendar not found.", gone: true }, 404);
 
     return json(await syncFeed(feeds[0]));
   }
@@ -428,7 +439,11 @@ Deno.serve(async (request) => {
     return json({ error: "Calendar sync is included with a plan." }, 402);
   }
 
-  if (!body.feedId) return json({ error: "No calendar specified." }, 400);
+  /* A real id or nothing. The id goes straight into the query string, and
+     until 28 Sep 2026 "<someone else's id>#" pushed the user_id filter
+     below into the URL fragment, which fetch never sends: the service key
+     then read and re-synced a feed that was not the caller's. */
+  if (!body.feedId || !UUID.test(body.feedId)) return json({ error: "No calendar specified." }, 400);
 
   // Scope by user_id as well as id, so one account cannot sync another's feed.
   const feeds: FeedRow[] = await rest(

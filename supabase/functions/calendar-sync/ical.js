@@ -103,7 +103,10 @@ function unescapeText(value) {
    across a calendar with twenty thousand events -- comfortably past the
    edge function's CPU budget, and the reason a sync could die without
    reaching its own error handler. */
-var zoneFormatters = {};
+/* Both caches are keyed by a zone name straight out of the feed, so
+   they have no prototype: TZID=constructor must look unknown and fall
+   back to UTC, not find Object's own constructor and fail the feed. */
+var zoneFormatters = Object.create(null);
 
 function formatterFor(timeZone) {
   var cached = zoneFormatters[timeZone];
@@ -149,7 +152,7 @@ function wallTimeToUtc(y, mo, d, h, mi, s, timeZone) {
    place still building a formatter per call: every parseDate asked,
    and each answer cost the same fifth of a millisecond. On a calendar
    with years of moved meetings that was about 40% of a sync's CPU. */
-var knownZones = {};
+var knownZones = Object.create(null);
 
 function isKnownZone(timeZone) {
   if (knownZones[timeZone] === undefined) {

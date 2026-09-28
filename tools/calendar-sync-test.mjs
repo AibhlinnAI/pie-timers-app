@@ -89,6 +89,63 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
 }
 
 {
+  // The back edge, from the other side of the world: 08:30 on the 27th at
+  // UTC-12 is 20:30Z, half an hour inside the window, but its bare date
+  // is twenty hours before the window opens. Slack of under a day would
+  // drop it.
+  const out = parse(cal(vevent('UID:back', 'DTSTART;TZID=Etc/GMT+12:20260927T083000', 'SUMMARY:Late')));
+  check('back edge: an event at UTC-12 just inside the window is kept', out.length === 1 && iso(out[0]) === '2026-09-27T20:30:00.000Z', out.map(iso));
+}
+
+{
+  // Zone names come from the feed. Ones that match Object's own property
+  // names must look unknown and fall back to UTC, not fail the feed.
+  const out = parse(cal(
+    vevent('UID:p1', 'DTSTART;TZID=constructor:20261001T090000', 'SUMMARY:A'),
+    vevent('UID:p2', 'DTSTART;TZID=__proto__:20261002T090000', 'SUMMARY:B'),
+    vevent('UID:p3', 'DTSTART;TZID=toString:20261003T090000', 'SUMMARY:C'),
+  ).replace('VERSION:2.0', 'VERSION:2.0\r\nX-WR-TIMEZONE:hasOwnProperty'));
+  check('zones: property-shaped names fall back to UTC', out.map(iso).join() === '2026-10-01T09:00:00.000Z,2026-10-02T09:00:00.000Z,2026-10-03T09:00:00.000Z', out.map(iso));
+}
+
+{
+  // What the CPU goes on, counted rather than timed, so a slow machine
+  // cannot hide a regression. Each zone is used by nothing else in this
+  // file, so its caches start cold.
+  const RealDTF = Intl.DateTimeFormat;
+  const realParts = RealDTF.prototype.formatToParts;
+  let built = 0, conversions = 0;
+  Intl.DateTimeFormat = new Proxy(RealDTF, { construct(target, args) { built++; return new target(...args); } });
+  RealDTF.prototype.formatToParts = function () { conversions++; return realParts.apply(this, arguments); };
+  const counted = (fn) => { built = 0; conversions = 0; fn(); return { built, conversions }; };
+
+  try {
+    // 300 one-off events in the window's zone, plus the same meeting
+    // moved every week for six years.
+    const lines = [];
+    for (let k = 0; k < 300; k++) {
+      const d = new Date(NOW + (k % 20) * DAY).toISOString().slice(0, 10).replace(/-/g, '');
+      lines.push(...vevent('UID:k' + k, 'DTSTART;TZID=Asia/Kathmandu:' + d + 'T0' + (k % 10) + '0000', 'SUMMARY:K'));
+    }
+    const zoneCost = counted(() => parse(cal(lines)));
+    check('cost: one formatter per zone, not one per date (' + zoneCost.built + ' built)', zoneCost.built <= 2, zoneCost);
+
+    const series = cal(vevent('UID:old', 'DTSTART;TZID=America/St_Johns:20100104T090000', 'RRULE:FREQ=WEEKLY', 'SUMMARY:Since 2010'),
+      ...Array.from({ length: 300 }, (_, k) => {
+        const d = new Date(Date.UTC(2010, 0, 4) + k * 7 * DAY).toISOString().slice(0, 10).replace(/-/g, '');
+        return vevent('UID:old', 'RECURRENCE-ID;TZID=America/St_Johns:' + d + 'T090000', 'DTSTART;TZID=America/St_Johns:' + d + 'T110000', 'SUMMARY:Moved');
+      }));
+    const seriesCost = counted(() => parse(series));
+    check('cost: a weekly series since 2010 converts only near the window (' + seriesCost.conversions + ' conversions)', seriesCost.conversions < 60, seriesCost);
+    const mondays = parse(series).map(iso).join();
+    check('cost: and still produces its four Mondays in the window', mondays === '2026-09-28T11:30:00.000Z,2026-10-05T11:30:00.000Z,2026-10-12T11:30:00.000Z,2026-10-19T11:30:00.000Z', mondays);
+  } finally {
+    Intl.DateTimeFormat = RealDTF;
+    RealDTF.prototype.formatToParts = realParts;
+  }
+}
+
+{
   const out = parse(cal(
     vevent('UID:done', 'DTSTART:20150105T090000Z', 'RRULE:FREQ=WEEKLY;COUNT=20', 'SUMMARY:Finished course'),
     vevent('UID:until', 'DTSTART:20260101T090000Z', 'RRULE:FREQ=DAILY;UNTIL=20261001T000000Z', 'SUMMARY:Until'),
@@ -201,14 +258,19 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
   globalThis.Deno = { env: { get: (k) => ENV[k] }, serve: (h) => { handler = h; }, errors: { RateLimitError } };
 
   const uuid = (k) => '00000000-0000-4000-8000-' + String(k).padStart(12, '0');
-  // Eight feeds, as on 28 Sep. Feed 3 belongs to someone without a plan;
-  // feed 6's worker is killed by the platform; feed 7's call is refused
-  // by Supabase's limit on function-to-function calls.
+  /* Eight feeds, as on 28 Sep, each owned by user-(k % 3) except feed 3,
+     whose owner has no plan. What happens to each one's worker:
+       0, 1  synced
+       2     deleted between the list and its sync: our own 404
+       4     the gateway answers 404 (say the function was renamed)
+       5     the gateway answers 429
+       6     killed by the platform: 546
+       7     the call is refused with RateLimitError */
   const FEEDS = Array.from({ length: 8 }, (_, k) => ({ id: uuid(k), user_id: 'user-' + (k === 3 ? 'lapsed' : k % 3), feed_url: 'https://cal.test/' + k + '.ics', label: 'x', kind: 'ical' }));
-  const KILLED = uuid(6);
-  const REFUSED = uuid(7);
+  const GONE = uuid(2), MISSING = uuid(4), BUSY = uuid(5), KILLED = uuid(6), REFUSED = uuid(7);
 
   const patches = {};
+  const patchFilters = {};
   const events = {};
   const selfCalls = [];
   let inFlight = 0, peak = 0;
@@ -229,6 +291,8 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
       const body = JSON.parse(init.body);
       selfCalls.push({ body, secret: headers.get('x-cron-secret'), auth: headers.get('authorization') });
       if (body.feedId === REFUSED) throw new RateLimitError('too many nested calls');
+      if (body.feedId === BUSY) return reply(429, { message: 'Too many requests' });
+      if (body.feedId === MISSING) return reply(404, { code: 'NOT_FOUND', message: 'Requested function was not found' });
       if (body.feedId === KILLED) {
         return reply(546, { code: 'WORKER_RESOURCE_LIMIT', message: 'Function failed due to not having enough compute resources (please check logs)' });
       }
@@ -237,6 +301,10 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
       try {
         return await handler(new Request(url.href, { method: 'POST', headers, body: init.body }));
       } finally { inFlight--; }
+    }
+
+    if (url.pathname === '/auth/v1/user') {
+      return headers.get('authorization') === 'Bearer user-token' ? reply(200, { id: 'user-0' }) : reply(401, {});
     }
 
     check('REST calls carry the service key', headers.get('apikey') === 'service-key');
@@ -250,10 +318,15 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
     }
     if (path === '/calendar_feeds' && method === 'GET') {
       const id = q.get('id').slice(3);
-      return reply(200, FEEDS.filter((f) => f.id === id));
+      const owner = q.get('user_id');
+      if (!owner) check('a scheduled feed is read only while active', q.get('active') === 'is.true', q.toString());
+      if (id === GONE) return reply(200, []);
+      return reply(200, FEEDS.filter((f) => f.id === id && (!owner || 'eq.' + f.user_id === owner)));
     }
     if (path === '/calendar_feeds' && method === 'PATCH') {
-      patches[q.get('id').slice(3)] = JSON.parse(init.body);
+      const id = q.get('id').slice(3);
+      patches[id] = JSON.parse(init.body);
+      patchFilters[id] = q.get('or');
       return reply(200);
     }
     if (path === '/calendar_events' && method === 'DELETE') return reply(200);
@@ -267,35 +340,47 @@ const parse = (text, max) => parseCalendar(text, WS, WE, max === undefined ? 400
   await import('../supabase/functions/calendar-sync/index.ts');
   check('index.ts registers a handler', typeof handler === 'function');
 
-  const call = (body, secret) => handler(new Request('https://proj.supabase.test/functions/v1/calendar-sync', {
+  const call = (body, headers = {}) => handler(new Request('https://proj.supabase.test/functions/v1/calendar-sync', {
     method: 'POST',
-    headers: secret ? { 'x-cron-secret': secret, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   }));
+  const cron = { 'x-cron-secret': 'cron-secret' };
 
   check('the run refuses a missing secret', (await call({ all: true })).status === 403);
-  check('the run refuses a wrong secret', (await call({ all: true }, 'nope')).status === 403);
+  check('the run refuses a wrong secret', (await call({ all: true }, { 'x-cron-secret': 'nope' })).status === 403);
   check('a scheduled feed refuses a missing secret', (await call({ scheduled: true, feedId: uuid(1) })).status === 403);
-  check('a scheduled feed refuses a malformed id', (await call({ scheduled: true, feedId: uuid(1) + '&user_id=eq.x' }, 'cron-secret')).status === 400);
-  check('a scheduled feed answers 404 for an unknown id', (await call({ scheduled: true, feedId: uuid(99) }, 'cron-secret')).status === 404);
+  check('a scheduled feed refuses a malformed id', (await call({ scheduled: true, feedId: uuid(1) + '&user_id=eq.x' }, cron)).status === 400);
+  check('a scheduled feed answers 404 for an unknown id', (await call({ scheduled: true, feedId: uuid(99) }, cron)).status === 404);
   check('the user path still wants a token', (await call({ feedId: uuid(1) })).status === 401);
 
   for (const k of Object.keys(patches)) delete patches[k];
   selfCalls.length = 0;
 
-  const response = await call({ all: true }, 'cron-secret');
+  const response = await call({ all: true }, cron);
   const summary = await response.json();
-  check('the run answers 200 with counts', response.status === 200 && JSON.stringify(summary) === JSON.stringify({ ok: true, due: 7, synced: 5, failed: 0, died: 1, deferred: 1 }), summary);
+  check('the run answers 200 with counts', response.status === 200 && JSON.stringify(summary) === JSON.stringify({ ok: true, due: 7, synced: 2, failed: 1, died: 2, deferred: 2 }), summary);
   check('each due feed got its own invocation, carrying the secret', selfCalls.length === 7 && selfCalls.every((c) => c.body.scheduled === true && c.secret === 'cron-secret' && c.auth === 'Bearer anon-key'), selfCalls);
   check('the lapsed account was not synced', !selfCalls.some((c) => c.body.feedId === uuid(3)) && !patches[uuid(3)]);
-  check('workers ran in parallel, at most six', peak > 1 && peak <= 6, peak);
+  check('workers ran in parallel', peak > 1, peak);
 
-  const synced = FEEDS.filter((f) => f.id !== KILLED && f.id !== REFUSED && f.id !== uuid(3));
-  check('every other feed synced and cleared its error', synced.every((f) => patches[f.id] && patches[f.id].last_error === null && patches[f.id].event_count === 1), patches);
-  check('every other feed stored its event', synced.every((f) => events[f.id] && events[f.id].length === 1));
-  check('the killed feed now says so, instead of nothing', patches[KILLED] && /did not finish/.test(patches[KILLED].last_error) && typeof patches[KILLED].last_synced === 'string', patches[KILLED]);
-  check('the killed feed stored nothing', !events[KILLED]);
-  check('a refused call is not blamed on the feed: no error, no timestamp', !patches[REFUSED] && !events[REFUSED], patches[REFUSED]);
+  check('synced feeds cleared their error and stored their event', [uuid(0), uuid(1)].every((id) => patches[id] && patches[id].last_error === null && patches[id].event_count === 1 && events[id] && events[id].length === 1), patches);
+  for (const [name, id] of [['killed', KILLED], ['missing-function', MISSING]]) {
+    check('the ' + name + ' feed now says so, instead of nothing', patches[id] && /did not finish/.test(patches[id].last_error) && typeof patches[id].last_synced === 'string', patches[id]);
+    check('the ' + name + ' feed is stamped only if its worker wrote nothing since it started', /^\(last_synced\.is\.null,last_synced\.lt\."\d{4}-\d\d-\d\dT[\d:.]+Z"\)$/.test(patchFilters[id] || ''), patchFilters[id]);
+    check('the ' + name + ' feed stored nothing', !events[id]);
+  }
+  check('a feed deleted mid-run is counted as failed and left alone', !patches[GONE] && !events[GONE]);
+  check('refused calls are not blamed on the feed: no error, no timestamp', !patches[BUSY] && !patches[REFUSED], { busy: patches[BUSY], refused: patches[REFUSED] });
+
+  // The user path: user-0 owns feeds 0 and 6; feed 1 is user-1's.
+  for (const k of Object.keys(patches)) delete patches[k];
+  const user = { Authorization: 'Bearer user-token' };
+  const own = await call({ feedId: uuid(0) }, user);
+  check('a user can sync their own feed', own.status === 200 && (await own.json()).ok === true && Boolean(patches[uuid(0)]));
+  check('a user cannot sync a feed that is not theirs', (await call({ feedId: uuid(1) }, user)).status === 404 && !patches[uuid(1)]);
+  const trick = await call({ feedId: uuid(1) + '#' }, user);
+  check('nor by pushing the owner filter into a URL fragment', trick.status === 400 && !patches[uuid(1)], trick.status);
 }
 
 console.log(passed + ' passed, ' + failed + ' failed');
