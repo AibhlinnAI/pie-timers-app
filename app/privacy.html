@@ -41,8 +41,13 @@
        2. Have this reviewed. If you get EU or UK customers you are a data
           controller under GDPR/UK GDPR, which brings obligations this
           document only summarises.
-       3. Re-check section 9 if you ever add analytics. Today there are
-          none, and that claim must stay true.
+       3. Section 9 lists every count there is: Cloudflare's daily totals
+          and the first-open count (app/visits.js,
+          supabase/schema-visit-counts.sql, checked by
+          tools/check-visits.js). Before either changes (a new field, a new
+          kind of count, finer time, longer retention), change section 9
+          and deploy it FIRST. Never name an analytics vendor on this page:
+          the deploy guard greps app/.
      ============================================================ -->
 </head>
 <body class="legal-page">
@@ -72,12 +77,14 @@
   <ul>
     <li>Without an account, your schedule, appointments and settings never leave
     your device. The only exceptions are an email you choose to leave on the
-    Android tester form, and the bot check that loads when you open the sign-in
-    form.</li>
+    Android tester form, the bot check that loads when you open the sign-in
+    form, and a one-off count the first time the app opens, which carries
+    nothing about you (see <a href="#counting">section 9</a>).</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
-    <li>We do not sell your data, and there are no analytics, trackers or
-    advertising in this app.</li>
+    <li>We do not sell your data, and there are no third-party analytics,
+    trackers or advertising in this app. We count visits in total only (see
+    <a href="#counting">section 9</a>).</li>
     <li>You can delete your account from the Settings tab, without asking us. See
     <a href="#delete">Deleting your account</a> below for what is deleted and what
     we keep.</li>
@@ -192,7 +199,7 @@
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, and your email if you join the Android tester list</td><td>Database, sign-in and server functions</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record the IP address and browser of each request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
       <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in code</td></tr>
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
@@ -218,20 +225,48 @@
     <li><strong>Sign-in attempt hashes</strong> — one day.</li>
     <li><strong>Tester sign-up emails</strong>: until Android testing ends, or
     until you ask us to remove yours.</li>
+    <li><strong>First-open totals</strong>: kept. They are numbers per day that
+    say nothing about any one person.</li>
+    <li><strong>Supabase's request logs</strong>, which include IP addresses:
+    7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days, then
+    deleted by Supabase.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
     for as long as Australian tax law requires.</li>
   </ul>
 
-  <h2>9. Cookies and tracking</h2>
+  <h2 id="counting">9. Cookies, tracking and counting</h2>
   <p>The app sets no cookies and runs no tracking code: no analytics scripts, no
   advertising pixels, no third-party trackers, no cross-site tracking. It stores your
-  settings in local storage and, if you sign in, a session token in your browser.
-  That is all.</p>
-  <p>We do count visits, in total only. Cloudflare, which passes the app's files on
+  settings in local storage and, if you sign in, a session token in your browser.</p>
+  <p>We do count visits, in total only, in two ways. Neither can tell us who you are,
+  what you did in the app, or anything about your schedule.</p>
+  <p><strong>Daily visit totals.</strong> Cloudflare, which passes the app's files on
   to your device, gives us daily totals from its standard server logs: how many
   pages were loaded, a rough number of visitors, and which countries they came from.
-  We see only those totals. We cannot see who you are, what you did in the app, or
-  anything about your schedule.</p>
+  We see only those totals.</p>
+  <p><strong>First opens.</strong> The first time the app opens in a browser, it asks
+  our database to add one to that day's total. The request carries two things and
+  nothing else: whether the app is running in the Android app from Google Play or in
+  a web browser, and, if the link you followed had one, a short tag we made for an
+  event or a printed code, such as <code>nls26</code>. A tag we did not make is
+  counted as &ldquo;other&rdquo;. No name, email address, account, device ID, cookie
+  or time goes with it, and nothing from your schedule. What we keep is the number of
+  first opens on each day, in Adelaide time, for each tag and each kind of app. Later
+  visits send nothing.</p>
+  <p>So that a browser is counted only once, the app keeps a note in that browser's
+  local storage. The note never leaves your device. If you clear this site's data,
+  your next visit counts as a first open again.</p>
+  <p>Like any request to a website, the one carrying the count reaches Supabase, which
+  runs our database, with your IP address and your browser's name. Supabase's
+  standard request logs keep those for
+  7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days. We do not use
+  those logs for counting, and the totals keep nothing from them. Because the totals
+  cannot be linked to you, there is nothing of yours in them to show you or to
+  delete.</p>
+  <p>If your browser sends a Global Privacy Control or Do Not Track signal, the app
+  counts nothing. To stop a browser being counted without those signals, open the app
+  once as <code>pietimers.aibhlinn.ai/#count=off</code>. The code that counts is
+  <a href="visits.js">visits.js</a>, and anyone can read it.</p>
 
   <h2>10. Your rights</h2>
   <p>You can, at any time and without contacting us:</p>

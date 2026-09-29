@@ -38,6 +38,13 @@ window.CT.config = {
      Supabase → Authentication → URL Configuration → Redirect URLs. */
   redirectUrl: '',
 
+  /* The first-open count (app/visits.js, privacy.html section 9). Off
+     until supabase/schema-visit-counts.sql has run and the privacy
+     policy that discloses it is live. Also the kill switch: false stops
+     every new count at once. Returning browsers never count, so a stale
+     cached copy of this file changes nothing. */
+  countFirstOpens: false,
+
   /* One-click Google Calendar. Off until Google has verified the app.
 
      Calendar scopes are sensitive: Google allows them in Testing mode

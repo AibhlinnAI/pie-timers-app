@@ -17,9 +17,10 @@ contents in this order:
 | 5 | `schema-calendar.sql` | calendar feeds and events, **appointments column** | Always |
 | 6 | `schema-breaks.sql` | **breaks column** (extra breaks, lunch's length) | Always, before deploying functions |
 | 7 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
-| 8 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
+| 8 | `schema-visit-counts.sql` | first-open totals and the tag list | Always |
+| 9 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
 
-Steps 1–7 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
+Steps 1–8 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
 editing**, and only after the edge functions are deployed, because the file points at
 their URLs.
 
@@ -42,7 +43,8 @@ select table_name from information_schema.tables
 
 Expect: `access_codes`, `billing_events`, `calendar_events`, `calendar_feeds`,
 `code_attempts`, `code_redemptions`, `notification_log`, `push_subscriptions`,
-`signin_attempts`, `subscriptions`, `timer_profiles`.
+`signin_attempts`, `subscriptions`, `tester_signups`, `timer_profiles`,
+`visit_counts`, `visit_sources`.
 
 Row-level security must be on for every one of them:
 
@@ -106,6 +108,48 @@ A healthy calendar-sync run answers 200 with counts only, for example
 `{"ok":true,"due":8,"synced":8,"failed":0,"died":0,"deferred":0}`. `died` is
 a feed whose own worker was killed or timed out; that feed's row says so in
 `last_error`, which the person sees in the app.
+
+## Reading the first-open counts
+
+`schema-visit-counts.sql` keeps daily totals of the first time the app opens
+in a browser (`app/visits.js`, `privacy.html` section 9). Read them in the
+SQL Editor, or Table Editor → `visit_counts`. There is no view on purpose.
+
+```sql
+-- First opens a day, last 30 days (Adelaide dates)
+select day,
+       sum(n) filter (where platform = 'web')  as web,
+       sum(n) filter (where platform = 'play') as play,
+       sum(n)                                   as total
+  from public.visit_counts
+ where kind = 'first_open'
+   and day > (now() at time zone 'Australia/Adelaide')::date - 30
+ group by day order by day desc;
+
+-- Where they came from, over a range
+select c.source,
+       coalesce(s.label, case c.source when 'none' then 'no tag' else 'tag not on the list' end) as what,
+       sum(c.n) as first_opens
+  from public.visit_counts c
+  left join public.visit_sources s using (source)
+ where c.kind = 'first_open'
+   and c.day between date '2026-10-01' and date '2026-10-31'
+ group by 1, 2 order by 3 desc;
+```
+
+How to read them:
+
+- They are first opens per **browser**, not people. A private window, an
+  iPhone home-screen app or cleared site data counts again; GPC/DNT, blocked
+  storage or a send that failed does not count at all.
+- `current_date` in the SQL Editor is UTC, so always use the Adelaide
+  expression above.
+- `none` is an untagged link (typed, bookmarked, shared, the t-shirt code);
+  `other` is a tag not on the list in `visit_sources`.
+- A cell stuck at 100000, or a spike well above Cloudflare's unique visitors
+  for that day, is abuse: anyone holding the public key can add to a total.
+- Before sharing numbers outside the business, merge any cell under 5 into a
+  bigger group.
 
 ## If a run fails partway
 

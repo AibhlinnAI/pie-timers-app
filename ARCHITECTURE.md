@@ -127,6 +127,21 @@ put third-party bytes into the app, breaking this rule and rule 4. The check
 is that a page served through the proxy is byte-identical to `main`.
 Disclosed in `privacy.html` sections 6 and 9.
 
+**First opens:** `app/visits.js` adds one to a daily total in
+`public.visit_counts` (`supabase/schema-visit-counts.sql`) the first time the
+app opens in a browser. Each total is keyed by Adelaide day, kind
+(`first_open`), a tag from the allowlist `public.visit_sources` (otherwise
+`none` or `other`) and `web`/`play`. The request body is exactly
+`{p_source, p_platform}`. No id, time, IP, cookie or user agent is sent or
+stored, and the function never reads request headers. The "already counted"
+note lives only in localStorage and is never sent. GPC/DNT, automated
+browsers and any host but pietimers.aibhlinn.ai never count. Kiosk and event
+pages never count. A tag names a place or a printed item, never a person.
+The kill switch is `countFirstOpens` in config.js. `tools/check-visits.js`
+enforces all of this in smoke.yml and in the deploy guard. Anything that
+widens what is sent or kept (a field, a kind, finer time, a view) is a
+privacy.html change first, deployed before the code.
+
 **Enforced, not just stated:** `.github/workflows/deploy.yml` has a build
 step, "Refuse to publish ad or tracking dependencies", that greps `app/` and
 `identity/` for the domains and script globals of known ad/tracking vendors

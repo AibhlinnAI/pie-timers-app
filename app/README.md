@@ -651,8 +651,9 @@ always.
 ## Data & privacy
 
 Signed out, everything stays in `localStorage` under `countdown-timers/v1` and
-nothing leaves the device. Signed in, your schedule and settings are stored in
-the project's own Supabase instance rather than being pooled with anyone else's.
+nothing leaves the device apart from a one-off first-open count (privacy.html
+section 9). Signed in, your schedule and settings are stored in the project's
+own Supabase instance rather than being pooled with anyone else's.
 
 **Breaks** are stored apart from all of that, never inside the schedule or the
 settings, so older copies of the app never read or overwrite them. Lunch itself

@@ -124,6 +124,8 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
       project already has the column (added 27 Sep 2026).
 - [ ] `schema-google-calendar.sql`
 - [ ] `identity-schema.sql`
+- [ ] `schema-visit-counts.sql` — the first-open totals and the tag list. Run it
+      before `countFirstOpens` is turned on in `app/config.js` (see 5.5).
 - [ ] `cron.sql` — last, because the file schedules a job against edge functions that do
       not exist until 5.3.
 
@@ -191,6 +193,56 @@ common cause of "the email arrived but clicking the link does nothing".
 
 - [ ] Put the project URL and the **publishable** key into `app/config.js`.
 - [ ] Push, then rerun diagnostics. Every table and function should PASS.
+
+### 5.5 The first-open count
+
+`app/visits.js` adds one to a daily total the first time the app opens in a
+browser (`privacy.html` section 9, `ARCHITECTURE.md` rule 3). It ships
+switched off, and goes on in this order, because the disclosure must be live
+before anything is counted:
+
+1. The Cloudflare proxy disclosure (branch `cloudflare-proxy-counts`) merges
+   first.
+2. Before the counter's pull request merges, settle two numbers:
+   - the Supabase plan's API log retention (1 day on Free, 7 on Pro, 28 on
+     Team). Replace both `MAL TO CONFIRM` numbers in `privacy.html`;
+   - the next free `CACHE` number, used in `CACHE` and in `visits.js?v=` in
+     both `index.html` and `sw.js`.
+3. Run `supabase/schema-visit-counts.sql` in the SQL Editor, then the checks
+   at the end of that file.
+4. Merge the counter with `countFirstOpens: false`. The disclosure is live and
+   nothing is counted yet.
+5. Decide whether the promise in `privacy.html` section 13 (an email before a
+   material change) applies, and check the new `privacy.html` is live.
+6. Merge a one-line change: `countFirstOpens: true` in `app/config.js`, plus
+   the next `CACHE` bump. No `?v=` change: `config.js` is unversioned, and
+   returning browsers never count, so a stale cached copy does not matter.
+7. Check it live (it writes to production): open
+   `https://pietimers.aibhlinn.ai/#src=test` in a private window, wait 3 s, and
+   run the first read-out query in `supabase/README.md`. Expect a row
+   `test | web | 1`. Optionally clean up with
+   `delete from public.visit_counts where source = 'test';`.
+
+If the app ships before the SQL, the call answers 404 and those first opens are
+silently lost. `countFirstOpens: false` is also the kill switch.
+
+Kiosk and event pages (`/ndexpo26/`, `/nls26/`, `/nsw26/`, `/nwc26/`,
+`/stall41/`) load no shared scripts and are never counted: a foyer screen is a
+display, not an open. Their QR codes count when the scan lands in the app.
+
+#### Tagging a QR code
+
+1. Pick a tag for a place or a printed item, **never a person**: a tag handed to
+   one person turns a total into "this person opened the app". Use `a-z`,
+   `0-9` and `-`, 24 characters at most.
+2. Add it to the seed list in `supabase/schema-visit-counts.sql` in the same
+   commit, and run just its `insert` in the SQL Editor.
+3. Encode `https://pietimers.aibhlinn.ai/#src=<tag>`.
+4. Scan the printed code once with iOS Camera and once with Google Lens, each
+   in a private window. Expect a row for today; if it lands in `other`, the
+   insert did not run.
+5. Mal's own devices, and any stall device that wipes its profile: open
+   `/#count=off` once, or launch with it on the URL.
 
 ## 6. Email (Resend)
 
