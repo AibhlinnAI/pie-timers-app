@@ -117,6 +117,16 @@ If first-party analytics are ever added, they must be aggregate,
 non-identifying, and disclosed in `privacy.html` before shipping — not
 after.
 
+**Visit counts today (from 30 Sep 2026):** `pietimers.aibhlinn.ai` is proxied
+through Cloudflare (orange cloud). The only visit numbers are the totals on
+Cloudflare's own dashboard, built from its server logs; nothing is added to
+the page for them. Cloudflare features that inject scripts into pages must
+stay **off** for this zone: Web Analytics (RUM) automatic setup, Rocket
+Loader, Email Address Obfuscation and Bot Fight Mode. Any one of them would
+put third-party bytes into the app, breaking this rule and rule 4. The check
+is that a page served through the proxy is byte-identical to `main`.
+Disclosed in `privacy.html` sections 6 and 9.
+
 **Enforced, not just stated:** `.github/workflows/deploy.yml` has a build
 step, "Refuse to publish ad or tracking dependencies", that greps `app/` and
 `identity/` for the domains and script globals of known ad/tracking vendors
