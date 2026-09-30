@@ -27,13 +27,52 @@ const FILE = path.join(ROOT, 'app', 'visits.js');
 const SOURCE = fs.readFileSync(FILE, 'utf8');
 const FLAG = 'countdown-timers/first-open/v1';
 
+/* Every browser API the harness does not stub answers with a SENTINEL,
+   not undefined. undefined would vanish from JSON.stringify, so a field
+   read from, say, document.referrer or screen.width would be sent by a
+   real browser and never seen here. A sentinel survives stringifying,
+   string concatenation and property chains, and calling or constructing
+   one (navigator.sendBeacon, new Image, document.createElement,
+   importScripts...) is recorded as a second way out. Writing an unlisted
+   property (document.cookie, location.href) is recorded too. Only the
+   JavaScript built-ins of a fresh context resolve normally; they are
+   real values, so the body-keys check sees anything read from them. */
+const SENT = 'SENTINEL-unlisted-';
+const INTRINSICS = new Set(vm.runInNewContext('Object.getOwnPropertyNames(globalThis)'));
+// Every run's leaks, except the harness self-tests' deliberate ones.
+const allRuns = [];
+
 function run(opts) {
   const o = Object.assign({
     url: 'https://pietimers.aibhlinn.ai/', storage: {}, nav: {}, config: {},
     inPlayApp: false, app: true, readyState: 'loading', visibility: 'visible',
     storageThrows: false, fetchRejects: false, fetchThrows: false, afterLoad: null,
-    prerendering: false, store: null, manual: false,
+    prerendering: false, store: null, manual: false, source: SOURCE, selfTest: false,
   }, opts);
+  const calls = [], sets = [], fetches = [];
+  if (!o.selfTest) allRuns.push({ fetches, calls, sets });
+  function sentinel(name) {
+    const tag = SENT + name;
+    return new Proxy(function () {}, {
+      get(t, k) {
+        if (k === 'toJSON' || k === 'toString' || k === 'valueOf' || k === Symbol.toPrimitive) return () => tag;
+        if (typeof k === 'symbol') return undefined;
+        return sentinel(name + '.' + k);
+      },
+      apply() { calls.push(name + '()'); return sentinel(name + '()'); },
+      construct() { calls.push('new ' + name); return sentinel('new ' + name); },
+      set(t, k) { sets.push(name + '.' + String(k)); return true; },
+    });
+  }
+  function guarded(obj, name) {
+    return new Proxy(obj, {
+      get(t, k) {
+        if (typeof k === 'symbol' || k in t) return Reflect.get(t, k, t);
+        return sentinel(name + '.' + k);
+      },
+      set(t, k, v) { if (!(k in t)) sets.push(name + '.' + String(k)); t[k] = v; return true; },
+    });
+  }
   const u = new URL(o.url);
   const loc = { hostname: u.hostname, pathname: u.pathname, search: u.search, hash: u.hash };
   // A shared Map plays two tabs of one browser.
@@ -43,7 +82,6 @@ function run(opts) {
     getItem(k) { if (o.storageThrows) throw new Error('blocked'); return store.has(k) ? store.get(k) : null; },
     setItem(k, v) { if (o.storageThrows) throw new Error('blocked'); writes.push(k); store.set(k, String(v)); },
   };
-  const fetches = [];
   const timers = [];
   const winL = {}, docL = {};
   const on = (m) => (t, f) => { (m[t] = m[t] || []).push(f); };
@@ -53,22 +91,31 @@ function run(opts) {
   const win = {
     CT: { config: Object.assign({ supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'sb_publishable_TEST',
       isConfigured: true, countFirstOpens: true }, o.config) },
-    document: doc, localStorage: storage, location: loc,
+    document: guarded(doc, 'document'), localStorage: storage, location: guarded(loc, 'location'),
     history: { replaceState(s, t, url) { const n = new URL(url, 'https://h'); loc.pathname = n.pathname; loc.search = n.search; loc.hash = n.hash; } },
-    navigator: Object.assign({ onLine: true, userAgent: 'Mozilla/5.0 Chrome/140' }, o.nav),
+    navigator: guarded(Object.assign({ onLine: true, userAgent: 'Mozilla/5.0 Chrome/140' }, o.nav), 'navigator'),
     fetch(url, init) { fetches.push({ url, init }); if (o.fetchThrows) throw new TypeError("no fetch"); return o.fetchRejects ? Promise.reject(new TypeError('offline')) : Promise.resolve({ ok: true, status: 204 }); },
     setTimeout(f, ms) { timers.push(f); return timers.length; },
     addEventListener: on(winL), removeEventListener: off(winL),
     URLSearchParams, JSON, String, Promise,
   };
-  win.window = win;
-  vm.createContext(win);
-  vm.runInContext(SOURCE, win, { filename: FILE });
+  // The global object itself: `window.x` and a bare `x` both come here.
+  const ctx = new Proxy(win, {
+    has(t, k) { return k in t || (typeof k === 'string' && !INTRINSICS.has(k)); },
+    get(t, k) {
+      if (typeof k === 'symbol' || k in t || INTRINSICS.has(k)) return Reflect.get(t, k, t);
+      return sentinel('window.' + k);
+    },
+    set(t, k, v) { if (!(k in t)) sets.push('window.' + String(k)); t[k] = v; return true; },
+  });
+  win.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(o.source, ctx, { filename: FILE });
   // app.js runs after: sets these
   win.CT.inPlayApp = o.inPlayApp;
   if (o.app) win.CT.app = {};
   if (!store.has('countdown-timers/device/v1')) { try { store.set('countdown-timers/device/v1', 'dev_x'); } catch (e) {} }
-  const result = () => ({ fetches, store, writes, loc, state: win.CT.visits && win.CT.visits.state, address: loc.pathname + loc.search + loc.hash });
+  const result = () => ({ fetches, calls, sets, store, writes, loc, state: win.CT.visits && win.CT.visits.state, address: loc.pathname + loc.search + loc.hash });
   const finish = () => {
     (winL.load || []).forEach((f) => f());
     while (timers.length) timers.shift()();
@@ -255,6 +302,50 @@ check('25 prerendered, then shown: sends once', r.fetches.length === 1);
   check("27 a throwing fetch never reaches the app", !threw && r.store.get(FLAG) === "1");
 }
 
+// ── Across every case above: nothing but the one fetch, nothing unlisted ──
+{
+  const fetchesAll = allRuns.flatMap((x) => x.fetches);
+  const callsAll = [...new Set(allRuns.flatMap((x) => x.calls))];
+  const setsAll = [...new Set(allRuns.flatMap((x) => x.sets))];
+  const leaks = fetchesAll.filter((f) => (String(f.url) + JSON.stringify(f.init)).includes(SENT));
+  check('B1 no fetch carries anything read from a browser API the harness does not stub (url, init, headers, body)',
+    fetchesAll.length > 0 && leaks.length === 0, leaks.map((f) => JSON.stringify(f.init)));
+  check('B2 fetch init keys are exactly method, credentials, referrerPolicy, cache, headers, body',
+    fetchesAll.every((f) => JSON.stringify(Object.keys(f.init).sort()) ===
+      '["body","cache","credentials","headers","method","referrerPolicy"]'));
+  check('B3 no other way out: no unlisted API is called or constructed (sendBeacon, XMLHttpRequest, Image, WebSocket, EventSource, importScripts, createElement...)',
+    callsAll.length === 0, callsAll);
+  check('B4 nothing is written to an unlisted property (document.cookie, location.href, window.name...)',
+    setsAll.length === 0, setsAll);
+}
+
+// The harness catches what it claims to catch: a scratch copy of
+// visits.js with a leak added must be seen. If a replace target below
+// stops matching, update it rather than deleting the check.
+{
+  const BODY = 'JSON.stringify({ p_source: source,';
+  const FETCH_END = '}).catch(noop);';
+  const withRef = SOURCE.replace(BODY, 'JSON.stringify({ p_ref: document.referrer, p_screen: window.screen && window.screen.width, p_lang: navigator.language, p_source: source,');
+  r = run({ source: withRef, selfTest: true });
+  check('H1 harness sees a field read from an API it does not stub (document.referrer, screen, language)',
+    withRef !== SOURCE && r.fetches.length === 1 && r.fetches[0].init.body.includes(SENT + 'document.referrer'), r.fetches[0] && r.fetches[0].init.body);
+  const withBeacon = SOURCE.replace(FETCH_END, FETCH_END + " navigator.sendBeacon('/log', navigator.language); new Image().src = '/p'; new XMLHttpRequest();");
+  r = run({ source: withBeacon, selfTest: true });
+  check('H2 harness sees a second send channel after the fetch (sendBeacon, Image, XMLHttpRequest)',
+    withBeacon !== SOURCE && r.calls.length === 3 && r.sets.length === 1, [r.calls, r.sets]);
+}
+
+// ── Static checks on visits.js: one way out, one body ──
+{
+  const fetchCount = (SOURCE.match(/\bfetch\s*\(/g) || []).length;
+  const others = SOURCE.match(/sendBeacon|XMLHttpRequest|new\s+Image\b|WebSocket|EventSource|importScripts|\bimport\s*\(|createElement|document\.cookie|\.src\s*=|new\s+(Shared)?Worker\b|window\.open\b|\.assign\s*\(|location\.href\s*=/g) || [];
+  check('V1 visits.js calls fetch exactly once and names no other way to send', fetchCount === 1 && others.length === 0, { fetchCount, others });
+  const bodies = [...SOURCE.matchAll(/JSON\.stringify\(\s*\{([^}]*)\}\s*\)/g)];
+  const keys = bodies.length === 1 ? [...bodies[0][1].matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*:/g)].map((m) => m[1]).sort() : [];
+  check('V2 the only JSON.stringify in visits.js is the body, with exactly p_platform and p_source',
+    (SOURCE.match(/JSON\.stringify/g) || []).length === 1 && JSON.stringify(keys) === '["p_platform","p_source"]', keys);
+}
+
 // ── Static checks: what the server keeps, and the load order ──
 const sqlRaw = fs.readFileSync(path.join(ROOT, 'supabase', 'schema-visit-counts.sql'), 'utf8');
 // Comments may name what the code must not use, so they are dropped first.
@@ -268,9 +359,34 @@ check('S1 visit_counts columns are exactly day, kind, source, platform, n',
  'cf-connecting', 'create trigger', 'timestamptz'].forEach((bad) => {
   check('S2 SQL never uses ' + bad, !sql.toLowerCase().includes(bad));
 });
-const anonGrants = sql.match(/grant [^;]* to anon[^;]*;/gi) || [];
-check('S3 the only grant to anon is execute on count_first_open', anonGrants.length === 1 &&
-  /^grant execute on function public\.count_first_open\(text, text\) to anon;$/i.test(anonGrants[0]), anonGrants);
+// create table if not exists does nothing to a live table, so a new
+// column would arrive by alter table; a view would be granted to anon by
+// Supabase's default privileges and read past RLS as its owner.
+[['add column', /\badd\s+column\b/i], ['create view', /\bcreate\s+(or\s+replace\s+)?(materialized\s+)?view\b/i],
+ ['create policy', /\bcreate\s+policy\b/i], ['create rule', /\bcreate\s+(or\s+replace\s+)?rule\b/i],
+ ['alter default privileges', /\balter\s+default\s+privileges\b/i], ['security_invoker', /\bsecurity_invoker\b/i],
+ ['timestamp', /\btimestamp\b/i], ['publication', /\bpublication\b/i]].forEach(([name, bad]) => {
+  check('S2 SQL never uses ' + name, !bad.test(sql));
+});
+const alters = sql.match(/\balter\s+table\b[^;]*;/gi) || [];
+check('S1 every alter table only turns on row level security',
+  alters.length === 2 && alters.every((a) => /^alter table public\.visit_(counts|sources) enable row level security;$/i.test(a.replace(/\s+/g, ' '))), alters);
+const tables = (sql.match(/\bcreate\s+table\b[^(]*/gi) || []).map((t) => t.replace(/\s+/g, ' ').trim());
+check('S1 the only tables are visit_sources and visit_counts',
+  JSON.stringify(tables) === '["create table if not exists public.visit_sources","create table if not exists public.visit_counts"]', tables);
+const funcs = (sql.match(/\bcreate\s+(or\s+replace\s+)?function\s+[\w.]+/gi) || []).map((t) => t.replace(/\s+/g, ' '));
+check('S1 the only function is count_first_open', funcs.length === 1 && /public\.count_first_open$/i.test(funcs[0]), funcs);
+const grants = sql.match(/\bgrant\b[^;]*;/gi) || [];
+check('S3 the only grant, to anyone, is execute on count_first_open to anon', grants.length === 1 &&
+  /^grant execute on function public\.count_first_open\(text, text\) to anon;$/i.test(grants[0].replace(/\s+/g, ' ')), grants);
+['revoke all on table public.visit_counts from anon, authenticated;',
+ 'revoke all on table public.visit_sources from anon, authenticated;',
+ 'revoke all on function public.count_first_open(text, text) from public, anon, authenticated;'].forEach((line) => {
+  check('S3 SQL has: ' + line, sql.includes(line));
+});
+check('S10 a nightly job rewrites finished days together, and one vacuums after it',
+  /cron\.schedule\(\s*'countdown-settle-visit-counts'[^;]*update public\.visit_counts set n = n[^;]*;/i.test(sql) &&
+  /cron\.schedule\(\s*'countdown-vacuum-visit-counts'[^;]*vacuum public\.visit_counts/i.test(sql));
 const html = fs.readFileSync(path.join(ROOT, 'app', 'index.html'), 'utf8');
 const tag = /<script src="visits\.js\?v=(\d+)"><\/script>/.exec(html);
 const at = (s) => html.indexOf('<script src="' + s);
@@ -309,6 +425,17 @@ check('S8 privacy.html section 9 discloses the first-open count',
 // match, so an innocent identifier in visits.js could trip it.
 const guard = /pattern='([^']+)'/.exec(read('.github/workflows/deploy.yml'));
 check('S9 visits.js passes the deploy guard pattern', guard && !new RegExp(guard[1], 'i').test(SOURCE));
+
+// The Windows screensaver loads the live app in its own WebView2 profile,
+// which shares nothing with the person's browser: without #count=off each
+// install would count as a first open.
+{
+  const dir = path.join(ROOT, 'windows-screensaver');
+  const urls = fs.readdirSync(dir).filter((f) => f.endsWith('.cs'))
+    .flatMap((f) => fs.readFileSync(path.join(dir, f), 'utf8').match(/"https:\/\/pietimers\.aibhlinn\.ai\/index\.html[^"]*"/g) || []);
+  check('S11 the Windows screensaver loads the app with #count=off',
+    urls.length > 0 && urls.every((x) => /#count=off"$/.test(x)), urls);
+}
 
 process.on('exit', () => {
   if (failures) { console.error(failures + ' check(s) failed.'); process.exitCode = 1; }

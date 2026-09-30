@@ -11,10 +11,19 @@
 -- Totals and nothing else. No IP address, no user or device id, no
 -- user agent, no time finer than a day, no row per visit. The
 -- function below never reads request.headers (where PostgREST puts
--- the caller's IP headers), auth.uid() or inet_client_addr().
--- tools/check-visits.js fails the build if visit_counts gains a
--- column or this file mentions any of those. Change privacy.html
--- section 9 BEFORE changing anything here.
+-- the caller's IP headers), auth.uid() or inet_client_addr(). Each
+-- finished day's rows are rewritten together every night, so no row
+-- keeps the transaction id of the request that last added to it
+-- (see "Every night" below). tools/check-visits.js fails the build if
+-- visit_counts gains a column (in the create or by alter table), if
+-- this file adds a view, a policy, a trigger or any grant but the one
+-- below, or mentions any of those reads. Change privacy.html section
+-- 9 BEFORE changing anything here.
+--
+-- The request itself still reaches Supabase with the caller's IP and
+-- user agent, and its standard API logs keep those, the time, the
+-- path and an IP-derived location for the plan's retention. That is
+-- disclosed in privacy.html section 9; nothing here reads or keeps it.
 --
 -- Tags are an allowlist (visit_sources). A tag names a place or a
 -- printed item many people see, NEVER a person: a tag handed to one
@@ -31,8 +40,9 @@
 -- every call, so nobody can read a total or probe which tags exist.
 --
 -- HOW TO RUN: Supabase -> SQL Editor -> New query, paste this whole
--- file, Run. Needs nothing else run first. Idempotent: safe to
--- re-run. Then run the checks at the end.
+-- file, Run. Needs nothing else run first (it enables pg_cron itself,
+-- as schema-ratelimit.sql does). Idempotent: safe to re-run. Then run
+-- the checks at the end.
 --
 -- HOW TO READ THE COUNTS: SQL Editor (runs as the owner, so RLS does
 -- not apply), or Table Editor -> visit_counts. The queries are at the
@@ -116,6 +126,48 @@ $$;
 revoke all on function public.count_first_open(text, text) from public, anon, authenticated;
 grant execute on function public.count_first_open(text, text) to anon;
 
+-- ── Every night: leave no per-request trace ──
+-- Each increment rewrites its row, and a row's xmin (the id of the
+-- transaction that last wrote it) is kept for good, even once frozen.
+-- Those ids come from the same sequence as rows that do carry an exact
+-- time and an identity (tester_signups, timer_profiles,
+-- push_subscriptions). A cell of n = 1 could then be lined up with a
+-- tester sign-up two ids later: "this email first opened the app from
+-- the nls26 code at about 10:40". So once a day is over, all of its
+-- rows are rewritten in one statement and share one id, and a vacuum
+-- then clears the old row versions instead of waiting for autovacuum,
+-- which on a table this small may not come for weeks. The last 7 days
+-- are rewritten each night, so a missed run is caught up. Today's rows
+-- keep their own ids until the next run; privacy.html section 9 says
+-- the totals are rewritten shortly after midnight.
+--
+-- Written inline, not as a function: a function in public would be
+-- executable by anon unless revoked, and this needs no caller but
+-- pg_cron, which runs as the owner. Adelaide midnight is 13:30 UTC in
+-- summer and 14:30 UTC in winter; 14:45 UTC is 01:15 or 00:15 there.
+create extension if not exists pg_cron;
+
+select cron.unschedule('countdown-settle-visit-counts')
+where exists (select 1 from cron.job where jobname = 'countdown-settle-visit-counts');
+
+select cron.schedule(
+  'countdown-settle-visit-counts',
+  '45 14 * * *',
+  $$ update public.visit_counts set n = n
+      where day >= (now() at time zone 'Australia/Adelaide')::date - 7
+        and day <  (now() at time zone 'Australia/Adelaide')::date $$
+);
+
+-- VACUUM cannot run inside the update's transaction, so it is its own job.
+select cron.unschedule('countdown-vacuum-visit-counts')
+where exists (select 1 from cron.job where jobname = 'countdown-vacuum-visit-counts');
+
+select cron.schedule(
+  'countdown-vacuum-visit-counts',
+  '55 14 * * *',
+  $$ vacuum public.visit_counts $$
+);
+
 -- ── Every tag that exists ──
 -- Add a line here in the same commit as the QR code or poster that
 -- uses it, then run just that insert in the SQL editor.
@@ -149,6 +201,18 @@ notify pgrst, 'reload schema';
 --
 -- Expect: off (if on, each row would carry the time of its last increment)
 -- show track_commit_timestamp;
+--
+-- Expect: countdown-settle-visit-counts and countdown-vacuum-visit-counts, both active
+-- select jobname, schedule, active from cron.job
+--  where jobname in ('countdown-settle-visit-counts', 'countdown-vacuum-visit-counts');
+--
+-- Expect: no rows (every finished day's totals share one transaction id).
+-- Rows here mean the nightly job is not running; see cron.job_run_details.
+-- select day, count(distinct xmin::text) as ids
+--   from public.visit_counts
+--  where day < (now() at time zone 'Australia/Adelaide')::date - 1
+--  group by day
+-- having count(distinct xmin::text) > 1;
 --
 -- app/diagnostics.html also shows "Table: visit_counts ... Exists and is
 -- locked down" once this has run.

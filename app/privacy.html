@@ -30,8 +30,10 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in, except the three values in
-     "Deleting your account" marked MAL TO CONFIRM, which are provisional.
+     Every placeholder is now filled in, except five values marked MAL TO
+     CONFIRM, which are provisional: three in "Deleting your account", and
+     the Supabase request-log retention in section 8 and again in section 9
+     (1 day on Free, 7 on Pro, 28 on Team; both must say the same number).
      What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
@@ -78,8 +80,9 @@
     <li>Without an account, your schedule, appointments and settings never leave
     your device. The only exceptions are an email you choose to leave on the
     Android tester form, the bot check that loads when you open the sign-in
-    form, and a one-off count the first time the app opens, which carries
-    nothing about you (see <a href="#counting">section 9</a>).</li>
+    form, and a one-off count the first time the app opens. That count carries no
+    name, account or ID, though like any web request it reaches our database
+    provider with your IP address (see <a href="#counting">section 9</a>).</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
     <li>We do not sell your data, and there are no third-party analytics,
@@ -137,7 +140,8 @@
   <p>The app works fully offline. Your schedule, appointments and settings are
   stored only in your browser's local storage on that device. We cannot see them,
   and no request carrying them is ever sent anywhere.</p>
-  <p>There is no sign-up wall and no tracking on the free version. The only
+  <p>There is no sign-up wall and no tracking on the free version, only the
+  one-off first-open count in <a href="#counting">section 9</a>. The only
   email we collect without an account is one you choose to leave on the
   Android tester form. We use it for two things: we add it to Google Play's
   tester list so Google can give you access, and we email you the install
@@ -199,7 +203,7 @@
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record the IP address and browser of each request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
       <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in code</td></tr>
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
@@ -227,7 +231,8 @@
     until you ask us to remove yours.</li>
     <li><strong>First-open totals</strong>: kept. They are numbers per day that
     say nothing about any one person.</li>
-    <li><strong>Supabase's request logs</strong>, which include IP addresses:
+    <li><strong>Supabase's request logs</strong>, which include IP addresses and
+    the approximate locations worked out from them:
     7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days, then
     deleted by Supabase.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
@@ -235,8 +240,9 @@
   </ul>
 
   <h2 id="counting">9. Cookies, tracking and counting</h2>
-  <p>The app sets no cookies and runs no tracking code: no analytics scripts, no
-  advertising pixels, no third-party trackers, no cross-site tracking. It stores your
+  <p>The app sets no cookies and does not track you: no third-party analytics
+  scripts, no advertising pixels, no third-party trackers, no cross-site tracking.
+  Its only analytics code is the first-open count described below. It stores your
   settings in local storage and, if you sign in, a session token in your browser.</p>
   <p>We do count visits, in total only, in two ways. Neither can tell us who you are,
   what you did in the app, or anything about your schedule.</p>
@@ -249,20 +255,30 @@
   nothing else: whether the app is running in the Android app from Google Play or in
   a web browser, and, if the link you followed had one, a short tag we made for an
   event or a printed code, such as <code>nls26</code>. A tag we did not make is
-  counted as &ldquo;other&rdquo;. No name, email address, account, device ID, cookie
-  or time goes with it, and nothing from your schedule. What we keep is the number of
-  first opens on each day, in Adelaide time, for each tag and each kind of app. Later
-  visits send nothing.</p>
+  counted as &ldquo;other&rdquo;. No name, email address, account, device ID or
+  cookie goes with it, and nothing from your schedule. The request itself carries no
+  time: our database notes only the day it arrived. What we keep is the number of
+  first opens on each day, in Adelaide time, for each tag and each kind of app.</p>
+  <p>The count is sent once. If the first open is closed within a couple of seconds,
+  or your device is offline, it is sent on your next visit instead and counted on
+  that day. After that, nothing is sent.</p>
   <p>So that a browser is counted only once, the app keeps a note in that browser's
   local storage. The note never leaves your device. If you clear this site's data,
-  your next visit counts as a first open again.</p>
+  or your browser clears it for you (Safari does this when you have not used the
+  site for seven days), your next visit counts as a first open again.</p>
   <p>Like any request to a website, the one carrying the count reaches Supabase, which
-  runs our database, with your IP address and your browser's name. Supabase's
-  standard request logs keep those for
+  runs our database. Supabase's standard request logs record, for this request as for
+  every other one the app makes to it: the time, the address it was sent to (so the
+  log shows that it was the first-open request, though not which tag it carried), your
+  IP address, the approximate location worked out from that address (such as the city
+  or postcode), your network provider and your browser's name. Supabase deletes those
+  logs after
   7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days. We do not use
-  those logs for counting, and the totals keep nothing from them. Because the totals
-  cannot be linked to you, there is nothing of yours in them to show you or to
-  delete.</p>
+  them for counting, and the totals keep nothing from them.</p>
+  <p>Shortly after midnight each day, the previous day's totals are rewritten
+  together, so nothing is left in our database that shows which total any one request
+  added to. Because the totals cannot be linked to you, there is nothing of yours in
+  them to show you or to delete.</p>
   <p>If your browser sends a Global Privacy Control or Do Not Track signal, the app
   counts nothing. To stop a browser being counted without those signals, open the app
   once as <code>pietimers.aibhlinn.ai/#count=off</code>. The code that counts is

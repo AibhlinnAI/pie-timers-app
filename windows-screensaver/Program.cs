@@ -12,7 +12,12 @@ namespace PieTimersScreensaver;
 /// </summary>
 internal static class Program
 {
-    public const string SaverUrl = "https://pietimers.aibhlinn.ai/index.html?focus=1";
+    // #count=off: this WebView2 profile shares nothing with the person's
+    // browser, so without it every install (and every monitor's first
+    // load) would be counted as a first open. app/visits.js marks the
+    // profile as counted, sends nothing and strips the fragment; ?focus=1
+    // is left alone. tools/check-visits.js fails the build without it.
+    public const string SaverUrl = "https://pietimers.aibhlinn.ai/index.html?focus=1#count=off";
     public const string HomeUrl = "https://pietimers.aibhlinn.ai/";
 
     // A quiet crash log in %TEMP%, not shown to anyone -- cheap
