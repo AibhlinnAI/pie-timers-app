@@ -96,7 +96,9 @@ jobs:
           SCAN_DIRS="app/ identity/ windows-screensaver/ www/"
           pattern='google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|amazon-adsystem\.com|facebook\.net|connect\.facebook\.com|fbq\(|gtag\(|mixpanel|segment\.(io|com)|hotjar|amplitude\.com|clarity\.ms|matomo|posthog|sentry\.io|bugsnag|fullstory|crazyegg|adroll'
 
-          if grep -rniE "$pattern" $SCAN_DIRS; then
+          # www/.github holds a copy of this very pattern, ready for the
+          # aibhlinn.ai repo, so workflow folders are skipped.
+          if grep -rniE --exclude-dir=.github "$pattern" $SCAN_DIRS; then
             echo "::error::An ad or tracking dependency's domain/global was found. This app's no-ads-no-tracking commitment (ARCHITECTURE.md) is meant to break the build if this happens, not just be a promise on a page. Remove it, or if this is a genuine first-party analytics addition, update this pattern deliberately alongside the ARCHITECTURE.md note explaining what changed and why."
             fail=1
           fi
