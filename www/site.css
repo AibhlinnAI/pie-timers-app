@@ -1,0 +1,302 @@
+/* ============================================================
+   aibhlinn.ai, the AibhlínnAI front door
+   ------------------------------------------------------------
+   Colours come from brand/README.md and nowhere else:
+     brand blue        #050818  grounds and dark surfaces
+     blue on white     #2E3A63  the name and headings on light
+     titanium          #CED1D8  the name and headings on dark,
+                                with its sampled gradient stops
+   The rule from that file holds here too: never the blue on dark,
+   never the metal on white. The hero is always navy, because the
+   logo artwork has its navy ground baked in. Everything below the
+   hero follows the visitor's light or dark setting.
+
+   Pie Timers' purple, green and orange appear only inside the Pie
+   Timers card. They are that app's colours, not the suite's.
+   ============================================================ */
+
+/* Self-hosted, as in app/: no font CDN, no third-party request.
+   Same files and subsets as app/styles.css. */
+@font-face{
+  font-family:'Instrument Sans';
+  font-style:normal;
+  font-weight:400 700;
+  font-stretch:100%;
+  font-display:swap;
+  src:url('fonts/instrument-sans-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:'Instrument Sans';
+  font-style:normal;
+  font-weight:400 700;
+  font-stretch:100%;
+  font-display:swap;
+  src:url('fonts/instrument-sans-latin-ext.woff2') format('woff2');
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root{
+  color-scheme:light dark;
+
+  /* Brand, fixed */
+  --navy:        #050818;
+  --navy-lift:   #0B1129;
+  --navy-glow:   #141E48;   /* the light behind the monogram */
+  --blue-on-white:#2E3A63;
+  --ti-hi:       #F8FAFD;
+  --ti-upper:    #DDE0E7;
+  --ti:          #CED1D8;
+  --ti-lower:    #AEB1B8;
+  --ti-shadow:   #8E9199;
+  --titanium:    linear-gradient(180deg, var(--ti-hi) 0%, var(--ti-upper) 30%, var(--ti) 60%, var(--ti-lower) 100%);
+
+  /* Pie Timers, inside its own card only */
+  --pt-purple:   #1C1024;
+  --pt-purple-lift:#4B2A5A;
+  --pt-forest:   #32493C;
+  --pt-orange:   #FF8A00;
+
+  /* Theme: light. Every text pair here clears 6.9:1. */
+  --bg:          #F4F6FA;
+  --surface:     #FFFFFF;
+  --ink:         #141A33;
+  --heading:     var(--blue-on-white);
+  --muted:       #4B5470;
+  --line:        #D9DEE8;
+  --link:        var(--blue-on-white);
+  --focus:       var(--blue-on-white);
+  --btn-bg:      var(--blue-on-white);
+  --btn-fg:      #FFFFFF;
+  --btn-line:    var(--blue-on-white);
+
+  --font: "Instrument Sans", "Aptos", "Segoe UI Variable Text", "Segoe UI", system-ui,
+          -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --radius:      18px;
+  --radius-sm:   12px;
+  --wrap:        1080px;
+  --gutter:      clamp(16px, 4vw, 32px);
+  --shadow:      0 1px 2px rgba(5,8,24,.06), 0 10px 30px rgba(5,8,24,.08);
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:        var(--navy);
+    --surface:   var(--navy-lift);
+    --ink:       var(--ti-upper);
+    --heading:   var(--ti);
+    --muted:     var(--ti-lower);
+    --line:      #1C2445;
+    --link:      var(--ti-upper);
+    --focus:     var(--ti-hi);
+    --btn-bg:    var(--titanium);
+    --btn-fg:    var(--navy);
+    --btn-line:  var(--ti-lower);
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  }
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font);
+  font-size:1.0625rem;
+  line-height:1.6;
+  text-rendering:optimizeLegibility;
+}
+img{ max-width:100%; height:auto; display:block; }
+a{ color:var(--link); text-underline-offset:.18em; text-decoration-thickness:1px; }
+a:hover{ text-decoration-thickness:2px; }
+:focus-visible{ outline:3px solid var(--focus); outline-offset:3px; border-radius:6px; }
+h1,h2,h3{ color:var(--heading); line-height:1.2; letter-spacing:-.012em; margin:0 0 .5em; }
+h2{ font-size:clamp(1.75rem, 1.25rem + 2vw, 2.5rem); }
+h3{ font-size:1.25rem; }
+p{ margin:0 0 1em; }
+code{ font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; font-size:.92em; }
+
+.wrap{ max-width:var(--wrap); margin:0 auto; padding:0 var(--gutter); }
+.narrow{ max-width:720px; }
+
+.skip{
+  position:absolute; left:16px; top:-60px; z-index:10;
+  background:var(--ti-hi); color:var(--navy);
+  padding:10px 16px; border-radius:10px; font-weight:600;
+}
+.skip:focus{ top:16px; }
+
+/* ───────────────────────── Hero, always navy ───────────────────────── */
+
+.hero{
+  --focus:var(--ti-hi);
+  --link:var(--ti-upper);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 38%, var(--navy-glow) 0%, #0A1131 40%, var(--navy) 78%),
+    var(--navy);
+  color:var(--ti-upper);
+  padding-bottom:clamp(48px, 8vw, 96px);
+}
+.bar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding-top:16px; padding-bottom:16px;
+}
+.bar .brand{ display:inline-flex; border-radius:10px; }
+.bar .brand img{ width:40px; height:40px; border-radius:10px; }
+.nav-links{ display:flex; gap:clamp(12px, 3vw, 28px); list-style:none; margin:0; padding:0; }
+.nav-links a{ color:var(--ti-upper); text-decoration:none; font-weight:500; font-size:.98rem; padding:6px 2px; }
+.nav-links a:hover{ color:var(--ti-hi); text-decoration:underline; }
+
+.hero-body{ text-align:center; padding-top:clamp(8px, 3vw, 24px); }
+.hero-logo{ margin:0 auto; max-width:640px; }
+/* The artwork carries its own navy, a shade off the page's. Fading its
+   edges lets it sit in the page instead of on it, at any width. */
+.hero-logo img{
+  width:100%;
+  -webkit-mask-image:radial-gradient(closest-side, #000 74%, transparent 100%);
+          mask-image:radial-gradient(closest-side, #000 74%, transparent 100%);
+}
+.tagline{
+  margin:clamp(4px, 1vw, 12px) auto 14px;
+  font-size:clamp(1.6rem, 1.05rem + 2.6vw, 2.6rem);
+  font-weight:600; letter-spacing:-.018em; line-height:1.15;
+  color:var(--ti);
+  background:var(--titanium);
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+@media (forced-colors: active){ .tagline{ -webkit-text-fill-color:currentColor; background:none; } }
+.lede{ max-width:52ch; margin:0 auto 28px; color:var(--ti-upper); font-size:clamp(1.05rem, 1rem + .35vw, 1.2rem); }
+
+/* ───────────────────────── Buttons ───────────────────────── */
+
+.actions{ display:flex; flex-wrap:wrap; gap:12px; }
+.hero .actions{ justify-content:center; }
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:48px; padding:12px 22px;
+  border-radius:999px; border:1.5px solid transparent;
+  font:inherit; font-weight:600; font-size:1rem; line-height:1.2;
+  text-decoration:none; cursor:pointer;
+}
+.btn-primary{ background:var(--btn-bg); color:var(--btn-fg); border-color:var(--btn-line); }
+.btn-primary:hover{ filter:brightness(1.08); text-decoration:none; }
+.btn-ghost{ background:transparent; color:var(--link); border-color:currentColor; }
+.btn-ghost:hover{ background:color-mix(in srgb, currentColor 8%, transparent); text-decoration:none; }
+/* Brushed metal, for the navy hero in either theme. */
+.btn-metal{
+  background:var(--titanium); color:var(--navy); border-color:var(--ti-lower);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 6px 18px rgba(0,0,0,.35);
+}
+.btn-metal:hover{ filter:brightness(1.05); text-decoration:none; }
+
+/* ───────────────────────── Sections ───────────────────────── */
+
+.section{ padding:clamp(56px, 9vw, 104px) 0; }
+.section + .section{ border-top:1px solid var(--line); }
+.eyebrow{
+  margin:0 0 6px; color:var(--muted);
+  font-size:.82rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+}
+.intro{ max-width:60ch; color:var(--ink); }
+.muted{ color:var(--muted); }
+
+/* Pie Timers card */
+.app-card{
+  display:grid; grid-template-columns:1fr; overflow:hidden;
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+  margin-top:28px;
+}
+@media (min-width:760px){ .app-card{ grid-template-columns:minmax(220px, 34%) 1fr; } }
+.app-tile{
+  display:grid; place-items:center; min-height:180px; padding:28px;
+  background:radial-gradient(circle at 50% 45%, var(--pt-purple-lift) 0%, var(--pt-purple) 72%);
+}
+.app-tile svg{ width:clamp(112px, 22vw, 168px); height:auto; filter:drop-shadow(0 8px 18px rgba(0,0,0,.4)); }
+.app-body{ padding:clamp(22px, 4vw, 40px); }
+.app-body h3{ font-size:clamp(1.5rem, 1.2rem + 1vw, 1.9rem); margin-bottom:.2em; }
+.app-tagline{ font-style:italic; color:var(--muted); margin-bottom:1em; }
+
+.ticks{ list-style:none; margin:0 0 24px; padding:0; display:grid; gap:12px; }
+.ticks li{ position:relative; padding-left:30px; }
+/* A tiny Pie Timers pie: the same wedge as the app's own mark. */
+.ticks li::before{
+  content:""; position:absolute; left:0; top:.3em;
+  width:16px; height:16px; border-radius:50%;
+  background:conic-gradient(var(--pt-forest) 0 49deg, var(--pt-orange) 49deg 360deg);
+  box-shadow:0 0 0 2.5px var(--pt-forest);
+}
+@media (prefers-color-scheme: dark){ .ticks li::before{ box-shadow:0 0 0 2.5px #4A6B56; } }
+
+.next{
+  margin-top:28px; padding:22px clamp(20px, 4vw, 32px);
+  border:1.5px dashed var(--line); border-radius:var(--radius);
+}
+.next h3{ margin-bottom:.3em; }
+.next p{ margin:0; }
+
+/* Promise cards */
+.grid{ display:grid; gap:18px; margin-top:28px; grid-template-columns:1fr; }
+@media (min-width:760px){ .grid{ grid-template-columns:repeat(3, 1fr); } }
+.card{
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--radius); padding:clamp(20px, 3vw, 28px);
+}
+.card p{ margin:0; }
+.card .icon{
+  display:grid; place-items:center; width:44px; height:44px; margin-bottom:14px;
+  border-radius:12px; background:var(--bg); border:1px solid var(--line); color:var(--heading);
+}
+.card .icon svg{ width:22px; height:22px; }
+
+/* Brand kit */
+.kit{ display:grid; gap:18px; margin:28px 0 24px; grid-template-columns:1fr; }
+@media (min-width:640px){ .kit{ grid-template-columns:2fr 1fr; } }
+.kit figure{
+  margin:0; background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden; display:flex; flex-direction:column;
+}
+.kit .art{ background:var(--navy); display:grid; place-items:center; flex:1; }
+.kit .art img{ width:100%; }
+.kit .art--mark img{ width:min(60%, 180px); border-radius:22px; margin:24px auto; }
+.kit figcaption{ padding:14px 18px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline; }
+.kit figcaption a{ font-weight:600; }
+
+.swatches{ list-style:none; margin:0 0 20px; padding:0; display:grid; gap:12px; grid-template-columns:1fr; }
+@media (min-width:760px){ .swatches{ grid-template-columns:repeat(3, 1fr); } }
+.swatches li{
+  display:grid; grid-template-columns:48px 1fr; gap:4px 14px; align-items:center;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px;
+}
+.chip{ grid-row:span 2; width:48px; height:48px; border-radius:10px; background:var(--c); border:1px solid rgba(128,136,160,.45); }
+.chip--metal{ background:var(--titanium); }
+.swatches strong{ color:var(--heading); }
+.swatches span.use{ grid-column:2; color:var(--muted); font-size:.92rem; }
+
+/* Contact */
+.email{ font-size:clamp(1.25rem, 1rem + 1.2vw, 1.7rem); font-weight:600; }
+
+/* ───────────────────────── Footer ───────────────────────── */
+
+.foot{
+  --focus:var(--ti-hi);
+  --link:var(--ti-upper);
+  background:var(--navy); color:var(--ti-lower);
+  border-top:1px solid var(--line);
+  padding:40px 0 calc(40px + env(safe-area-inset-bottom));
+  font-size:.95rem;
+}
+.foot a{ color:var(--link); }
+.foot .promise{ color:var(--ti); font-weight:600; font-size:1.05rem; margin-bottom:.4em; }
+.foot-links{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:18px 0; }
+.foot .fine{ margin:0; font-size:.88rem; }
+
+/* ───────────────────────── 404 ───────────────────────── */
+
+.lost{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+.lost .hero-body{ flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; padding-bottom:48px; }
+.lost .hero-body img{ width:96px; height:96px; border-radius:22px; margin-bottom:24px; }
+.lost h1{ color:var(--ti); font-size:clamp(1.8rem, 1.2rem + 2.5vw, 2.6rem); }
