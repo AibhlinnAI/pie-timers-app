@@ -15,9 +15,9 @@ forget or accidentally undo.
   `assetlinks.json` and `DEPLOY.md` §9). Section 5 below exists because of
   this second product.
 
-The suite's own front door, the bare domain `aibhlinn.ai`, is a separate
-one-page site in `www/`. It is not served by this repo's Pages deploy; see
-`www/README.md` for why, and for how it goes live.
+The suite's own front door, the bare domain `aibhlinn.ai`, lives in its own
+repo, `AibhlinnAI/aibhlinn.ai`, because a GitHub Pages site has one custom
+domain and this repo's is `pietimers.aibhlinn.ai`.
 
 Everything here is static HTML/CSS/JS with no build step and no npm
 dependency, deployed as-is to GitHub Pages. The file the browser runs is the

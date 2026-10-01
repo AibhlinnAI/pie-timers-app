@@ -51,14 +51,13 @@ jobs:
           # deploy job below), but the repo itself is public regardless of
           # what Pages serves, so a secret committed there is just as
           # exposed. bin/ and obj/ are gitignored build output, never
-          # checked out here, so this only ever scans source. www/ is the
-          # aibhlinn.ai front door: also not served from here, also public.
-          SCAN_DIRS="app/ identity/ windows-screensaver/ www/"
+          # checked out here, so this only ever scans source.
+          SCAN_DIRS="app/ identity/ windows-screensaver/"
 
           # Literal secret formats. None of these has any business in a
           # file the browser downloads.
           if grep -rnE 'BEGIN [A-Z ]*PRIVATE KEY|sk_live_|sk_test_|whsec_|GOCSPX-' $SCAN_DIRS; then
-            echo "::error::A secret is present in app/, identity/, windows-screensaver/ or www/."
+            echo "::error::A secret is present in app/, identity/ or windows-screensaver/."
             fail=1
           fi
 
@@ -79,7 +78,7 @@ jobs:
           done
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "No private keys found in app/, identity/, windows-screensaver/ or www/."
+          echo "No private keys found in app/, identity/ or windows-screensaver/."
 
       # No ads, no tracking, no third-party analytics is a permanent
       # product principle (see ARCHITECTURE.md) covering every surface
@@ -93,18 +92,16 @@ jobs:
         run: |
           set -u
           fail=0
-          SCAN_DIRS="app/ identity/ windows-screensaver/ www/"
+          SCAN_DIRS="app/ identity/ windows-screensaver/"
           pattern='google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|amazon-adsystem\.com|facebook\.net|connect\.facebook\.com|fbq\(|gtag\(|mixpanel|segment\.(io|com)|hotjar|amplitude\.com|clarity\.ms|matomo|posthog|sentry\.io|bugsnag|fullstory|crazyegg|adroll'
 
-          # www/.github holds a copy of this very pattern, ready for the
-          # aibhlinn.ai repo, so workflow folders are skipped.
-          if grep -rniE --exclude-dir=.github "$pattern" $SCAN_DIRS; then
+          if grep -rniE "$pattern" $SCAN_DIRS; then
             echo "::error::An ad or tracking dependency's domain/global was found. This app's no-ads-no-tracking commitment (ARCHITECTURE.md) is meant to break the build if this happens, not just be a promise on a page. Remove it, or if this is a genuine first-party analytics addition, update this pattern deliberately alongside the ARCHITECTURE.md note explaining what changed and why."
             fail=1
           fi
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "No ad or tracking dependencies found in app/, identity/, windows-screensaver/ or www/."
+          echo "No ad or tracking dependencies found in app/ or identity/."
 
   deploy:
     needs: guard
