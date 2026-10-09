@@ -30,11 +30,13 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in, except three values marked MAL TO
-     CONFIRM in "Deleting your account", which are provisional. The
-     Supabase request-log retention in sections 8 and 9 is 1 day because
-     the project is on the Free plan (confirmed by Mal, 10 Oct 2026). It is
-     7 days on Pro and 28 on Team: if the plan changes, change both.
+     Every placeholder is now filled in, except two values marked MAL TO
+     CONFIRM in "Deleting your account" (tax-record years, backup window),
+     which are provisional. The Supabase request-log retention in sections
+     8 and 9, and the sign-in log in "Deleting your account", are 1 day
+     because the project is on the Free plan (confirmed by Mal, 10 Oct
+     2026). They are 7 days on Pro and 28 on Team: if the plan changes,
+     change all three.
      What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
@@ -123,7 +125,7 @@
     <li>An email left on the Android tester form is kept apart from your account.
     Ask and we will remove it, and it is deleted when testing ends.</li>
     <li>The sign-in log our database provider keeps, with the email address and
-    IP address of each sign-in, for up to 30<!-- MAL TO CONFIRM --> days.</li>
+    IP address of each sign-in, for 1<!-- Supabase Free plan: its auth log, as auth.audit_log_entries is empty (checked 10 Oct 2026). Change with sections 8 and 9 if the plan changes --> day.</li>
     <li>Backups held by our database provider drop deleted data within
     7<!-- MAL TO CONFIRM --> days.</li>
     <li>Sign-in attempt hashes are cleared within a day.</li>
