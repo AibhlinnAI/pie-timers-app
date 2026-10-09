@@ -8,6 +8,8 @@ hand into somebody else's dashboard, where the size is fixed by them.
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
 | `aibhlinn-emoji-128.png` | Custom emoji (Discord, Slack, Teams), name `aibhlinnai` | 128×128 PNG, under 128 KB |
 | `aibhlinn-emoji-light-128.png` | Light-mode custom emoji, name `aibhlinnai_light` | 128×128 PNG, under 128 KB |
+| `aibhlinn-emoji-gmail-24.png` | Gmail: pasted inline in a message, or in a signature | 24×24 PNG (Gmail shows images at their own size) |
+| `aibhlinn-emoji-light-bold-gmail-24.png` | Gmail, white theme only | 24×24 PNG |
 | `aibhlinn-emoji-light-bold-128.png` | Bolder light-mode emoji, name `aibhlinnai_light` (use instead of the regular one) | 128×128 PNG, under 128 KB |
 
 ## Colours
@@ -61,6 +63,17 @@ This one thickens it so it reads at a glance.
 - Upload one light version or the other under `aibhlinnai_light`, not
   both. Two near-identical emoji just clutter the picker.
 - 7 KB.
+
+## Gmail versions (24px)
+
+Gmail has no custom emoji, so the emoji goes in as an inline image, and
+Gmail shows an inline image at its own pixel size. 24px sits beside
+normal body text the way an emoji does; the 128px files would show as a
+large picture. Both are LANCZOS downscales of the 128px files.
+
+Prefer the tiled `aibhlinn-emoji-gmail-24.png` in email. You cannot
+know whether the reader uses dark mode, and on a dark Gmail theme the
+blue-on-transparent version almost disappears.
 
 ## pie-timers-oauth-120.png
 
