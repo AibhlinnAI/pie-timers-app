@@ -7,6 +7,7 @@ hand into somebody else's dashboard, where the size is fixed by them.
 |---|---|---|
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
 | `aibhlinn-emoji-128.png` | Custom emoji (Discord, Slack, Teams), name `aibhlinnai` | 128×128 PNG, under 128 KB |
+| `aibhlinn-emoji-light-128.png` | Light-mode custom emoji, name `aibhlinnai_light` | 128×128 PNG, under 128 KB |
 
 ## Colours
 
@@ -28,6 +29,22 @@ rather than the 40px mark, so the edges stay crisp.
 - Rounded corners (22% radius) with transparency outside, so the navy
   reads as a tile on light and dark themes alike.
 - 17 KB, inside Slack's 128 KB and Discord's 256 KB limits.
+
+## aibhlinn-emoji-light-128.png
+
+The light-mode partner to the emoji above: the monogram in brand blue
+`#2E3A63` on a transparent background, with no tile. Use it where the
+navy tile looks heavy on a white chat theme.
+
+- Made from `app/aibhlinn-mark-512.png`. The letters are cut out by
+  brightness (the metal is above 160 and the navy below 50, with a
+  smooth ramp between) and filled with flat `#2E3A63`. The metal is
+  never used on white (see Colours).
+- Cropped a little tighter (340px square) than the tiled version,
+  because there is no tile to fill.
+- Disappears on dark themes, the same way the blue wordmark does. Use
+  the tiled version there.
+- 7 KB.
 
 ## pie-timers-oauth-120.png
 
