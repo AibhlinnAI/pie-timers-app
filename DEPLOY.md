@@ -244,7 +244,8 @@ before anything is counted:
 1. The Cloudflare proxy disclosure (branch `cloudflare-proxy-counts`) merges
    first. Done: PR #34, live 30 Sep 2026. Withdrawn 10 Oct 2026: the record
    was never proxied, so `privacy.html` now names Cloudflare only for
-   Turnstile. Do not restore it unless the proxy is switched on (see 3.1).
+   Turnstile and for email to our `@aibhlinn.ai` addresses (6.3). Do not
+   restore it unless the proxy is switched on (see 3.1).
 2. Before the counter's pull request merges, settle these:
    - the Supabase plan's retention figures. Done 10 Oct 2026: the project is
      on Free, so `privacy.html` says request logs and the sign-in log are kept
@@ -459,6 +460,17 @@ If you sign in on an address at `aibhlinn.ai`, remember incoming mail runs
 through Cloudflare Email Routing: a rule (or catch-all) must exist for that
 exact address, and its destination must be verified, or the link is dropped
 with no error anywhere.
+
+That routing is also a disclosure. `privacy.html` section 6 names
+Cloudflare for receiving mail sent to an `@aibhlinn.ai` address and passing
+it on, and Google for holding it, because the destination mailbox is Gmail.
+Replies, and any email we start ourselves (a tester's install link, a
+"your account is deleted" notice), go out through Gmail's send-as for the
+`aibhlinn.ai` address, which relays through Resend (`smtp.resend.com`),
+not Google: so section 6 names Resend for our email to people as well as
+for sign-in codes, and section 5 says it goes through Resend. If the MX
+records, the destination or the send-as relay ever change, change sections
+5 and 6 the same day.
 
 ### 6.4 Make the sign-in email a code, not a link
 

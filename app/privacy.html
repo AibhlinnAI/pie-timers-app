@@ -42,7 +42,12 @@
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
           the project to another region, this becomes a false statement
           about where Australians' data lives — change this page the same day.
-          The same applies to section 6 if you move off GitHub Pages.
+          The same applies to section 6 if you move off GitHub Pages, or
+          move email for aibhlinn.ai off Cloudflare Email Routing or off
+          Gmail, and to sections 5 and 6 if Gmail's send-as for
+          aibhlinn.ai stops relaying through Resend (smtp.resend.com):
+          that relay is why both name Resend for our email to people, not
+          only for sign-in codes (DEPLOY.md 6.3).
        2. Have this reviewed. If you get EU or UK customers you are a data
           controller under GDPR/UK GDPR, which brings obligations this
           document only summarises.
@@ -51,10 +56,14 @@
           tools/check-visits.js). Before it changes (a new field, a new
           kind of count, finer time, longer retention), change section 9
           and deploy it FIRST. pietimers.aibhlinn.ai is DNS only in
-          Cloudflare, so Cloudflare carries none of the app's pages or
-          files, keeps no server logs of them and gives no visit totals.
-          Its only contact with visitors is Turnstile on the sign-in form
-          (section 6). Switching it to Proxied would add a second
+          Cloudflare, so our Cloudflare account carries none of the app's
+          pages or files, and keeps no logs or totals of the app. What it
+          does reach is in section 6: Turnstile on the sign-in form, and
+          email sent to an @aibhlinn.ai address, which Email Routing
+          receives and passes on to Gmail. Supabase's API traffic also
+          passes through Cloudflare, as Supabase's own network provider:
+          that is Supabase's account, not ours, and the Supabase row
+          covers it. Switching the record to Proxied would add a second
           count and a second set of server logs: disclose both here, and
           deploy that, before the cloud turns orange (DEPLOY.md 3.1).
           Never name an analytics vendor on this page:
@@ -88,10 +97,10 @@
   <ul>
     <li>Without an account, your schedule, appointments and settings never leave
     your device. The only exceptions are an email you choose to leave on the
-    Android tester form, the bot check that loads when you open the sign-in
-    form, and a one-off count the first time the app opens. That count carries no
-    name, account or ID, though like any web request it reaches our database
-    provider with your IP address (see <a href="#counting">section 9</a>).</li>
+    Android tester form, the bot check that runs from when you open the
+    sign-in form until you close the app, and a one-off count the first time
+    the app opens. That count carries no name, account or ID, though like any
+    web request it reaches our database provider with your IP address (see <a href="#counting">section 9</a>).</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
     <li>We do not sell your data, and there are no third-party analytics,
@@ -139,6 +148,8 @@
     "Backups held by our database provider drop deleted data within 7
     days." --></li>
     <li>Sign-in attempt hashes are cleared within a day.</li>
+    <li>Any email you sent us, and our replies, in our mailbox. Ask and we will
+    delete them.</li>
   </ul>
   <p>You can also remove some data without deleting your account. Disconnecting a
   calendar deletes its address and the events we stored from it.</p>
@@ -155,10 +166,11 @@
   and no request carrying them is ever sent anywhere.</p>
   <p>There is no sign-up wall and no tracking on the free version, only the
   one-off first-open count in <a href="#counting">section 9</a>. The only
-  email we collect without an account is one you choose to leave on the
-  Android tester form. We use it for two things: we add it to Google Play's
-  tester list so Google can give you access, and we email you the install
-  link.</p>
+  email address the app collects without an account is one you choose to
+  leave on the Android tester form. We use it for two things: we add it to
+  Google Play's tester list so Google can give you access, and we email you
+  the install link. If you email us, we keep that email too (sections 6
+  and 8).</p>
 
   <h2>3. If you create an account</h2>
   <p>We then store:</p>
@@ -204,24 +216,31 @@
   <p>Account data is stored with <strong>Supabase</strong> in the
   <strong>ap-southeast-2 (Sydney)</strong> region. Your schedule, appointments,
   settings and calendar data stay in Australia.</p>
-  <p>Three exceptions, so this is not misleading. Sign-in emails are sent through
-  Resend, and your email address passes through their systems overseas to
-  deliver them. If you pay, Paddle handles the transaction and holds your billing
-  details under their own policy, also overseas. If you join the Android tester
-  list, we add your email address to Google Play's testing list, which Google
-  holds overseas. None of them receives your schedule, your appointments or your
-  calendar.</p>
+  <p>Some things do leave Australia, so this is not misleading. Sign-in emails,
+  and the emails we send you from an @aibhlinn.ai address, are sent through
+  Resend, and your email address and those emails pass through their systems
+  overseas to deliver them. If you pay, Paddle handles the transaction and holds
+  your billing details under their own policy, also overseas. If you join the
+  Android tester list, we add your email address to Google Play's testing list,
+  which Google holds overseas. If you email us, Cloudflare receives your message
+  and passes it on to our mailbox with Google, which holds it overseas. The
+  services in section 6 that see only your IP address and browser are overseas
+  too: GitHub, which serves the app's files, and Cloudflare's bot check. And if
+  alerts are on, each one passes through your browser's push service, encrypted
+  so that the service cannot read it. None of them can read your schedule, your
+  appointments or your calendar.</p>
 
   <h2>6. Who else touches your data</h2>
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
-      <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in code</td></tr>
-      <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
-      <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser. Its network provider, Cloudflare, carries every request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
+      <tr><td>Resend</td><td>Your email address, and any email we send you from an @aibhlinn.ai address, such as our replies</td><td>Sending your sign-in code and our email to you</td></tr>
+      <tr><td>Paddle</td><td>Your account email and account ID, which we pass to checkout so your payment reaches your account, and the billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
+      <tr><td>Google</td><td>What Google sign-in or Google Calendar needs, only if you use them. Any email you send us, and email we send you, because our mailbox is with Google</td><td>Authentication, reading your calendar, and holding our email</td></tr>
       <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
-      <tr><td>Cloudflare</td><td>Your IP address and browser signals, while the sign-in form is open</td><td>Checking that a person, not a bot, is using the sign-in form</td></tr>
+      <tr><td>Cloudflare</td><td>Your IP address and browser signals, from when you open the sign-in form until you close the app. Any email you send to an @aibhlinn.ai address, such as support@aibhlinn.ai</td><td>Checking that a person, not a bot, is using the sign-in form, and receiving email sent to us and passing it on to our mailbox</td></tr>
+      <tr><td>Your browser's push service (Google, Apple, Microsoft or Mozilla, depending on your browser)</td><td>An encrypted alert and when it is sent, only if you are signed in, have allowed notifications and have alerts switched on</td><td>Delivering alerts while the app is closed</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
     </tbody>
   </table>
@@ -250,6 +269,8 @@
     deleted by Supabase.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
     for as long as Australian tax law requires.</li>
+    <li><strong>Email you send us, and email we send you</strong>: kept in our
+    mailbox until you ask us to delete it.<!-- No fixed period: Gmail keeps mail until someone deletes it, so this says only what is true by default. If Mal sets a period and keeps to it, say it here and in "What we keep". --></li>
   </ul>
 
   <h2 id="counting">9. Cookies, tracking and counting</h2>
