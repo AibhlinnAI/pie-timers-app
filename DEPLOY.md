@@ -109,7 +109,11 @@ these come first, in this order:
    itself, and that is reported to fail while the record is proxied. Under
    Full (strict), an expired certificate is error 526 on every page. The
    routine is: grey the cloud, wait for the new certificate, orange it again.
-   Certificate lifetimes are shortening, so this comes round every few weeks.
+   If that report holds, the routine comes round at every renewal: about
+   every two months on today's 90-day certificates, and more often as Let's
+   Encrypt shortens lifetimes (64 days from February 2027, 45 from February
+   2028). Measure the real interval first: read the live certificate's
+   expiry date, and check whether it moves while the record is proxied.
 3. **Turn off everything that changes a response, before the switch.** Not
    four settings but about twenty, several on by default: Email Address
    Obfuscation (it would rewrite every `mailto:` link), Automatic HTTPS
@@ -238,7 +242,9 @@ switched off, and goes on in this order, because the disclosure must be live
 before anything is counted:
 
 1. The Cloudflare proxy disclosure (branch `cloudflare-proxy-counts`) merges
-   first. Done: PR #34, live 30 Sep 2026.
+   first. Done: PR #34, live 30 Sep 2026. Withdrawn 10 Oct 2026: the record
+   was never proxied, so `privacy.html` now names Cloudflare only for
+   Turnstile. Do not restore it unless the proxy is switched on (see 3.1).
 2. Before the counter's pull request merges, settle these:
    - the Supabase plan's retention figures. Done 10 Oct 2026: the project is
      on Free, so `privacy.html` says request logs and the sign-in log are kept

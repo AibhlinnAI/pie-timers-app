@@ -123,21 +123,26 @@ after.
 
 **Cloudflare: DNS only, deliberately (decided 10 Oct 2026).**
 `pietimers.aibhlinn.ai` is a DNS only (grey cloud) record. Cloudflare answers
-the name lookup and never sees the app's traffic, so it counts nothing. An
+the name lookup but never carries the app's pages or files, so it keeps no
+logs of them and gives no visit totals. Its only contact with visitors is
+Turnstile on the sign-in form (section 4). An
 earlier note here said the record had been proxied from 30 Sep 2026. It never
 was: the disclosure went live, the switch did not happen. Switching it was
 then researched and deferred until after Launch Month, because:
 
 - GitHub's own certificate renewal is reported to fail while the record is
   proxied, and under Full (strict) an expired certificate is error 526 on
-  every page. Keeping it working means a grey-cloud renewal routine every
-  few weeks.
+  every page. Keeping it working would mean a grey-cloud routine at every
+  renewal: about every two months now, and more often as certificate
+  lifetimes shorten.
 - About twenty Cloudflare features would change the app's pages, headers or
   cookies, several of them on by default, and all of them must stay off.
 - The free plan's totals are rough: requests (every file), not pages.
 
-`DEPLOY.md` 3.1 has what to do before ever switching. The first-open count
-below is the visit number meanwhile.
+`DEPLOY.md` 3.1 has what to do before ever switching. Meanwhile the
+first-open count below is the only visit number planned, and it ships
+switched off (`countFirstOpens: false` in `app/config.js`). Until it is
+switched on (`DEPLOY.md` 5.5) there is no visit number at all.
 
 **First opens:** `app/visits.js` adds one to a daily total in
 `public.visit_counts` (`supabase/schema-visit-counts.sql`) the first time the
@@ -178,14 +183,16 @@ The commitment is also stated in the app, in the footer of every page:
 *"No ads. No tracking. No selling your data. Ever."* — not buried in the
 privacy policy alone.
 
-## 4. Every byte comes from our own origin
+## 4. Every file of the app comes from our own origin
 
 Every file the app is made of comes from our own origin, and that is a
 consequence of section 3 rather than a separate rule. The only requests to
 anyone else are the services the app needs to do its job, each named in
-`privacy.html` section 6: Supabase for accounts and sync; Cloudflare
-Turnstile, loaded only while the sign-in form is open; and Paddle's
-checkout, loaded only when someone goes to subscribe. Two things follow, and
+`privacy.html` section 6: Supabase for accounts, sync, the tester form and
+the first-open count; Cloudflare Turnstile, loaded only while the sign-in
+form is open; Paddle's checkout, loaded only when someone goes to
+subscribe; and Google, reached through Supabase, only when someone chooses
+Google sign-in or connects Google Calendar. Two things follow, and
 both are easy to undo by accident:
 
 - **The typeface is self-hosted.** `app/fonts/` carries Instrument Sans as

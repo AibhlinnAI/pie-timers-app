@@ -51,8 +51,10 @@
           tools/check-visits.js). Before it changes (a new field, a new
           kind of count, finer time, longer retention), change section 9
           and deploy it FIRST. pietimers.aibhlinn.ai is DNS only in
-          Cloudflare, so Cloudflare sees none of the app's traffic and
-          counts nothing. Switching it to Proxied would add a second
+          Cloudflare, so Cloudflare carries none of the app's pages or
+          files, keeps no server logs of them and gives no visit totals.
+          Its only contact with visitors is Turnstile on the sign-in form
+          (section 6). Switching it to Proxied would add a second
           count and a second set of server logs: disclose both here, and
           deploy that, before the cloud turns orange (DEPLOY.md 3.1).
           Never name an analytics vendor on this page:

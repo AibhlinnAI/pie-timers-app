@@ -64,24 +64,34 @@ var SHELL = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE)
-      /* All or nothing. If any shell file fails to arrive (a dropped
-         connection, a 5xx, an error page from anything in front of Pages),
-         the install fails and the browser retries later, while the old
-         worker and its complete cache carry on. Skipping the failed file
-         instead, as this used to, still activated the new worker, whose
-         activate step then deleted the old cache: the offline shell came
-         up a file short with nothing to fall back on.
+      /* An UPDATE is all or nothing. If any shell file fails to arrive (a
+         dropped connection, a 5xx, an error page from anything in front of
+         Pages), the install fails and the browser retries later, while the
+         old worker and its complete cache carry on. Skipping the failed
+         file instead, as this used to, still activated the new worker,
+         whose activate step then deleted the old cache: the offline shell
+         came up a file short with nothing to fall back on.
 
-         The reason it used to skip, that one 404 in this list would block
-         every update, is now a smoke-test failure instead:
-         tools/check-sw.js checks every entry here is a real file. */
+         A FIRST install keeps whatever arrived. There is no old worker to
+         fall back on, and a failed first install leaves no worker at all,
+         so navigator.serviceWorker.ready never resolves and notify.js
+         cannot set up background alerts for the rest of the visit. The
+         cache-first handler below stores a missed file the first time the
+         page loads it.
+
+         The reason updates used to skip a failed file, that one dead entry
+         in this list would block every update, is now caught before it
+         ships: tools/check-sw.js, in smoke.yml and in deploy.yml's guard,
+         checks every entry here is a real file. */
       .then(function (cache) {
+        var strict = !!self.registration.active;
         return Promise.all(SHELL.map(function (url) {
           /* cache:'reload' goes past the browser's HTTP cache to the server.
              Pages keeps files for ten minutes, so a plain add() soon after
              a deploy could store the OLD app.js under the NEW cache name,
              and it would then be served until the next bump. */
-          return cache.add(new Request(url, { cache: 'reload' }));
+          var add = cache.add(new Request(url, { cache: 'reload' }));
+          return strict ? add : add.catch(function () { return null; });
         }));
       })
       .then(function () { return self.skipWaiting(); })
@@ -92,8 +102,12 @@ self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys()
       .then(function (keys) {
+        /* Only this worker's own old caches. stall41/sw.js keeps its
+           offline copy in a cache of its own on the same origin, and an
+           app release must not wipe it. */
         return Promise.all(keys.map(function (key) {
-          return key === CACHE ? null : caches.delete(key);
+          return key.indexOf('countdown-timers-') === 0 && key !== CACHE
+            ? caches.delete(key) : null;
         }));
       })
       .then(function () { return self.clients.claim(); })
@@ -115,21 +129,30 @@ self.addEventListener('fetch', function (event) {
   // Network-first for navigations so a deploy is picked up promptly,
   // cache-first for static assets so the app opens instantly offline.
   if (request.mode === 'navigate') {
+    /* Never stored, never substituted: a cached health check is a lie
+       (see SHELL). The browser shows the server's real answer. */
+    if (url.pathname.slice(-17) === '/diagnostics.html') return;
+
     event.respondWith(
       fetch(request)
         .then(function (response) {
           /* Only a good page replaces the stored one. This used to store
              whatever came back, so one error page (a Pages 404 or 5xx, or
              an error from anything in front of Pages) overwrote the copy
-             that works offline, and was then shown offline. */
-          if (response.ok && response.type === 'basic') {
+             that works offline, and was then shown offline.
+
+             A redirect is stored too. Pages answers a folder address
+             without its slash (/nsw26) with a redirect to /nsw26/, and the
+             stored redirect is what still gets there offline. */
+          if ((response.ok && response.type === 'basic') ||
+              response.type === 'opaqueredirect') {
             var copy = response.clone();
             caches.open(CACHE).then(function (c) { c.put(request, copy); });
             return response;
           }
           /* The server is failing: the stored copy is better than its
-             error page. A 404 is an answer, not a failure, so it is shown,
-             and a redirect passes straight through to the browser. */
+             error page. A 404 is an answer, not a failure, so it is shown
+             as it is. */
           if (response.status >= 500) {
             return caches.match(request).then(function (hit) {
               return hit || response;

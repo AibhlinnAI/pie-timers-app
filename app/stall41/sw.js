@@ -25,10 +25,14 @@ self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE)
       .then(function (cache) {
+        /* As in app/sw.js: an update is all or nothing, so a failed file
+           leaves the old worker and its complete cache in place; a first
+           install keeps whatever arrived, because there is nothing to
+           fall back on. */
+        var strict = !!self.registration.active;
         return Promise.all(FILES.map(function (url) {
-          /* All or nothing, as in app/sw.js: a failed file fails the
-             install, so the old worker and its complete cache carry on. */
-          return cache.add(new Request(url, { cache: 'reload' }));
+          var add = cache.add(new Request(url, { cache: 'reload' }));
+          return strict ? add : add.catch(function () { return null; });
         }));
       })
       .then(function () { return self.skipWaiting(); })
@@ -47,30 +51,42 @@ self.addEventListener('activate', function (event) {
   );
 });
 
+/* The stored page, from this worker's own cache only: the app's worker
+   on the same origin keeps caches of its own. */
+function storedPage() {
+  return caches.open(CACHE).then(function (c) { return c.match('./'); });
+}
+
 self.addEventListener('fetch', function (event) {
   var request = event.request;
   if (request.method !== 'GET') return;
-  if (new URL(request.url).origin !== self.location.origin) return;
+  var url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
   // Network first for the page, so a fix is picked up; the cached copy
   // when the venue Wi-Fi is down.
   if (request.mode === 'navigate') {
+    /* Only the page itself. Opening manifest.webmanifest or sw.js in a
+       tab is a navigation too, and must not be stored as the page. */
+    if (!/\/stall41\/(index\.html)?$/.test(url.pathname)) return;
+
     event.respondWith(
       fetch(request)
         .then(function (response) {
-          /* Only a good page replaces the stored one, as in app/sw.js. On a
-             server error, the stored page is better than the error. */
+          /* Only a good copy of the page replaces the stored one, as in
+             app/sw.js. On a server error, the stored page is better than
+             the error. */
           if (response.ok && response.type === 'basic') {
             var copy = response.clone();
             caches.open(CACHE).then(function (c) { c.put('./', copy); });
             return response;
           }
           if (response.status >= 500) {
-            return caches.match('./').then(function (hit) { return hit || response; });
+            return storedPage().then(function (hit) { return hit || response; });
           }
           return response;
         })
-        .catch(function () { return caches.match('./'); })
+        .catch(storedPage)
     );
     return;
   }

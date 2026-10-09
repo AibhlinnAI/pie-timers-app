@@ -2,27 +2,36 @@
 /* ============================================================
    Service worker checks: app/sw.js and app/stall41/sw.js.
 
-   Static cases: every precache entry is a real file in this repo, and
-   every versioned script or stylesheet app/index.html asks for is
-   precached by exactly that URL. Both matter more now that install is
-   all-or-nothing: one missing file in the list would block every
-   update, and a ?v= that disagrees with index.html leaves the app
-   unable to start offline (the comment above SHELL in sw.js says why).
+   Static cases: every precache entry is a real file at the address the
+   browser will ask for (deploy.yml publishes app/ at the root and
+   identity/ at /identity/), and every versioned URL app/index.html asks
+   for is precached by exactly that URL. Both matter more now that an
+   update is all-or-nothing: one dead entry would block every update, and
+   a ?v= that disagrees with index.html leaves the app unable to start
+   offline (the comment above SHELL in sw.js says why). The lists are
+   read from the workers' own code, run in a sandbox, not scraped.
 
-   Behaviour cases run each worker's own code in a vm sandbox, with
-   fetch and the Cache API stubbed, and play the browser's part:
-   - a good page is stored for offline use;
-   - an error page is never stored, so it cannot replace the good copy;
-   - a server error shows the stored copy instead, if there is one;
-   - a 404 is shown as it is, and a redirect passes straight through;
+   Behaviour cases run each worker's own code in a vm sandbox, with fetch
+   and the Cache API stubbed as the browser behaves, and both workers
+   sharing one cache store, as they do on the one origin:
+   - a good page is stored for offline use, and an error page never is;
+   - on a server error the stored copy is shown, if there is one;
+   - a 404 is shown as it is;
+   - a redirect: the app worker stores it (so /nsw26 still reaches
+     /nsw26/ offline); the stall worker passes it through;
    - with no network, the stored copy (or the app shell) is shown;
-   - one failed precache file fails the whole install, so the old
-     worker and its complete cache carry on.
+   - diagnostics.html is never stored or substituted;
+   - the stall worker stores only its page, not other files opened in a
+     tab, and the app worker's release never deletes the stall's cache;
+   - an update with one failed file fails as a whole, so the old worker
+     and its cache carry on; a first install keeps what arrived;
+   - every precache fetch goes past the HTTP cache (cache: 'reload').
 
    Nothing here touches the network.
 
    Run: node tools/check-sw.js   (PT_ROOT=<dir> checks another copy)
-   Runs in smoke.yml on every pull request.
+   Runs in smoke.yml on every pull request, and in deploy.yml's guard
+   before every publish.
    ============================================================ */
 'use strict';
 const fs = require('fs');
@@ -42,48 +51,60 @@ function check(name, ok, detail) {
 
 /* ───────────────────────── Harness ───────────────────────── */
 
+const ORIGIN = 'https://pietimers.aibhlinn.ai';
+const APP = ORIGIN + '/';
+const STALL = ORIGIN + '/stall41/';
+
 /* A Response stand-in with just what the workers use. */
 function res(status, opts) {
   const o = Object.assign({ type: 'basic', body: 'body-' + status }, opts);
-  const r = {
+  return {
     status, type: o.type, body: o.body,
-    ok: status >= 200 && status < 300,
+    ok: o.type !== 'opaqueredirect' && status >= 200 && status < 300,
     clone() { return res(status, o); },
   };
-  return r;
 }
 
-/* Loads a worker into a fresh context. `network` decides each fetch:
-   (url) => a res(), or the string 'offline' to reject. Returns handles
-   to its listeners, its caches and what it fetched. */
-function load(file, scope, network) {
+/* Loads a worker into a fresh context. `network(url)` returns a res(),
+   or 'offline' to reject. opts.shared: a cache store shared with another
+   worker (one origin, one CacheStorage). opts.active: an older worker is
+   already active, so this install is an update. */
+function load(file, scope, network, opts) {
+  const o = opts || {};
   const source = readText(path.join(ROOT, file));
   const listeners = {};
-  const stores = new Map();          // cache name -> Map(key -> response)
-  const fetched = [];
+  const stores = o.shared || new Map();   // cache name -> Map(url -> response)
+  const fetched = [], modes = [];
   const keyOf = (req) => new URL(typeof req === 'string' ? req : req.url, scope).href;
+  function doFetch(req) {
+    const url = keyOf(req);
+    fetched.push(url);
+    modes.push(req && req.init ? req.init.cache : undefined);
+    const r = network(url);
+    return r === 'offline' ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(r);
+  }
   const cacheObj = (name) => {
     if (!stores.has(name)) stores.set(name, new Map());
     const m = stores.get(name);
     return {
       put(req, r) { m.set(keyOf(req), r); return Promise.resolve(); },
       match(req) { return Promise.resolve(m.get(keyOf(req))); },
-      /* Cache.add rejects on a network failure or a non-OK response,
-         and stores nothing; that is the browser's behaviour. */
+      // Rejects on a failed fetch or a non-OK response and stores nothing, as the browser does.
       add(req) {
         return doFetch(req).then((r) => {
           if (!r.ok) throw new TypeError('bad status ' + r.status);
           m.set(keyOf(req), r);
         });
       },
+      // All or nothing: stores nothing unless every response is OK.
+      addAll(reqs) {
+        return Promise.all(reqs.map(doFetch)).then((rs) => {
+          rs.forEach((r) => { if (!r.ok) throw new TypeError('bad status ' + r.status); });
+          rs.forEach((r, i) => m.set(keyOf(reqs[i]), r));
+        });
+      },
     };
   };
-  function doFetch(req) {
-    const url = keyOf(req);
-    fetched.push(url);
-    const r = network(url);
-    return r === 'offline' ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(r);
-  }
   const caches = {
     open: (name) => Promise.resolve(cacheObj(name)),
     keys: () => Promise.resolve([...stores.keys()]),
@@ -94,11 +115,11 @@ function load(file, scope, network) {
     },
   };
   const self = {
-    location: new URL(scope),
+    location: new URL(scope + 'sw.js'),
     addEventListener: (type, fn) => { listeners[type] = fn; },
     skipWaiting: () => Promise.resolve(),
     clients: { claim: () => Promise.resolve(), matchAll: () => Promise.resolve([]) },
-    registration: { showNotification: () => Promise.resolve() },
+    registration: { active: o.active ? {} : null, showNotification: () => Promise.resolve() },
   };
   function Request(url, init) { this.url = new URL(url, scope).href; this.init = init; }
   const ctx = vm.createContext({
@@ -106,59 +127,57 @@ function load(file, scope, network) {
     setTimeout, Date, Object, JSON,
   });
   vm.runInContext(source, ctx, { filename: file });
-  const cacheName = /var CACHE = '([^']+)'/.exec(source)[1];
-  return { listeners, stores, fetched, caches, cacheName, keyOf };
+  return { ctx, listeners, stores, fetched, modes, caches, keyOf, scope };
 }
 
-/* Dispatches an event and waits for everything it started, including
-   the cache writes a handler does without waiting for them. */
+/* Dispatches an event and waits for everything it started, including the
+   cache writes a handler makes without waiting for them. */
 async function settle() { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); }
 async function navigate(w, url) {
-  let responded;
+  let responded = null;
   const event = {
-    request: { method: 'GET', mode: 'navigate', url: new URL(url, w.keyOf('./')).href },
+    request: { method: 'GET', mode: 'navigate', url: new URL(url, w.scope).href },
     respondWith(p) { responded = Promise.resolve(p); },
   };
   w.listeners.fetch(event);
-  const out = responded ? await responded.catch((e) => ({ error: e })) : undefined;
+  const out = responded ? await responded.catch((e) => ({ error: String(e) })) : 'not handled';
   await settle();
   return out;
 }
-async function install(w) {
+async function lifecycle(w, type) {
   let waited;
-  w.listeners.install({ waitUntil(p) { waited = p; } });
-  try { await waited; await settle(); return 'installed'; } catch (e) { await settle(); return 'failed'; }
+  w.listeners[type]({ waitUntil(p) { waited = p; } });
+  try { await waited; await settle(); return 'done'; }
+  catch (e) { await settle(); if (process.env.PT_DEBUG) console.error(type, e); return 'failed'; }
 }
-const stored = (w, key) => (w.stores.get(w.cacheName) || new Map()).get(w.keyOf(key));
+const stored = (w, key) => (w.stores.get(w.ctx.CACHE) || new Map()).get(w.keyOf(key));
 
 /* ───────────────────────── Static cases ───────────────────────── */
 
-/* Where a precache URL lives in the repo. deploy.yml publishes app/ at
-   the root and identity/ at /identity/. */
-function repoPath(url, base) {
-  const clean = url.split('?')[0];
-  const rel = path.posix.normalize(path.posix.join(base, clean === './' || clean.endsWith('/') ? clean + 'index.html' : clean));
-  return rel.startsWith('identity/') ? rel : path.posix.join('app', rel);
-}
-function listOf(file, name) {
-  const src = readText(path.join(ROOT, file));
-  const m = new RegExp('var ' + name + ' = \\[([\\s\\S]*?)\\];').exec(src);
-  // Entries only: strip comments first, so a quoted word in one is not read as a URL.
-  return m ? [...m[1].replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch (e) { return false; } };
+/* The repo file the browser gets for a URL, as deploy.yml publishes it. */
+function servedFile(u, scope) {
+  let p = new URL(u, scope).pathname;
+  if (p.endsWith('/')) p += 'index.html';
+  p = p.slice(1);
+  return path.join(ROOT, p.startsWith('identity/') ? '' : 'app', p);
 }
 
-const SHELL = listOf('app/sw.js', 'SHELL');
-check('S1 app/sw.js has a SHELL list', SHELL.length > 10, SHELL.length);
-const missing = SHELL.filter((u) => !fs.existsSync(path.join(ROOT, repoPath(u, ''))));
+const appSW = load('app/sw.js', APP, () => res(200));
+const stallSW = load('app/stall41/sw.js', STALL, () => res(200));
+const SHELL = appSW.ctx.SHELL || [];
+const FILES = stallSW.ctx.FILES || [];
+
+check('S1 app/sw.js has a SHELL list and a CACHE name', SHELL.length > 10 && /^countdown-timers-/.test(appSW.ctx.CACHE), [SHELL.length, appSW.ctx.CACHE]);
+const missing = SHELL.filter((u) => !isFile(servedFile(u, APP)));
 check('S2 every app/sw.js SHELL entry is a real file (' + SHELL.length + ' checked)', missing.length === 0, missing);
-
-const STALL = listOf('app/stall41/sw.js', 'FILES');
-check('S3 app/stall41/sw.js has a FILES list', STALL.length > 0, STALL.length);
-const stallMissing = STALL.filter((u) => !fs.existsSync(path.join(ROOT, repoPath(u, 'stall41/'))));
-check('S4 every app/stall41/sw.js FILES entry is a real file (' + STALL.length + ' checked)', stallMissing.length === 0, stallMissing);
+check('S3 app/stall41/sw.js has a FILES list and a CACHE name', FILES.length > 0 && /^stall41-/.test(stallSW.ctx.CACHE), [FILES.length, stallSW.ctx.CACHE]);
+const stallMissing = FILES.filter((u) => !isFile(servedFile(u, STALL)));
+check('S4 every app/stall41/sw.js FILES entry is a real file (' + FILES.length + ' checked)', stallMissing.length === 0, stallMissing);
 
 const index = readText(path.join(ROOT, 'app', 'index.html'));
-const versioned = [...index.matchAll(/(?:src|href)="([^":]+\?v=[^"]+)"/g)].map((m) => m[1]);
+// Every versioned token, however it is quoted. The comment text "file.js?v=<release>" cannot match.
+const versioned = [...new Set([...index.matchAll(/[\w./-]+\?v=[\w.-]+/g)].map((m) => m[0]))];
 check('S5 app/index.html loads versioned files', versioned.length > 0, versioned);
 const unshelled = versioned.filter((u) => !SHELL.includes(u));
 check('S6 every versioned URL app/index.html asks for is precached exactly (' + versioned.length + ' checked)',
@@ -166,105 +185,166 @@ check('S6 every versioned URL app/index.html asks for is precached exactly (' + 
 
 /* ───────────────────────── Behaviour cases ───────────────────────── */
 
-const APP = 'https://pietimers.aibhlinn.ai/';
-const STALL_SCOPE = 'https://pietimers.aibhlinn.ai/stall41/';
-
 (async () => {
-  // B1. A good page is stored.
-  {
-    const w = load('app/sw.js', APP, () => res(200, { body: 'fresh privacy' }));
-    const r = await navigate(w, 'privacy.html');
-    check('B1 app: a good page is shown', r && r.status === 200);
-    check('B1 app: a good page is stored for offline use', stored(w, 'privacy.html') && stored(w, 'privacy.html').body === 'fresh privacy');
+  /* The rules both workers share, run for each. The stall worker stores
+     its page under './' whatever the URL, so it is asked again with a
+     query string to pin that. */
+  const WORKERS = [
+    { tag: 'app', file: 'app/sw.js', scope: APP, page: 'privacy.html', key: 'privacy.html', again: 'privacy.html' },
+    { tag: 'stall41', file: 'app/stall41/sw.js', scope: STALL, page: './', key: './', again: './?display=1' },
+  ];
+  for (const W of WORKERS) {
+    const T = W.tag + ': ';
+    {
+      const w = load(W.file, W.scope, () => res(200, { body: 'fresh page' }));
+      const r = await navigate(w, W.page);
+      check('B1 ' + T + 'a good page is shown', r && r.status === 200);
+      check('B1 ' + T + 'a good page is stored for offline use', stored(w, W.key) && stored(w, W.key).body === 'fresh page');
+    }
+    for (const status of [500, 502, 526]) {
+      let net = () => res(200, { body: 'good page' });
+      const w = load(W.file, W.scope, (u) => net(u));
+      await navigate(w, W.page);
+      net = () => res(status, { body: 'error page ' + status });
+      const r = await navigate(w, W.again);
+      check('B2 ' + T + 'a ' + status + ' does not replace the stored page', stored(w, W.key).body === 'good page');
+      check('B3 ' + T + 'on a ' + status + ', the stored page is shown instead', r && r.body === 'good page', r && r.body);
+    }
+    {
+      const w = load(W.file, W.scope, () => res(503, { body: 'error page 503' }));
+      const r = await navigate(w, W.page);
+      check('B4 ' + T + 'a 5xx with nothing stored shows the server\'s page', r && r.status === 503);
+      check('B4 ' + T + 'and stores nothing', !stored(w, W.key));
+    }
+    {
+      let net = () => res(200, { body: 'good page' });
+      const w = load(W.file, W.scope, (u) => net(u));
+      await navigate(w, W.page);
+      net = () => res(404, { body: 'not found' });
+      const r = await navigate(w, W.again);
+      check('B5 ' + T + 'a 404 is shown as the server sent it', r && r.status === 404);
+      check('B5 ' + T + 'a 404 does not overwrite the stored page', stored(w, W.key).body === 'good page');
+    }
+    {
+      let net = () => res(200, { body: 'good page' });
+      const w = load(W.file, W.scope, (u) => net(u));
+      await navigate(w, W.page);
+      net = () => 'offline';
+      const r = await navigate(w, W.again);
+      check('B7 ' + T + 'offline shows the stored page', r && r.body === 'good page', r && r.body);
+    }
+    {
+      const w = load(W.file, W.scope, () => res(200), { active: true });
+      check('B8 ' + T + 'an update installs when every file arrives', (await lifecycle(w, 'install')) === 'done');
+      const list = w.ctx.SHELL || w.ctx.FILES;
+      check('B8 ' + T + 'and stores every file', list.every((u) => stored(w, u)), list.filter((u) => !stored(w, u)));
+      check('B8 ' + T + 'every precache fetch goes past the HTTP cache', w.modes.length === list.length && w.modes.every((c) => c === 'reload'), w.modes);
+    }
+    {
+      const list = load(W.file, W.scope, () => res(200)).ctx.SHELL || load(W.file, W.scope, () => res(200)).ctx.FILES;
+      const victim = new URL(list[list.length - 1], W.scope).href;
+      for (const [label, bad] of [['a 5xx', () => res(503)], ['a dropped connection', () => 'offline'], ['a 404', () => res(404)]]) {
+        const w = load(W.file, W.scope, (u) => (u === victim ? bad() : res(200)), { active: true });
+        check('B9 ' + T + label + ' on one file fails the whole update', (await lifecycle(w, 'install')) === 'failed');
+      }
+      const first = load(W.file, W.scope, (u) => (u === victim ? res(503) : res(200)));
+      check('B9 ' + T + 'a first install with one failed file still installs', (await lifecycle(first, 'install')) === 'done');
+      check('B9 ' + T + 'and stores every other file', list.filter((u) => new URL(u, W.scope).href !== victim).every((u) => stored(first, u)));
+    }
   }
 
-  // B2-B4. Error pages are never stored; a 5xx falls back to the stored copy.
-  for (const status of [500, 502, 526]) {
-    let net = () => res(200, { body: 'good privacy' });
+  // B6. Redirects: the app worker stores one and replays it offline; the stall worker passes it through.
+  {
+    let net = () => res(0, { type: 'opaqueredirect', body: '' });
     const w = load('app/sw.js', APP, (u) => net(u));
-    await navigate(w, 'privacy.html');
-    net = () => res(status, { body: 'error page ' + status });
-    const r = await navigate(w, 'privacy.html');
-    check('B2 app: a ' + status + ' does not replace the stored page', stored(w, 'privacy.html').body === 'good privacy');
-    check('B3 app: on a ' + status + ', the stored page is shown instead', r && r.body === 'good privacy', r && r.body);
-  }
-  {
-    const w = load('app/sw.js', APP, () => res(503, { body: 'error page 503' }));
-    const r = await navigate(w, 'privacy.html');
-    check('B4 app: a 5xx with nothing stored shows the server\'s page', r && r.status === 503);
-    check('B4 app: and stores nothing', !stored(w, 'privacy.html'));
-  }
-
-  // B5. A 404 is an answer: shown, never stored, never swapped for a stale copy.
-  {
-    let net = () => res(200, { body: 'old page' });
-    const w = load('app/sw.js', APP, (u) => net(u));
-    await navigate(w, 'gone.html');
-    net = () => res(404, { body: 'not found' });
-    const r = await navigate(w, 'gone.html');
-    check('B5 app: a 404 is shown as the server sent it', r && r.status === 404);
-    check('B5 app: a 404 does not overwrite the stored copy', stored(w, 'gone.html').body === 'old page');
-  }
-
-  // B6. A redirect (fetch of a navigation gives an opaque redirect) passes through, unstored.
-  {
-    const w = load('app/sw.js', APP, () => res(0, { type: 'opaqueredirect', body: '' }));
-    const r = await navigate(w, 'stall41');
+    const r = await navigate(w, 'nsw26');
     check('B6 app: a redirect passes straight through to the browser', r && r.type === 'opaqueredirect');
-    check('B6 app: a redirect is not stored', !stored(w, 'stall41'));
+    net = () => 'offline';
+    const off = await navigate(w, 'nsw26');
+    check('B6 app: offline, a folder address without its slash still gets its redirect', off && off.type === 'opaqueredirect', off);
+  }
+  {
+    let net = () => res(200, { body: 'stall page' });
+    const w = load('app/stall41/sw.js', STALL, (u) => net(u));
+    await navigate(w, './');
+    net = () => res(0, { type: 'opaqueredirect', body: '' });
+    const r = await navigate(w, './');
+    check('B6 stall41: a redirect passes through', r && r.type === 'opaqueredirect');
+    check('B6 stall41: a redirect is not stored as the page', stored(w, './').body === 'stall page');
   }
 
-  // B7. Offline: the stored copy, or the app shell.
+  // B10. Offline, an unvisited app page falls back to the app shell.
   {
     let net = (u) => res(200, { body: 'page ' + new URL(u).pathname });
     const w = load('app/sw.js', APP, (u) => net(u));
-    await navigate(w, 'terms.html');
     await navigate(w, 'index.html');
     net = () => 'offline';
-    const a = await navigate(w, 'terms.html');
-    const b = await navigate(w, 'never-visited.html');
-    check('B7 app: offline shows the stored copy of a page', a && a.body === 'page /terms.html', a && a.body);
-    check('B7 app: offline, an unvisited page falls back to the app shell', b && b.body === 'page /index.html', b && b.body);
+    const r = await navigate(w, 'never-visited.html');
+    check('B10 app: offline, an unvisited page falls back to the app shell', r && r.body === 'page /index.html', r && r.body);
   }
 
-  // B8. Install is all or nothing.
+  // B11. diagnostics.html is never handled, so never stored or substituted.
   {
-    const w = load('app/sw.js', APP, () => res(200));
-    check('B8 app: install succeeds when every shell file arrives', (await install(w)) === 'installed');
-    check('B8 app: and stores every shell file', SHELL.every((u) => stored(w, u)), SHELL.filter((u) => !stored(w, u)));
-  }
-  const APPJS = SHELL.find((u) => u.startsWith('app.js'));
-  for (const [label, bad] of [['a 5xx', () => res(503)], ['a dropped connection', () => 'offline'], ['a 404', () => res(404)]]) {
-    const w = load('app/sw.js', APP, (u) => (u === APP + APPJS ? bad() : res(200)));
-    check('B9 app: ' + label + ' on ' + APPJS + ' fails the whole install', (await install(w)) === 'failed');
-  }
-  {
-    // The old cache must survive a failed install: activate never runs, so it is untouched.
-    const w = load('app/sw.js', APP, (u) => (u.endsWith('/styles.css') ? res(500) : res(200)));
-    w.stores.set('countdown-timers-v1', new Map([[w.keyOf('index.html'), res(200, { body: 'old shell' })]]));
-    const outcome = await install(w);
-    check('B10 app: after a failed install the old cache is still there', outcome === 'failed' && w.stores.has('countdown-timers-v1'));
+    let net = () => res(200, { body: 'live health check' });
+    const w = load('app/sw.js', APP, (u) => net(u));
+    const a = await navigate(w, 'diagnostics.html');
+    net = () => res(503);
+    const b = await navigate(w, 'diagnostics.html');
+    check('B11 app: diagnostics.html goes straight to the network', a === 'not handled' && b === 'not handled', [a, b]);
+    check('B11 app: diagnostics.html is never stored', !stored(w, 'diagnostics.html'));
   }
 
-  // B11-B14. The same rules for the stall worker, which stores its page under './'.
+  // B12. The stall worker stores only its page, not another file opened in a tab.
   {
     let net = () => res(200, { body: 'stall page' });
-    const w = load('app/stall41/sw.js', STALL_SCOPE, (u) => net(u));
-    await navigate(w, './?display=1');
-    check('B11 stall41: a good page is stored', stored(w, './') && stored(w, './').body === 'stall page');
-    net = () => res(526, { body: 'error page' });
-    const r = await navigate(w, './');
-    check('B12 stall41: an error page does not replace the stored page', stored(w, './').body === 'stall page');
-    check('B12 stall41: on a 5xx, the stored page is shown instead', r && r.body === 'stall page');
-    net = () => 'offline';
-    const off = await navigate(w, './');
-    check('B13 stall41: offline shows the stored page', off && off.body === 'stall page');
+    const w = load('app/stall41/sw.js', STALL, (u) => net(u));
+    await navigate(w, './');
+    net = () => res(200, { body: '{"name":"Stall 41"}' });
+    const r = await navigate(w, 'manifest.webmanifest');
+    check('B12 stall41: a navigation to manifest.webmanifest is left to the network', r === 'not handled', r);
+    check('B12 stall41: and the stored page is untouched', stored(w, './').body === 'stall page');
   }
+
+  // B13. One origin, one cache store: an app release must not delete the stall's cache.
   {
-    const w = load('app/stall41/sw.js', STALL_SCOPE, (u) => (u.endsWith('manifest.webmanifest') ? res(500) : res(200)));
-    check('B14 stall41: one failed file fails the whole install', (await install(w)) === 'failed');
-    const ok = load('app/stall41/sw.js', STALL_SCOPE, () => res(200));
-    check('B14 stall41: install succeeds when every file arrives', (await install(ok)) === 'installed');
+    const shared = new Map();
+    let net = () => res(200, { body: 'stall page' });
+    const stall = load('app/stall41/sw.js', STALL, (u) => net(u), { shared });
+    await lifecycle(stall, 'install'); await lifecycle(stall, 'activate');
+    await navigate(stall, './');
+    shared.set('countdown-timers-v1', new Map());
+    net = () => res(200);
+    const app = load('app/sw.js', APP, (u) => net(u), { shared, active: true });
+    await lifecycle(app, 'install'); await lifecycle(app, 'activate');
+    check('B13 app: activate deletes the app\'s own old cache', !shared.has('countdown-timers-v1'), [...shared.keys()]);
+    check('B13 app: activate leaves the stall\'s cache alone', shared.has(stall.ctx.CACHE), [...shared.keys()]);
+    net = () => 'offline';
+    const r = await navigate(stall, './');
+    check('B13 stall41: after an app release, the stall page still opens offline', r && r.body === 'stall page', r && r.body);
+  }
+
+  /* B13b. The stall worker reads its page from its own cache only. Before
+     the stall worker existed on a device, the app worker could have stored
+     an older /stall41/ in its cache; that stale copy must never win. */
+  {
+    const shared = new Map([['countdown-timers-v119', new Map([[STALL, res(200, { body: 'stale copy in the app cache' })]])]]);
+    let net = () => res(200, { body: 'stall page' });
+    const stall = load('app/stall41/sw.js', STALL, (u) => net(u), { shared });
+    await navigate(stall, './');
+    net = () => 'offline';
+    const r = await navigate(stall, './');
+    check('B13 stall41: offline, its own stored page wins over a copy in the app cache', r && r.body === 'stall page', r && r.body);
+    net = () => res(503);
+    const e = await navigate(stall, './');
+    check('B13 stall41: on a 5xx, its own stored page wins too', e && e.body === 'stall page', e && e.body);
+  }
+
+  // B14. A failed update leaves the old cache in place (activate never runs).
+  {
+    const shared = new Map([['countdown-timers-v1', new Map([[APP + 'index.html', res(200, { body: 'old shell' })]])]]);
+    const w = load('app/sw.js', APP, (u) => (u.endsWith('/styles.css') ? res(500) : res(200)), { shared, active: true });
+    const outcome = await lifecycle(w, 'install');
+    check('B14 app: after a failed update the old cache is still there', outcome === 'failed' && shared.has('countdown-timers-v1'));
   }
 
   if (failures) { console.error(failures + ' check(s) failed, ' + passes + ' passed.'); process.exitCode = 1; }
