@@ -103,8 +103,36 @@
            path survived unnoticed in the first place. */
         console.warn('Turnstile produced no token in time; signing in without ' +
                      'the bot check. See identity-bridge.js.');
-        return null;   // null tells identity to use its own path
+
+        /* Ask `signin` anyway before going round it. It answers the store
+           review address without a bot check and sends that address
+           nothing; identity's own path would email it, and within a minute
+           of a review sign-in Supabase refuses that email outright, which
+           leaves the reviewer with no code box. For everyone else signin
+           refuses an empty token with a 403, and identity's own path runs
+           exactly as before. */
+        return CT.auth.signInWithEmail(email, '').catch(function (err) {
+          if (err && err.status === 403) return null;   // null tells identity to use its own path
+          throw err;
+        });
       });
+    },
+
+    /* ── The store review account ───────────────────────────────
+       Google Play's reviewers cannot read an inbox, so the one account
+       they use also takes a fixed code, checked by the `review-signin`
+       edge function. identity calls this only once Supabase has refused
+       a code.
+
+       That code is ten digits and an emailed one is eight, so anything
+       else stops here: a real person's mistyped code never leaves for the
+       function, and their error appears as fast as it always did.
+       Resolved lazily, like signIn above: supabase.js loads after this
+       file. */
+    verifyCode: function (email, code) {
+      if (!/^\d{10}$/.test(String(code || '').replace(/[\s-]+/g, ''))) return null;
+      if (!CT.auth || typeof CT.auth.verifyReviewCode !== 'function') return null;
+      return CT.auth.verifyReviewCode(email, code);
     }
   });
 

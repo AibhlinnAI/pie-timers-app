@@ -93,6 +93,7 @@ jobs:
           set -u
           fail=0
           SCAN_DIRS="app/ identity/ windows-screensaver/"
+          # Case-insensitive substring match: it also matches inside identifiers (a function whose name ends in gTag( fails the deploy; see app.js createSvgTag). Name such things differently.
           pattern='google-analytics\.com|googletagmanager\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|amazon-adsystem\.com|facebook\.net|connect\.facebook\.com|fbq\(|gtag\(|mixpanel|segment\.(io|com)|hotjar|amplitude\.com|clarity\.ms|matomo|posthog|sentry\.io|bugsnag|fullstory|crazyegg|adroll'
 
           if grep -rniE "$pattern" $SCAN_DIRS; then
@@ -102,6 +103,11 @@ jobs:
 
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "No ad or tracking dependencies found in app/ or identity/."
+
+      # The first-open count sends and keeps exactly what privacy.html
+      # section 9 says (ARCHITECTURE.md rule 3).
+      - name: Check the first-open count sends and keeps only what is disclosed
+        run: node tools/check-visits.js
 
   deploy:
     needs: guard

@@ -38,6 +38,19 @@ window.CT.config = {
      Supabase → Authentication → URL Configuration → Redirect URLs. */
   redirectUrl: '',
 
+  /* The first-open count (app/visits.js, privacy.html section 9). Off
+     until supabase/schema-visit-counts.sql has run and the privacy
+     policy that discloses it is live.
+
+     NOT an instant kill switch. sw.js serves this file cache-first
+     under an unversioned URL, so a browser whose first open is still
+     pending (closed within 2 s, offline, never shown) keeps reading
+     the old true, and sends on its next open. To stop counting at
+     once, revoke the function server-side first (DEPLOY.md 5.5, "To
+     stop counting"), then set this to false WITH a CACHE bump in
+     sw.js so the requests stop being made at all. */
+  countFirstOpens: false,
+
   /* One-click Google Calendar. Off until Google has verified the app.
 
      Calendar scopes are sensitive: Google allows them in Testing mode

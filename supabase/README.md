@@ -17,9 +17,11 @@ contents in this order:
 | 5 | `schema-calendar.sql` | calendar feeds and events, **appointments column** | Always |
 | 6 | `schema-breaks.sql` | **breaks column** (extra breaks, lunch's length) | Always, before deploying functions |
 | 7 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
-| 8 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
+| 8 | `schema-tester-signups.sql` | the Android tester form's write-only `tester_signups` | Always |
+| 9 | `schema-visit-counts.sql` | first-open totals, the tag list, and their nightly job | Always |
+| 10 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
 
-Steps 1–7 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
+Steps 1–9 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
 editing**, and only after the edge functions are deployed, because the file points at
 their URLs.
 
@@ -42,7 +44,8 @@ select table_name from information_schema.tables
 
 Expect: `access_codes`, `billing_events`, `calendar_events`, `calendar_feeds`,
 `code_attempts`, `code_redemptions`, `notification_log`, `push_subscriptions`,
-`signin_attempts`, `subscriptions`, `timer_profiles`.
+`signin_attempts`, `subscriptions`, `tester_signups`, `timer_profiles`,
+`visit_counts`, `visit_sources`.
 
 Row-level security must be on for every one of them:
 
@@ -83,7 +86,9 @@ select jobname, schedule, active from cron.job order by jobname;
 
 Expect `countdown-calendar-sync`, `countdown-milestones`,
 `countdown-prune-calendar`, `countdown-prune-code-attempts`,
-`countdown-prune-log`, `countdown-prune-signins`.
+`countdown-prune-log`, `countdown-prune-signins`,
+`countdown-settle-visit-counts`, `countdown-vacuum-visit-counts`. The last
+two come from `schema-visit-counts.sql`, not `cron.sql`.
 
 If something is not firing:
 
@@ -106,6 +111,68 @@ A healthy calendar-sync run answers 200 with counts only, for example
 `{"ok":true,"due":8,"synced":8,"failed":0,"died":0,"deferred":0}`. `died` is
 a feed whose own worker was killed or timed out; that feed's row says so in
 `last_error`, which the person sees in the app.
+
+## Reading the first-open counts
+
+`schema-visit-counts.sql` keeps daily totals of the first time the app opens
+in a browser (`app/visits.js`, `privacy.html` section 9). Read them in the
+SQL Editor, or Table Editor → `visit_counts`. There is no view on purpose.
+
+```sql
+-- First opens a day, last 30 days (Adelaide dates)
+select day,
+       sum(n) filter (where platform = 'web')  as web,
+       sum(n) filter (where platform = 'play') as play,
+       sum(n)                                   as total
+  from public.visit_counts
+ where kind = 'first_open'
+   and day > (now() at time zone 'Australia/Adelaide')::date - 30
+ group by day order by day desc;
+
+-- Where they came from, over a range
+select c.source,
+       coalesce(s.label, case c.source when 'none' then 'no tag' else 'tag not on the list' end) as what,
+       sum(c.n) as first_opens
+  from public.visit_counts c
+  left join public.visit_sources s using (source)
+ where c.kind = 'first_open'
+   and c.day between date '2026-10-01' and date '2026-10-31'
+ group by 1, 2 order by 3 desc;
+```
+
+How to read them:
+
+- They are first opens per **browser**, not people. A private window, an
+  iPhone home-screen app or cleared site data counts again; GPC/DNT, blocked
+  storage or a send that failed does not count at all.
+- Safari on iPhone and Mac deletes a site's stored data, the "already
+  counted" note included, after 7 days of browsing without a visit to it. A
+  returning Safari visitor who has been away that long counts again, usually
+  under `none`. Nothing in the browser can prevent this without keeping
+  something about them on the server, which the count refuses to do.
+- `play` means this browser's **first open happened in the Play app**. The
+  Play app runs inside the phone's Chrome and shares its storage, so someone
+  who used the website in Chrome on that phone first (almost every current
+  tester, who joined through the web form) appears only under `web`, and
+  their Play installs never show up here. It is not a count of Play installs:
+  use Play Console for those.
+- Google's pre-launch report opens the Play app on 5–10 freshly wiped test
+  devices for every upload to a testing track, and each one looks exactly
+  like a new person. Keep the report off while counting is on (DEPLOY.md
+  5.5, step 6) until the wrapper sends `#count=off` on those devices. If it
+  ran anyway, release days show extra `play | none` first opens. Google's
+  own review of a release can add one or two as well.
+- A day's rows are rewritten together shortly after midnight Adelaide time
+  (the `countdown-settle-visit-counts` job), so no row keeps a trace of the
+  request that last added to it. Today's rows have not been rewritten yet.
+- `current_date` in the SQL Editor is UTC, so always use the Adelaide
+  expression above.
+- `none` is an untagged link (typed, bookmarked, shared, the t-shirt code);
+  `other` is a tag not on the list in `visit_sources`.
+- A cell stuck at 100000, or a spike well above Cloudflare's unique visitors
+  for that day, is abuse: anyone holding the public key can add to a total.
+- Before sharing numbers outside the business, merge any cell under 5 into a
+  bigger group.
 
 ## If a run fails partway
 

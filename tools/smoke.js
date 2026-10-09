@@ -35,6 +35,7 @@ const SCRIPTS = [
   ['identity/entitlements.js',  ['Aibhlinn.entitlements']],
   ['identity/identity-ui.js',   ['Aibhlinn.identityUI']],
   ['app/config.js',             ['CT.config']],
+  ['app/visits.js',             ['CT.visits']],
   ['app/identity-bridge.js',    ['CT.entitlements', 'CT.emailTypos']],
   ['app/supabase.js',           ['CT.auth', 'CT.db']],
   ['app/billing.js',            ['CT.turnstile', 'CT.billing']],
@@ -149,7 +150,7 @@ const AUTH_METHODS = [
   'signInWithEmail', 'verifyEmailOtp', 'signInWithGoogle', 'connectGoogleCalendar',
   'wasConnectingGoogle', 'signOut', 'loadUser', 'deleteAccount',
   'consumeRedirect', 'getSession', 'getUser', 'isSignedIn',
-  'validToken', 'onChange',
+  'validToken', 'onChange', 'verifyReviewCode',
 ];
 
 const auth = resolve(sandbox, 'CT.auth');

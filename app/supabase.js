@@ -130,6 +130,26 @@
                : Promise.reject(new Error('Sign-in is unavailable.'));
     },
 
+    /* The second try at a code Supabase refused, for the one account
+       Google Play's reviewers sign in with (identity-bridge.js,
+       verifyCode). Resolves to a session payload, or null for "not the
+       review account", which leaves Supabase's own refusal on screen.
+
+       Only an answer the function marks `review: true` is passed on as
+       an error. Anything else (the function not deployed, or failing to
+       start) must not replace "wrong code" with a platform message for
+       a real person who simply mistyped. */
+    verifyReviewCode: function (email, code) {
+      return request(cfg.supabaseUrl + '/functions/v1/review-signin', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code })
+      }).catch(function (err) {
+        if (err && err.body && err.body.review === true) throw err;
+        return null;
+      });
+    },
+
     signInWithGoogle: function () {
       var i = id();
       if (i) i.signInWithGoogle();
