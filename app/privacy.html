@@ -46,12 +46,18 @@
        2. Have this reviewed. If you get EU or UK customers you are a data
           controller under GDPR/UK GDPR, which brings obligations this
           document only summarises.
-       3. Section 9 lists every count there is: Cloudflare's daily totals
-          and the first-open count (app/visits.js,
-          supabase/schema-visit-counts.sql, checked by
-          tools/check-visits.js). Before either changes (a new field, a new
+       3. Section 9 lists every count there is: the first-open count
+          (app/visits.js, supabase/schema-visit-counts.sql, checked by
+          tools/check-visits.js). Before it changes (a new field, a new
           kind of count, finer time, longer retention), change section 9
-          and deploy it FIRST. Never name an analytics vendor on this page:
+          and deploy it FIRST. pietimers.aibhlinn.ai is DNS only in
+          Cloudflare, so Cloudflare carries none of the app's pages or
+          files, keeps no server logs of them and gives no visit totals.
+          Its only contact with visitors is Turnstile on the sign-in form
+          (section 6). Switching it to Proxied would add a second
+          count and a second set of server logs: disclose both here, and
+          deploy that, before the cloud turns orange (DEPLOY.md 3.1).
+          Never name an analytics vendor on this page:
           the deploy guard greps app/.
      ============================================================ -->
 </head>
@@ -215,7 +221,7 @@
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
       <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
-      <tr><td>Cloudflare</td><td>Your IP address and browser, in standard web server logs, each time the app loads; and browser signals while the sign-in form is open</td><td>Passing the app files on to your device, giving us daily visit totals (see section 9), and checking that a person, not a bot, is using the sign-in form</td></tr>
+      <tr><td>Cloudflare</td><td>Your IP address and browser signals, while the sign-in form is open</td><td>Checking that a person, not a bot, is using the sign-in form</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
     </tbody>
   </table>
@@ -251,12 +257,8 @@
   scripts, no advertising pixels, no third-party trackers, no cross-site tracking.
   Its only analytics code is the first-open count described below. It stores your
   settings in local storage and, if you sign in, a session token in your browser.</p>
-  <p>We do count visits, in total only, in two ways. Neither can tell us who you are,
-  what you did in the app, or anything about your schedule.</p>
-  <p><strong>Daily visit totals.</strong> Cloudflare, which passes the app's files on
-  to your device, gives us daily totals from its standard server logs: how many
-  pages were loaded, a rough number of visitors, and which countries they came from.
-  We see only those totals.</p>
+  <p>We do count visits, in total only, in one way: first opens. The count cannot
+  tell us who you are, what you did in the app, or anything about your schedule.</p>
   <p><strong>First opens.</strong> The first time the app opens in a browser, it asks
   our database to add one to that day's total. The request carries two things and
   nothing else: whether the app is running in the Android app from Google Play or in

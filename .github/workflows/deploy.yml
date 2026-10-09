@@ -109,6 +109,12 @@ jobs:
       - name: Check the first-open count sends and keeps only what is disclosed
         run: node tools/check-visits.js
 
+      # An update to the service worker is all-or-nothing (app/sw.js), so
+      # one precache entry that is not a real file would stop every
+      # installed copy from updating. This refuses to publish one.
+      - name: Check the service workers precache only real files
+        run: node tools/check-sw.js
+
   deploy:
     needs: guard
     runs-on: ubuntu-latest

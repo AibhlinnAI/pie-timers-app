@@ -169,8 +169,12 @@ How to read them:
   expression above.
 - `none` is an untagged link (typed, bookmarked, shared, the t-shirt code);
   `other` is a tag not on the list in `visit_sources`.
-- A cell stuck at 100000, or a spike well above Cloudflare's unique visitors
-  for that day, is abuse: anyone holding the public key can add to a total.
+- A cell stuck at 100000, or a day far above any before it with nothing to
+  explain it (an event, a printed code, a Play release), is abuse: anyone
+  holding the public key can add to a total. There is no second count to
+  check it against: `pietimers.aibhlinn.ai` is DNS only in Cloudflare, so
+  Cloudflare sees no visits (`DEPLOY.md` 3.1). For `play`, Play Console's
+  install figures are a separate check.
 - Before sharing numbers outside the business, merge any cell under 5 into a
   bigger group.
 
