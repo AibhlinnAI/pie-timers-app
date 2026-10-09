@@ -204,11 +204,12 @@ switched off, and goes on in this order, because the disclosure must be live
 before anything is counted:
 
 1. The Cloudflare proxy disclosure (branch `cloudflare-proxy-counts`) merges
-   first.
+   first. Done: PR #34, live 30 Sep 2026.
 2. Before the counter's pull request merges, settle these:
-   - the Supabase plan's API log retention (1 day on Free, 7 on Pro, 28 on
-     Team). Replace both `MAL TO CONFIRM` numbers in `privacy.html` (sections
-     8 and 9), which must say the same number;
+   - the Supabase plan's retention figures. Done 10 Oct 2026: the project is
+     on Free, so `privacy.html` says request logs and the sign-in log are kept
+     1 day and that there are no backups. If the plan changes, the comment at
+     the top of `privacy.html` lists the four statements to change;
    - "Last updated" at the top of `privacy.html`: set it to the merge date.
      Section 13 promises the date always reflects the current version;
    - the next free `CACHE` number, used in `CACHE` and in `visits.js?v=` in
