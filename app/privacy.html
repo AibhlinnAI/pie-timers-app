@@ -30,10 +30,11 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in, except five values marked MAL TO
-     CONFIRM, which are provisional: three in "Deleting your account", and
-     the Supabase request-log retention in section 8 and again in section 9
-     (1 day on Free, 7 on Pro, 28 on Team; both must say the same number).
+     Every placeholder is now filled in, except three values marked MAL TO
+     CONFIRM in "Deleting your account", which are provisional. The
+     Supabase request-log retention in sections 8 and 9 is 1 day because
+     the project is on the Free plan (confirmed by Mal, 10 Oct 2026). It is
+     7 days on Pro and 28 on Team: if the plan changes, change both.
      What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
@@ -233,7 +234,7 @@
     say nothing about any one person.</li>
     <li><strong>Supabase's request logs</strong>, which include IP addresses and
     the approximate locations worked out from them:
-    7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days, then
+    1<!-- Supabase Free plan. 7 on Pro, 28 on Team: if the plan changes, change section 8 and section 9 together --> day, then
     deleted by Supabase.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
     for as long as Australian tax law requires.</li>
@@ -273,7 +274,7 @@
   IP address, the approximate location worked out from that address (such as the city
   or postcode), your network provider and your browser's name. Supabase deletes those
   logs after
-  7<!-- MAL TO CONFIRM: 1 day on Free, 7 on Pro, 28 on Team --> days. We do not use
+  1<!-- Supabase Free plan. 7 on Pro, 28 on Team: if the plan changes, change section 8 and section 9 together --> day. We do not use
   them for counting, and the totals keep nothing from them.</p>
   <p>Shortly after midnight each day, the previous day's totals are rewritten
   together, so nothing is left in our database that shows which total any one request
