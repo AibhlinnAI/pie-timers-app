@@ -30,13 +30,14 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in, except two values marked MAL TO
-     CONFIRM in "Deleting your account" (tax-record years, backup window),
-     which are provisional. The Supabase request-log retention in sections
-     8 and 9, and the sign-in log in "Deleting your account", are 1 day
-     because the project is on the Free plan (confirmed by Mal, 10 Oct
-     2026). They are 7 days on Pro and 28 on Team: if the plan changes,
-     change all three.
+     Every placeholder is now filled in, except one value marked MAL TO
+     CONFIRM in "Deleting your account" (tax-record years), which is
+     provisional. Four statements follow from the project being on the
+     Supabase Free plan (confirmed by Mal, 10 Oct 2026): the request-log
+     retention in sections 8 and 9 and the sign-in log in "Deleting your
+     account" are 1 day, and there are no backups. On Pro, logs are kept
+     7 days (28 on Team) and backups 7 days: if the plan changes, change
+     all four the same day.
      What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
@@ -126,8 +127,12 @@
     Ask and we will remove it, and it is deleted when testing ends.</li>
     <li>The sign-in log our database provider keeps, with the email address and
     IP address of each sign-in, for 1<!-- Supabase Free plan: its auth log, as auth.audit_log_entries is empty (checked 10 Oct 2026). Change with sections 8 and 9 if the plan changes --> day.</li>
-    <li>Backups held by our database provider drop deleted data within
-    7<!-- MAL TO CONFIRM --> days.</li>
+    <li>No backups. Our database plan includes none, so there is no backup copy
+    of deleted data for us to restore.<!-- Supabase Free plan has no backups
+    (Mal checked Database > Backups, 10 Oct 2026: an upgrade prompt). Pro
+    keeps daily backups for 7 days. If the plan changes, this becomes
+    "Backups held by our database provider drop deleted data within 7
+    days." --></li>
     <li>Sign-in attempt hashes are cleared within a day.</li>
   </ul>
   <p>You can also remove some data without deleting your account. Disconnecting a
