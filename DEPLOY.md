@@ -124,6 +124,10 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
       project already has the column (added 27 Sep 2026).
 - [ ] `schema-google-calendar.sql`
 - [ ] `identity-schema.sql`
+- [ ] `schema-tester-signups.sql` — the Android tester form's write-only
+      `tester_signups` table. Without it every sign-up from the form fails.
+- [ ] `schema-visit-counts.sql` — the first-open totals and the tag list. Run it
+      before `countFirstOpens` is turned on in `app/config.js` (see 5.5).
 - [ ] `cron.sql` — last, because the file schedules a job against edge functions that do
       not exist until 5.3.
 
@@ -191,6 +195,165 @@ common cause of "the email arrived but clicking the link does nothing".
 
 - [ ] Put the project URL and the **publishable** key into `app/config.js`.
 - [ ] Push, then rerun diagnostics. Every table and function should PASS.
+
+### 5.5 The first-open count
+
+`app/visits.js` adds one to a daily total the first time the app opens in a
+browser (`privacy.html` section 9, `ARCHITECTURE.md` rule 3). It ships
+switched off, and goes on in this order, because the disclosure must be live
+before anything is counted:
+
+1. The Cloudflare proxy disclosure (branch `cloudflare-proxy-counts`) merges
+   first. Done: PR #34, live 30 Sep 2026.
+2. Before the counter's pull request merges, settle these:
+   - the Supabase plan's retention figures. Done 10 Oct 2026: the project is
+     on Free, so `privacy.html` says request logs and the sign-in log are kept
+     1 day and that there are no backups. If the plan changes, the comment at
+     the top of `privacy.html` lists the four statements to change;
+   - "Last updated" at the top of `privacy.html`: set it to the merge date.
+     Section 13 promises the date always reflects the current version;
+   - the next free `CACHE` number, used in `CACHE` and in `visits.js?v=` in
+     both `index.html` and `sw.js`.
+3. Run `supabase/schema-visit-counts.sql` in the SQL Editor, then the checks
+   at the end of that file. They include the nightly job that rewrites each
+   finished day's totals together (see the file's header for why).
+   Done 10 Oct 2026 (via `supabase db query --linked -f`, the file as
+   merged in #35: blob 4712467ca3ba, which a rebase or squash leaves
+   unchanged): every check matched, an anonymous read of either table is
+   refused (401, 42501), and the function answers 204 while counting nothing
+   for an unknown platform. Re-running the file is safe, but it re-grants
+   execute to anon, so re-run it after a kill-switch revoke only on purpose.
+4. Merge the counter with `countFirstOpens: false`. The disclosure is live and
+   nothing is counted yet.
+5. Decide whether the promise in `privacy.html` section 13 (an email before a
+   material change) applies, and check the new `privacy.html` is live.
+6. **Google Play, before anything counts.** The Play app counts too (as
+   `play`), so the Play-facing statements must change first:
+   - **Data safety:** decide the answer and record it in the Play Console pack
+     (`docs/play-listing/Play-Console-Pack.md` section 5, which today says
+     "Not collected: ... app interactions"). Most likely: App activity → App
+     interactions: collected, for Analytics, not shared. Google counts "the
+     number of times they visit a page" as app interactions, and anonymised
+     data is exempt only from the sharing answer, not the collection one.
+     Update it in Play Console.
+   - **Store listing:** the pack's section 8 copy says "No ads, no analytics,
+     no trackers". Change it to "No ads, no third-party analytics, no
+     trackers", matching `privacy.html`, in the pack and in Play Console.
+   - **Pre-launch report (the stopgap):** Play Console → Testing → Pre-launch
+     report → Settings → turn it off. On every upload to a testing track it
+     opens the Play app on 5–10 freshly wiped Test Lab devices. They pass
+     every check in `visits.js` (no WebDriver, ordinary Chrome, empty storage,
+     the Play referrer), so each one would be counted as a `play | none`
+     first open, and with a handful of Play testers they would outnumber the
+     people. Leave it off until the wrapper fix in "The Play app and Google's
+     test devices" below has shipped. Google's own review of each release can
+     still add one or two `play` first opens; nothing on the web can tell.
+7. Merge a one-line change: `countFirstOpens: true` in `app/config.js`, plus
+   the next `CACHE` bump. No `?v=` change: `config.js` is unversioned, and the
+   `CACHE` bump is what makes installed copies fetch it again.
+8. Check it live (it writes to production). Open
+   `https://pietimers.aibhlinn.ai/#src=test` in a **Chrome, Edge or Safari**
+   private window, not Firefox, Brave or DuckDuckGo: those send Global Privacy
+   Control, and under GPC nothing is counted. Keep the tab in front for 5 s,
+   then run:
+
+   ```sql
+   select day, source, platform, n
+     from public.visit_counts
+    where day = (now() at time zone 'Australia/Adelaide')::date
+      and source in ('test', 'other');
+   ```
+
+   Expect `<today> | test | web | 1`. A row under `other` instead means the
+   `visit_sources` insert did not run: run it, then check again in a new
+   private window. Clean up with
+   `delete from public.visit_counts where source = 'test';`.
+
+**No row at all** means this browser was not counted, not that the SQL
+failed. The usual reasons: the browser sends GPC or Do Not Track; it has
+opened the app before, or has been marked with `#count=off`; the tab was
+closed or hidden within about 2 s of loading (it will then send on its next
+open); or it was offline. Try a fresh private window in Chrome or Edge before
+looking at the SQL or the grants.
+
+If the app ships before the SQL, the call answers 404 and those first opens are
+silently lost.
+
+#### To stop counting
+
+`countFirstOpens: false` on its own is **not** an instant stop. `sw.js`
+serves `config.js` cache-first under an unversioned URL, so a browser whose
+first open is still pending (closed within 2 s, opened offline, never shown)
+keeps reading the old `true` and sends on its next open. Even with a `CACHE`
+bump, the first load after the deploy is still served by the old worker. So:
+
+1. **At once, server-side:** in the SQL Editor run
+   `revoke execute on function public.count_first_open(text, text) from anon;`.
+   This stops every count immediately, including scripted calls with the
+   public key. Browsers that still call get an error they ignore, and mark
+   themselves counted. To undo, re-run the `grant execute ...` line from
+   `schema-visit-counts.sql`. Re-running the whole file also re-grants, so for
+   a lasting stop change the file too (and `tools/check-visits.js` S3 with it).
+2. **Then, client-side:** merge `countFirstOpens: false` **with** the next
+   `CACHE` bump, so the requests stop being made at all.
+
+#### Surfaces that must never count
+
+A foyer screen is a display, not an open.
+
+- Kiosk and event pages (`/ndexpo26/`, `/nls26/`, `/nsw26/`, `/nwc26/`,
+  `/stall41/`) load no shared scripts, so they never count. Their QR codes
+  count when the scan lands in the app.
+- The Windows screensaver loads the live app in its own WebView2 profile,
+  which shares nothing with the person's browser. `Program.SaverUrl` ends in
+  `#count=off`, so each profile is marked counted and sends nothing. A `.scr`
+  built before that change counts once per install: rebuild it before counting
+  goes on. `tools/check-visits.js` fails the build if the fragment is removed.
+
+#### The Play app and Google's test devices
+
+The lasting fix for the pre-launch report (step 6) belongs in the Android
+wrapper, which is not in this repository. Subclass Bubblewrap's
+`LauncherActivity`, point the manifest's launcher activity at it, bump
+`versionCode` and upload:
+
+```java
+public class LauncherActivity
+    extends com.google.androidbrowserhelper.trusted.LauncherActivity {
+  @Override
+  protected Uri getLaunchingUrl() {
+    Uri url = super.getLaunchingUrl();
+    // Set on every Firebase Test Lab device, which the pre-launch report uses.
+    if ("true".equals(Settings.System.getString(getContentResolver(), "firebase.test.lab"))) {
+      return url.buildUpon().fragment("count=off").build();
+    }
+    return url;
+  }
+}
+```
+
+`visits.js` already honours `#count=off` and strips it before `app.js` runs;
+Play detection uses the referrer, not the fragment, so it is unaffected. Once
+that release is on every track, the pre-launch report can go back on.
+
+#### Tagging a QR code
+
+1. Pick a tag for a place or a printed item, **never a person**: a tag handed to
+   one person turns a total into "this person opened the app". Use `a-z`,
+   `0-9` and `-`, 24 characters at most.
+2. Add it to the seed list in `supabase/schema-visit-counts.sql` in the same
+   commit, and run just its `insert` in the SQL Editor.
+3. Encode `https://pietimers.aibhlinn.ai/#src=<tag>`.
+4. Scan the printed code once with iOS Camera and once with Google Lens, but do
+   not let the camera open it: the phone's ordinary browser profile has used
+   the app before (or carries `#count=off`) and sends nothing. Copy the scanned
+   address into a Chrome or Safari private window instead, or use a device
+   that has never opened the app. Then run the query in step 8 above with your
+   tag in place of `'test'`. Expect a row for today under your tag; if it
+   lands in `other`, the insert did not run. No row at all: see "No row at
+   all" above.
+5. Mal's own devices, and any stall device that wipes its profile: open
+   `/#count=off` once, or launch with it on the URL.
 
 ## 6. Email (Resend)
 

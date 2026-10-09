@@ -613,6 +613,7 @@
           .then(function () { return checkTable('signin_attempts', 'schema-ratelimit.sql'); })
           .then(function () { return checkTable('calendar_feeds', 'schema-calendar.sql'); })
           .then(function () { return checkTable('calendar_events', 'schema-calendar.sql'); })
+          .then(function () { return checkTable('visit_counts', 'schema-visit-counts.sql'); })
           .then(function () { return checkFunction('signin', 'Needed for rate-limited magic links.'); })
           .then(function () { return checkFunction('delete-account', 'Needed for the delete button in Settings.'); })
           .then(function () { return checkFunction('paddle-webhook', 'Without this, payments never unlock access.'); })

@@ -73,6 +73,11 @@ jobs:
       - name: Run the smoke test
         run: node tools/smoke.js
 
+      # What the first-open count sends and keeps, checked against what
+      # privacy.html section 9 says (app/visits.js, schema-visit-counts.sql).
+      - name: Run the first-open count checks
+        run: node tools/check-visits.js
+
       # The calendar-sync edge function: its parser, its scheduled run, and
       # index.ts itself with Deno and the network stubbed. Type stripping is
       # what lets Node run the .ts file as it ships. Nothing is deployed.

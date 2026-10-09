@@ -30,8 +30,13 @@
      actual schema and edge functions rather than copied from a template.
      Before launch:
 
-     Every placeholder is now filled in, except the three values in
-     "Deleting your account" marked MAL TO CONFIRM, which are provisional.
+     Every placeholder is now filled in and confirmed (the last, the
+     five-year tax-record period, by Mal on 10 Oct 2026). Four statements follow from the project being on the
+     Supabase Free plan (confirmed by Mal, 10 Oct 2026): the request-log
+     retention in sections 8 and 9 and the sign-in log in "Deleting your
+     account" are 1 day, and there are no backups. On Pro, logs are kept
+     7 days (28 on Team) and backups 7 days: if the plan changes, change
+     all four the same day.
      What remains is upkeep:
 
        1. Section 5 states ap-southeast-2 (Sydney). If you ever migrate
@@ -41,8 +46,13 @@
        2. Have this reviewed. If you get EU or UK customers you are a data
           controller under GDPR/UK GDPR, which brings obligations this
           document only summarises.
-       3. Re-check section 9 if you ever add analytics. Today there are
-          none, and that claim must stay true.
+       3. Section 9 lists every count there is: Cloudflare's daily totals
+          and the first-open count (app/visits.js,
+          supabase/schema-visit-counts.sql, checked by
+          tools/check-visits.js). Before either changes (a new field, a new
+          kind of count, finer time, longer retention), change section 9
+          and deploy it FIRST. Never name an analytics vendor on this page:
+          the deploy guard greps app/.
      ============================================================ -->
 </head>
 <body class="legal-page">
@@ -62,7 +72,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>30 September 2026</strong> &middot;
+    Last updated: <strong>10 October 2026</strong> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <span data-hide-in-play><a href="terms.html#refunds">Refund Policy</a> &middot;</span>
     <a href="index.html">Back to the app</a>
@@ -72,12 +82,15 @@
   <ul>
     <li>Without an account, your schedule, appointments and settings never leave
     your device. The only exceptions are an email you choose to leave on the
-    Android tester form, and the bot check that loads when you open the sign-in
-    form.</li>
+    Android tester form, the bot check that loads when you open the sign-in
+    form, and a one-off count the first time the app opens. That count carries no
+    name, account or ID, though like any web request it reaches our database
+    provider with your IP address (see <a href="#counting">section 9</a>).</li>
     <li>With an account, we store your email, your schedule and your appointments
     so they can appear on your other devices.</li>
-    <li>We do not sell your data, and there are no analytics, trackers or
-    advertising in this app.</li>
+    <li>We do not sell your data, and there are no third-party analytics,
+    trackers or advertising in this app. We count visits in total only (see
+    <a href="#counting">section 9</a>).</li>
     <li>You can delete your account from the Settings tab, without asking us. See
     <a href="#delete">Deleting your account</a> below for what is deleted and what
     we keep.</li>
@@ -105,16 +118,20 @@
   <ul>
     <li>If you ever paid, the subscription updates Paddle sent us. They hold
     Paddle's customer number for you, not your email address, and we keep them
-    for five<!-- MAL TO CONFIRM --> years for tax records. Paddle keeps its own
+    for five<!-- Confirmed by Mal, 10 Oct 2026: the Australian five-year record-keeping rule --> years for tax records. Paddle keeps its own
     records under its own policy.</li>
     <li>If we gave you an access code, the code and the email address it was
     issued to, so it can't be used again. Ask and we will remove the email.</li>
     <li>An email left on the Android tester form is kept apart from your account.
     Ask and we will remove it, and it is deleted when testing ends.</li>
     <li>The sign-in log our database provider keeps, with the email address and
-    IP address of each sign-in, for up to 30<!-- MAL TO CONFIRM --> days.</li>
-    <li>Backups held by our database provider drop deleted data within
-    7<!-- MAL TO CONFIRM --> days.</li>
+    IP address of each sign-in, for 1<!-- Supabase Free plan: its auth log, as auth.audit_log_entries is empty (checked 10 Oct 2026). Change with sections 8 and 9 if the plan changes --> day.</li>
+    <li>No backups. Our database plan includes none, so there is no backup copy
+    of deleted data for us to restore.<!-- Supabase Free plan has no backups
+    (Mal checked Database > Backups, 10 Oct 2026: an upgrade prompt). Pro
+    keeps daily backups for 7 days. If the plan changes, this becomes
+    "Backups held by our database provider drop deleted data within 7
+    days." --></li>
     <li>Sign-in attempt hashes are cleared within a day.</li>
   </ul>
   <p>You can also remove some data without deleting your account. Disconnecting a
@@ -130,7 +147,8 @@
   <p>The app works fully offline. Your schedule, appointments and settings are
   stored only in your browser's local storage on that device. We cannot see them,
   and no request carrying them is ever sent anywhere.</p>
-  <p>There is no sign-up wall and no tracking on the free version. The only
+  <p>There is no sign-up wall and no tracking on the free version, only the
+  one-off first-open count in <a href="#counting">section 9</a>. The only
   email we collect without an account is one you choose to leave on the
   Android tester form. We use it for two things: we add it to Google Play's
   tester list so Google can give you access, and we email you the install
@@ -192,7 +210,7 @@
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, and your email if you join the Android tester list</td><td>Database, sign-in and server functions</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
       <tr><td>Resend</td><td>Your email address</td><td>Sending your sign-in code</td></tr>
       <tr><td>Paddle</td><td>Billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>Only if you use Google sign-in or Google Calendar</td><td>Authentication and reading your calendar</td></tr>
@@ -218,20 +236,60 @@
     <li><strong>Sign-in attempt hashes</strong> — one day.</li>
     <li><strong>Tester sign-up emails</strong>: until Android testing ends, or
     until you ask us to remove yours.</li>
+    <li><strong>First-open totals</strong>: kept. They are numbers per day that
+    say nothing about any one person.</li>
+    <li><strong>Supabase's request logs</strong>, which include IP addresses and
+    the approximate locations worked out from them:
+    1<!-- Supabase Free plan. 7 on Pro, 28 on Team: if the plan changes, change section 8 and section 9 together --> day, then
+    deleted by Supabase.</li>
     <li><strong>Billing records</strong> — held by Paddle under their policy, and
     for as long as Australian tax law requires.</li>
   </ul>
 
-  <h2>9. Cookies and tracking</h2>
-  <p>The app sets no cookies and runs no tracking code: no analytics scripts, no
-  advertising pixels, no third-party trackers, no cross-site tracking. It stores your
-  settings in local storage and, if you sign in, a session token in your browser.
-  That is all.</p>
-  <p>We do count visits, in total only. Cloudflare, which passes the app's files on
+  <h2 id="counting">9. Cookies, tracking and counting</h2>
+  <p>The app sets no cookies and does not track you: no third-party analytics
+  scripts, no advertising pixels, no third-party trackers, no cross-site tracking.
+  Its only analytics code is the first-open count described below. It stores your
+  settings in local storage and, if you sign in, a session token in your browser.</p>
+  <p>We do count visits, in total only, in two ways. Neither can tell us who you are,
+  what you did in the app, or anything about your schedule.</p>
+  <p><strong>Daily visit totals.</strong> Cloudflare, which passes the app's files on
   to your device, gives us daily totals from its standard server logs: how many
   pages were loaded, a rough number of visitors, and which countries they came from.
-  We see only those totals. We cannot see who you are, what you did in the app, or
-  anything about your schedule.</p>
+  We see only those totals.</p>
+  <p><strong>First opens.</strong> The first time the app opens in a browser, it asks
+  our database to add one to that day's total. The request carries two things and
+  nothing else: whether the app is running in the Android app from Google Play or in
+  a web browser, and, if the link you followed had one, a short tag we made for an
+  event or a printed code, such as <code>nls26</code>. A tag we did not make is
+  counted as &ldquo;other&rdquo;. No name, email address, account, device ID or
+  cookie goes with it, and nothing from your schedule. The request itself carries no
+  time: our database notes only the day it arrived. What we keep is the number of
+  first opens on each day, in Adelaide time, for each tag and each kind of app.</p>
+  <p>The count is sent once. If the first open is closed within a couple of seconds,
+  or your device is offline, it is sent on your next visit instead and counted on
+  that day. After that, nothing is sent.</p>
+  <p>So that a browser is counted only once, the app keeps a note in that browser's
+  local storage. The note never leaves your device. If you clear this site's data,
+  or your browser clears it for you (Safari does this when you have not used the
+  site for seven days), your next visit counts as a first open again.</p>
+  <p>Like any request to a website, the one carrying the count reaches Supabase, which
+  runs our database. Supabase's standard request logs record, for this request as for
+  every other one the app makes to it: the time, the address it was sent to (so the
+  log shows that it was the first-open request, though not which tag it carried), your
+  IP address, the approximate location worked out from that address (such as the city
+  or postcode), your network provider and your browser's name. Supabase deletes those
+  logs after
+  1<!-- Supabase Free plan. 7 on Pro, 28 on Team: if the plan changes, change section 8 and section 9 together --> day. We do not use
+  them for counting, and the totals keep nothing from them.</p>
+  <p>Shortly after midnight each day, the previous day's totals are rewritten
+  together, so nothing is left in our database that shows which total any one request
+  added to. Because the totals cannot be linked to you, there is nothing of yours in
+  them to show you or to delete.</p>
+  <p>If your browser sends a Global Privacy Control or Do Not Track signal, the app
+  counts nothing. To stop a browser being counted without those signals, open the app
+  once as <code>pietimers.aibhlinn.ai/#count=off</code>. The code that counts is
+  <a href="visits.js">visits.js</a>, and anyone can read it.</p>
 
   <h2>10. Your rights</h2>
   <p>You can, at any time and without contacting us:</p>

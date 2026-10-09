@@ -127,6 +127,32 @@ put third-party bytes into the app, breaking this rule and rule 4. The check
 is that a page served through the proxy is byte-identical to `main`.
 Disclosed in `privacy.html` sections 6 and 9.
 
+**First opens:** `app/visits.js` adds one to a daily total in
+`public.visit_counts` (`supabase/schema-visit-counts.sql`) the first time the
+app opens in a browser. Each total is keyed by Adelaide day, kind
+(`first_open`), a tag from the allowlist `public.visit_sources` (otherwise
+`none` or `other`) and `web`/`play`. The request body is exactly
+`{p_source, p_platform}`: no id, time or cookie. Like any request, it
+reaches Supabase with the caller's IP and user agent, and Supabase's standard
+API logs keep those, with the time, the path and an IP-derived location, for
+the plan's log retention (disclosed in privacy.html sections 6, 8 and 9).
+Nothing from the headers is read by the function or stored in
+`visit_counts`, and a nightly job rewrites each finished day's rows together
+so no row keeps the transaction id of the request that last added to it. The
+"already counted" note lives only in localStorage and is never sent.
+GPC/DNT, automated browsers and any host but pietimers.aibhlinn.ai never
+count. Kiosk and event pages never count, and the Windows screensaver loads
+the app with `#count=off`. A tag names a place or a printed item, never a
+person. `play` means the browser's first open happened in the Play app: it
+shares Chrome's storage, so anyone who used the website on that phone first
+counts only under `web`. It is not a count of Play installs. To stop
+counting at once, revoke `count_first_open` from anon; `countFirstOpens` in
+config.js, with a `CACHE` bump, then stops the requests (DEPLOY.md 5.5).
+`tools/check-visits.js` enforces the body, the send channels, the columns,
+the grants and the never-counting surfaces in smoke.yml and in the deploy
+guard. Anything that widens what is sent or kept (a field, a kind, finer
+time, a view) is a privacy.html change first, deployed before the code.
+
 **Enforced, not just stated:** `.github/workflows/deploy.yml` has a build
 step, "Refuse to publish ad or tracking dependencies", that greps `app/` and
 `identity/` for the domains and script globals of known ad/tracking vendors
