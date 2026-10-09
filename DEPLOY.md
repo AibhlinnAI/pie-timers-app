@@ -265,10 +265,12 @@ before anything is counted:
    for an unknown platform. Re-running the file is safe, but it re-grants
    execute to anon, so re-run it after a kill-switch revoke only on purpose.
 4. Merge the counter with `countFirstOpens: false`. The disclosure is live and
-   nothing is counted yet.
+   nothing is counted yet. Done: #35, live 10 Oct 2026 (CACHE v118).
 5. Decide whether the promise in `privacy.html` section 13 (an email before a
    material change) applies, and check the new `privacy.html` is live.
-6. **Google Play, before anything counts.** The Play app counts too (as
+6. **Google Play, before anything counts.** Done 10 Oct 2026: the Data safety
+   answers and the listing copy below were changed in Play Console and sent
+   for review, and the Play Console pack matches. The Play app counts too (as
    `play`), so the Play-facing statements must change first:
    - **Data safety:** decide the answer and record it in the Play Console pack
      (a private working file, not in this repo; its section 5 today says
@@ -280,17 +282,21 @@ before anything is counted:
    - **Store listing:** the pack's section 8 copy says "No ads, no analytics,
      no trackers". Change it to "No ads, no third-party analytics, no
      trackers", matching `privacy.html`, in the pack and in Play Console.
-   - **Pre-launch report (the stopgap):** Play Console → Testing → Pre-launch
-     report → Settings → turn it off. On every upload to a testing track it
-     opens the Play app on 5–10 freshly wiped Test Lab devices. They pass
-     every check in `visits.js` (no WebDriver, ordinary Chrome, empty storage,
-     the Play referrer), so each one would be counted as a `play | none`
-     first open, and with a handful of Play testers they would outnumber the
-     people. Leave it off until the wrapper fix in "The Play app and Google's
-     test devices" below has shipped. Google's own review of each release can
-     still add one or two `play` first opens; nothing on the web can tell.
+   - **Pre-launch report: it cannot be turned off.** Older help pages
+     describe a "Turn on pre-launch report" checkbox under Pre-launch report →
+     Settings → Preferences. As of 10 Oct 2026 that section is gone: the page
+     has only credentials, deep links, languages and a Robo script, and
+     Google's help no longer mentions an opt-out. On every upload to a
+     testing track it opens the Play app on 5–10 freshly wiped Test Lab
+     devices. They pass every check in `visits.js` (no WebDriver, ordinary
+     Chrome, empty storage, the Play referrer), so each is counted as a
+     `play | none` first open. Until the wrapper fix in "The Play app and
+     Google's test devices" below ships, read `play | none` on a day a build
+     was uploaded as mostly robots. Google's own review of each release can
+     add one or two `play` first opens as well; nothing on the web can tell.
 7. Merge a one-line change: `countFirstOpens: true` in `app/config.js`, plus
-   the next `CACHE` bump. No `?v=` change: `config.js` is unversioned, and the
+   the next `CACHE` bump (v124 on 25 Oct 2026: v121 and v123 were claimed
+   by unmerged branches). No `?v=` change: `config.js` is unversioned, and the
    `CACHE` bump is what makes installed copies fetch it again.
 8. Check it live (it writes to production). Open
    `https://pietimers.aibhlinn.ai/#src=test` in a **Chrome, Edge or Safari**
@@ -353,7 +359,8 @@ A foyer screen is a display, not an open.
 
 #### The Play app and Google's test devices
 
-The lasting fix for the pre-launch report (step 6) belongs in the Android
+The only fix for the pre-launch report (step 6), since it cannot be turned
+off, belongs in the Android
 wrapper, which is not in this repository. Subclass Bubblewrap's
 `LauncherActivity`, point the manifest's launcher activity at it, bump
 `versionCode` and upload:
@@ -375,7 +382,7 @@ public class LauncherActivity
 
 `visits.js` already honours `#count=off` and strips it before `app.js` runs;
 Play detection uses the referrer, not the fragment, so it is unaffected. Once
-that release is on every track, the pre-launch report can go back on.
+that release is on every track, `play | none` is people again.
 
 #### Tagging a QR code
 
