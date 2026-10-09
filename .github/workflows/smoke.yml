@@ -51,8 +51,9 @@ jobs:
 
       # Found rather than listed, so a new file is covered the day it is
       # added instead of the day someone remembers this file exists.
-      # --check parses without running, which is what lets it cover app.js
-      # and sw.js: neither can execute outside its real environment.
+      # --check parses without running, which is what lets it cover app.js,
+      # which needs a real DOM. The service workers are also run, stubbed,
+      # by tools/check-sw.js below.
       - name: Check every script parses
         run: |
           set -u
@@ -80,7 +81,8 @@ jobs:
 
       # The service workers: only good pages are stored for offline use,
       # a server error shows the stored copy, a failed precache file fails
-      # the whole install, and every precache entry is a real file.
+      # the whole update (a first install keeps what arrived), and every
+      # precache entry is a real file.
       - name: Run the service worker checks
         run: node tools/check-sw.js
 

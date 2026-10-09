@@ -59,6 +59,50 @@ var SHELL = [
   'manifest.webmanifest'
 ];
 
+/* ─────────────────────────── Cache helpers ─────────────────────────── */
+
+/* This worker reads only its own cache. stall41/sw.js keeps a cache of its
+   own on the same origin, and caches.match() would search that too: after
+   an app release it served the stall's older copies of the fonts and icons
+   both workers precache. */
+function fromCache(request) {
+  return caches.open(CACHE).then(function (c) { return c.match(request); });
+}
+
+/* cache.add(), except that an error response's body is cancelled. An
+   error response nobody reads is not released, and with three or more of
+   them a first install stalled until Chromium gave up on it (Chromium 141,
+   Oct 2026), leaving no worker at all.
+
+   cache:'reload' goes past the browser's HTTP cache to the server. Pages
+   keeps files for ten minutes, so a plain add() soon after a deploy could
+   store the OLD app.js under the NEW cache name, and it would then be
+   served until the next bump. */
+function addOne(cache, url) {
+  var request = new Request(url, { cache: 'reload' });
+  return fetch(request).then(function (response) {
+    if (!response.ok) {
+      if (response.body) response.body.cancel();
+      throw new TypeError(url + ' answered ' + response.status);
+    }
+    return cache.put(request, response);
+  });
+}
+
+/* The pages in SHELL. The app never fetches these itself (they are
+   navigations), so if a first install missed one, the cache-first handler
+   would never fill it: they are topped up after a good navigation. */
+var PAGES = SHELL.filter(function (url) { return url === './' || /\.html$/.test(url); });
+function topUpPages() {
+  return caches.open(CACHE).then(function (c) {
+    return Promise.all(PAGES.map(function (url) {
+      return c.match(url).then(function (hit) {
+        return hit || addOne(c, url).catch(function () { return null; });
+      });
+    }));
+  });
+}
+
 /* ─────────────────────────── Lifecycle ─────────────────────────── */
 
 self.addEventListener('install', function (event) {
@@ -77,7 +121,7 @@ self.addEventListener('install', function (event) {
          so navigator.serviceWorker.ready never resolves and notify.js
          cannot set up background alerts for the rest of the visit. The
          cache-first handler below stores a missed file the first time the
-         page loads it.
+         page loads it, and topUpPages() fetches a missed page.
 
          The reason updates used to skip a failed file, that one dead entry
          in this list would block every update, is now caught before it
@@ -86,11 +130,7 @@ self.addEventListener('install', function (event) {
       .then(function (cache) {
         var strict = !!self.registration.active;
         return Promise.all(SHELL.map(function (url) {
-          /* cache:'reload' goes past the browser's HTTP cache to the server.
-             Pages keeps files for ten minutes, so a plain add() soon after
-             a deploy could store the OLD app.js under the NEW cache name,
-             and it would then be served until the next bump. */
-          var add = cache.add(new Request(url, { cache: 'reload' }));
+          var add = addOne(cache, url);
           return strict ? add : add.catch(function () { return null; });
         }));
       })
@@ -130,8 +170,9 @@ self.addEventListener('fetch', function (event) {
   // cache-first for static assets so the app opens instantly offline.
   if (request.mode === 'navigate') {
     /* Never stored, never substituted: a cached health check is a lie
-       (see SHELL). The browser shows the server's real answer. */
-    if (url.pathname.slice(-17) === '/diagnostics.html') return;
+       (see SHELL). The browser shows the server's real answer. Pages
+       serves the page at /diagnostics as well as /diagnostics.html. */
+    if (/\/diagnostics(\.html)?$/.test(url.pathname)) return;
 
     event.respondWith(
       fetch(request)
@@ -148,21 +189,22 @@ self.addEventListener('fetch', function (event) {
               response.type === 'opaqueredirect') {
             var copy = response.clone();
             caches.open(CACHE).then(function (c) { c.put(request, copy); });
+            if (response.ok) topUpPages();
             return response;
           }
           /* The server is failing: the stored copy is better than its
              error page. A 404 is an answer, not a failure, so it is shown
              as it is. */
           if (response.status >= 500) {
-            return caches.match(request).then(function (hit) {
+            return fromCache(request).then(function (hit) {
               return hit || response;
             });
           }
           return response;
         })
         .catch(function () {
-          return caches.match(request).then(function (hit) {
-            return hit || caches.match('index.html');
+          return fromCache(request).then(function (hit) {
+            return hit || fromCache('index.html');
           });
         })
     );
@@ -170,8 +212,10 @@ self.addEventListener('fetch', function (event) {
   }
 
   event.respondWith(
-    caches.match(request).then(function (hit) {
-      if (hit) return hit;
+    fromCache(request).then(function (hit) {
+      /* A stored redirect answers a navigation only: given to fetch() it
+         fails even online. */
+      if (hit && hit.type !== 'opaqueredirect') return hit;
       return fetch(request).then(function (response) {
         if (response && response.status === 200 && response.type === 'basic') {
           var copy = response.clone();

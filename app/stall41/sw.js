@@ -21,6 +21,20 @@ var FILES = [
   '../icon-512-maskable.png'
 ];
 
+/* cache.add(), except that an error response's body is cancelled. An
+   unread error response is not released, and with three or more of them a
+   first install stalled until Chromium gave up on it (see app/sw.js). */
+function addOne(cache, url) {
+  var request = new Request(url, { cache: 'reload' });
+  return fetch(request).then(function (response) {
+    if (!response.ok) {
+      if (response.body) response.body.cancel();
+      throw new TypeError(url + ' answered ' + response.status);
+    }
+    return cache.put(request, response);
+  });
+}
+
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE)
@@ -31,7 +45,7 @@ self.addEventListener('install', function (event) {
            fall back on. */
         var strict = !!self.registration.active;
         return Promise.all(FILES.map(function (url) {
-          var add = cache.add(new Request(url, { cache: 'reload' }));
+          var add = addOne(cache, url);
           return strict ? add : add.catch(function () { return null; });
         }));
       })
@@ -51,11 +65,13 @@ self.addEventListener('activate', function (event) {
   );
 });
 
-/* The stored page, from this worker's own cache only: the app's worker
-   on the same origin keeps caches of its own. */
-function storedPage() {
-  return caches.open(CACHE).then(function (c) { return c.match('./'); });
+/* This worker reads only its own cache: the app's worker on the same
+   origin keeps caches of its own, and caches.match() would search those
+   too. */
+function fromCache(request) {
+  return caches.open(CACHE).then(function (c) { return c.match(request); });
 }
+function storedPage() { return fromCache('./'); }
 
 self.addEventListener('fetch', function (event) {
   var request = event.request;
@@ -92,6 +108,6 @@ self.addEventListener('fetch', function (event) {
   }
 
   event.respondWith(
-    caches.match(request).then(function (hit) { return hit || fetch(request); })
+    fromCache(request).then(function (hit) { return hit || fetch(request); })
   );
 });

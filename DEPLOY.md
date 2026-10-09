@@ -98,7 +98,7 @@ the service worker will not register and push notifications cannot work at all.
 ### 3.1 The Cloudflare proxy: not used, and why
 
 `pietimers.aibhlinn.ai` stays **DNS only**. Turning it orange was researched on
-9–10 Oct 2026 and deferred until after Launch Month. If it is ever revisited,
+9 and 10 Oct 2026 and deferred until after Launch Month. If it is ever revisited,
 these come first, in this order:
 
 1. **Disclose it.** `privacy.html` sections 6 and 9 must say that Cloudflare
