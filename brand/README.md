@@ -8,6 +8,7 @@ hand into somebody else's dashboard, where the size is fixed by them.
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
 | `aibhlinn-emoji-128.png` | Custom emoji (Discord, Slack, Teams), name `aibhlinnai` | 128×128 PNG, under 128 KB |
 | `aibhlinn-emoji-light-128.png` | Light-mode custom emoji, name `aibhlinnai_light` | 128×128 PNG, under 128 KB |
+| `aibhlinn-emoji-light-bold-128.png` | Bolder light-mode emoji, name `aibhlinnai_light` (use instead of the regular one) | 128×128 PNG, under 128 KB |
 
 ## Colours
 
@@ -44,6 +45,21 @@ navy tile looks heavy on a white chat theme.
   because there is no tile to fill.
 - Disappears on dark themes, the same way the blue wordmark does. Use
   the tiled version there.
+- 7 KB.
+
+## aibhlinn-emoji-light-bold-128.png
+
+The light-mode emoji with heavier strokes. The regular light version
+keeps the brand letter weight, which is thin at the ~22px emoji size.
+This one thickens it so it reads at a glance.
+
+- Same cut-out and crop as `aibhlinn-emoji-light-128.png`, then the
+  letter shape is grown about 12px on every side at 1024px working
+  size (Gaussian blur, then a low threshold), which rounds the
+  corners slightly instead of squaring them. The A's counter and the
+  gap under the accent stay open.
+- Upload one light version or the other under `aibhlinnai_light`, not
+  both. Two near-identical emoji just clutter the picker.
 - 7 KB.
 
 ## pie-timers-oauth-120.png
