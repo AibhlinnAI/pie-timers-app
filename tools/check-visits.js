@@ -23,8 +23,14 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = process.env.PT_ROOT || path.join(__dirname, '..');
+/* Every file is read with its line endings made LF. A Windows checkout
+   (core.autocrlf) has CRLF, and the static checks below match line by
+   line: with a carriage return left on each line, a comment is not
+   recognised as one and the SQL checks fail on prose. CI on Linux reads
+   LF either way. */
+const readText = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 const FILE = path.join(ROOT, 'app', 'visits.js');
-const SOURCE = fs.readFileSync(FILE, 'utf8');
+const SOURCE = readText(FILE);
 const FLAG = 'countdown-timers/first-open/v1';
 
 /* Every browser API the harness does not stub answers with a SENTINEL,
@@ -347,7 +353,7 @@ check('25 prerendered, then shown: sends once', r.fetches.length === 1);
 }
 
 // ── Static checks: what the server keeps, and the load order ──
-const sqlRaw = fs.readFileSync(path.join(ROOT, 'supabase', 'schema-visit-counts.sql'), 'utf8');
+const sqlRaw = readText(path.join(ROOT, 'supabase', 'schema-visit-counts.sql'));
 // Comments may name what the code must not use, so they are dropped first.
 const sql = sqlRaw.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
 const table = /create table if not exists public\.visit_counts \(([\s\S]*?)\n\);/i.exec(sql);
@@ -387,15 +393,15 @@ check('S3 the only grant, to anyone, is execute on count_first_open to anon', gr
 check('S10 a nightly job rewrites finished days together, and one vacuums after it',
   /cron\.schedule\(\s*'countdown-settle-visit-counts'[^;]*update public\.visit_counts set n = n[^;]*;/i.test(sql) &&
   /cron\.schedule\(\s*'countdown-vacuum-visit-counts'[^;]*vacuum public\.visit_counts/i.test(sql));
-const html = fs.readFileSync(path.join(ROOT, 'app', 'index.html'), 'utf8');
+const html = readText(path.join(ROOT, 'app', 'index.html'));
 const tag = /<script src="visits\.js\?v=(\d+)"><\/script>/.exec(html);
 const at = (s) => html.indexOf('<script src="' + s);
 check('S4 index.html loads visits.js after config.js, before identity-bridge.js and sync.js',
   tag && at('config.js') < tag.index && tag.index < at('identity-bridge.js') && tag.index < at('sync.js'));
-const sw = fs.readFileSync(path.join(ROOT, 'app', 'sw.js'), 'utf8');
+const sw = readText(path.join(ROOT, 'app', 'sw.js'));
 check('S5 sw.js precaches the same visits.js?v= that index.html asks for',
   tag && sw.includes("'visits.js?v=" + tag[1] + "'"));
-const conf = fs.readFileSync(path.join(ROOT, 'app', 'config.js'), 'utf8');
+const conf = readText(path.join(ROOT, 'app', 'config.js'));
 check('S6 config.js has the countFirstOpens switch', /countFirstOpens:\s*(true|false)/.test(conf));
 
 // Only the app itself counts: kiosk and event pages, pricing, terms and
@@ -408,7 +414,7 @@ const pages = [];
     else if (e.name.endsWith('.html')) pages.push(path.relative(ROOT, p).split(path.sep).join('/'));
   }
 }(path.join(ROOT, 'app')));
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+const read = (p) => readText(path.join(ROOT, p));
 const counting = pages.filter((p) => /<script[^>]*visits\.js/i.test(read(p)));
 check('S7 only app/index.html loads visits.js', counting.length === 1 && counting[0] === 'app/index.html', counting);
 const kiosks = pages.filter((p) => /^app\/[^/]+\/index\.html$/.test(p));
@@ -432,7 +438,7 @@ check('S9 visits.js passes the deploy guard pattern', guard && !new RegExp(guard
 {
   const dir = path.join(ROOT, 'windows-screensaver');
   const urls = fs.readdirSync(dir).filter((f) => f.endsWith('.cs'))
-    .flatMap((f) => fs.readFileSync(path.join(dir, f), 'utf8').match(/"https:\/\/pietimers\.aibhlinn\.ai\/index\.html[^"]*"/g) || []);
+    .flatMap((f) => readText(path.join(dir, f)).match(/"https:\/\/pietimers\.aibhlinn\.ai\/index\.html[^"]*"/g) || []);
   check('S11 the Windows screensaver loads the app with #count=off',
     urls.length > 0 && urls.every((x) => /#count=off"$/.test(x)), urls);
 }
