@@ -435,7 +435,7 @@ supabase secrets set TURNSTILE_SECRET_KEY=... ALLOWED_ORIGIN=https://your-site.e
 ```
 
 ```bash
-supabase functions deploy signin
+supabase functions deploy signin --no-verify-jwt
 ```
 
 Once `turnstileSiteKey` is set, the client stops calling `/auth/v1/otp` directly
@@ -445,6 +445,58 @@ per address and 15 per IP per hour, storing only hashes.
 > If `TURNSTILE_SECRET_KEY` is unset the function **fails open** — sign-in still works,
 > just without the bot check. That keeps a misconfiguration from locking everyone
 > out, but you must still confirm the secret is actually set in production.
+
+**4c — The store review account.** Google Play's reviewers cannot read an inbox,
+and Google refuses sign-in details that need one (9 Oct 2026). So one address
+also signs in with a fixed ten-digit code, checked by `review-signin`. Both
+halves are secrets, set here and in Play Console's Sign-in details, and nowhere
+else, this public repo least of all.
+
+**The address must be used for nothing else.** The function replaces any
+account at that address that it did not make itself, with everything in it.
+That is what stops someone registering the address, with a password of their
+own, in the gap after a reviewer tests Delete account. It also means the
+review account that existed before this function is replaced, once, on its
+first sign-in with the code.
+
+Generate the code at random rather than choosing one. This makes ten random
+digits, sets both secrets, and prints the code once for Play Console:
+
+```bash
+CODE=$(node -e "console.log(require('crypto').randomInt(1e9, 1e10))") && supabase secrets set REVIEW_EMAIL=<review address> REVIEW_CODE=$CODE && echo "Review code: $CODE"
+```
+
+```bash
+supabase functions deploy review-signin --no-verify-jwt
+```
+
+```bash
+supabase functions deploy signin --no-verify-jwt
+```
+
+`signin` needs the same `REVIEW_EMAIL` so it never emails that address. The
+code must be exactly ten digits (the code box takes a numeric keypad and ten
+characters), or the function switches itself off. With the secrets unset,
+nothing changes for anyone. What it does on a match, and why, is at the top of
+`supabase/functions/review-signin/index.ts`; the Play Console side is
+`docs/play-listing/Play-Console-Pack.md` section 7.
+
+The code only works through the browser half (`identity.js?v=117` and later,
+with `identity-bridge.js` and `supabase.js` alongside). Those reach people
+through GitHub Pages when the change is merged, not through this step, so
+change Play Console only once the merge has deployed and the code has been
+tried in the app.
+
+**Changing the code** (if it leaks, or a reviewer could have kept a session
+you no longer want): delete the review account in Supabase, Authentication >
+Users, then set a new `REVIEW_CODE` with the command above, then update Play
+Console the same day. Deleting the account is what ends sessions already handed
+out; the next sign-in with the new code makes it again.
+
+> **`--no-verify-jwt` on every function here except `manage-subscription`.** The
+> browser calls them with the publishable key, which is not a JWT, and there is
+> no `supabase/config.toml` to remember the setting. A bare `deploy` turns the
+> check back on and the gateway then refuses every call, sign-in included.
 
 **5 — For background push**, generate a VAPID key pair:
 
@@ -460,7 +512,7 @@ supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=ma
 ```
 
 ```bash
-supabase functions deploy notify-milestones
+supabase functions deploy notify-milestones --no-verify-jwt
 ```
 
 **6 — Schedule the refresh**: fill in the placeholders in `supabase/cron.sql` and run the file.
@@ -473,7 +525,7 @@ supabase secrets set ALLOWED_ORIGIN=https://your-site.example
 ```
 
 ```bash
-supabase functions deploy delete-account
+supabase functions deploy delete-account --no-verify-jwt
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are injected by
@@ -495,7 +547,7 @@ supabase secrets set PADDLE_WEBHOOK_SECRET=...
 ```
 
 ```bash
-supabase functions deploy paddle-webhook
+supabase functions deploy paddle-webhook --no-verify-jwt
 ```
 
 Test with Paddle's sandbox first — set `paddle.environment` to `'sandbox'` in
@@ -509,7 +561,7 @@ payments while you get set up.
 **9 — Calendar sync.**
 
 ```bash
-supabase functions deploy calendar-sync
+supabase functions deploy calendar-sync --no-verify-jwt
 ```
 
 Then fill in the placeholders at the bottom of `supabase/schema-calendar.sql` and
@@ -533,11 +585,11 @@ supabase secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
 ```
 
 ```bash
-supabase functions deploy google-connect
+supabase functions deploy google-connect --no-verify-jwt
 ```
 
 ```bash
-supabase functions deploy calendar-sync
+supabase functions deploy calendar-sync --no-verify-jwt
 ```
 
 Re-deploy `calendar-sync` even if you already have that function — the new version handles both kinds.

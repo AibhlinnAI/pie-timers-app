@@ -26,6 +26,7 @@ These must **never** be committed:
 | Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from `manage-subscription`, that one only opens a checkout in the browser. |
 | Turnstile secret key | Supabase → Edge Functions → Secrets |
 | Google client secret | Supabase → Edge Functions → Secrets |
+| Store review address and code (`REVIEW_EMAIL`, `REVIEW_CODE`) | Supabase → Edge Functions → Secrets, and Play Console → Sign-in details. Nowhere else. See `app/README.md` step 4c. |
 | Resend API key | Supabase → Authentication → SMTP |
 
 `.gitignore` covers the usual accidents, and the deploy workflow refuses to
@@ -175,7 +176,10 @@ locked down.
 
 ### 5.3 Edge functions and URL configuration
 
-- [ ] Deploy the seven edge functions.
+- [ ] Deploy the eight edge functions, each with `--no-verify-jwt` except
+      `manage-subscription`: signin, delete-account, paddle-webhook,
+      manage-subscription, notify-milestones, calendar-sync, google-connect,
+      review-signin.
 - [ ] **Authentication → URL Configuration → Site URL**:
       `https://pietimers.aibhlinn.ai` — no trailing slash.
 - [ ] **Redirect URLs**: `https://pietimers.aibhlinn.ai/**` — both asterisks.

@@ -149,7 +149,7 @@ const AUTH_METHODS = [
   'signInWithEmail', 'verifyEmailOtp', 'signInWithGoogle', 'connectGoogleCalendar',
   'wasConnectingGoogle', 'signOut', 'loadUser', 'deleteAccount',
   'consumeRedirect', 'getSession', 'getUser', 'isSignedIn',
-  'validToken', 'onChange',
+  'validToken', 'onChange', 'verifyReviewCode',
 ];
 
 const auth = resolve(sandbox, 'CT.auth');

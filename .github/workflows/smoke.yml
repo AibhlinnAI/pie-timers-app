@@ -78,3 +78,9 @@ jobs:
       # what lets Node run the .ts file as it ships. Nothing is deployed.
       - name: Run the calendar-sync tests
         run: node --experimental-strip-types tools/calendar-sync-test.mjs
+
+      # The Google Play review sign-in: review-signin, the line it needed in
+      # signin, and the browser fallback that reaches it. Most of its checks
+      # are that nobody else's sign-in changed. Nothing is deployed.
+      - name: Run the store-review sign-in tests
+        run: node --experimental-strip-types tools/review-signin-test.mjs
