@@ -217,6 +217,11 @@ before anything is counted:
 3. Run `supabase/schema-visit-counts.sql` in the SQL Editor, then the checks
    at the end of that file. They include the nightly job that rewrites each
    finished day's totals together (see the file's header for why).
+   Done 10 Oct 2026 (via `supabase db query --linked -f`, the file at
+   3783845): every check matched, an anonymous read of either table is
+   refused (401, 42501), and the function answers 204 while counting nothing
+   for an unknown platform. Re-running the file is safe, but it re-grants
+   execute to anon, so re-run it after a kill-switch revoke only on purpose.
 4. Merge the counter with `countFirstOpens: false`. The disclosure is live and
    nothing is counted yet.
 5. Decide whether the promise in `privacy.html` section 13 (an email before a
