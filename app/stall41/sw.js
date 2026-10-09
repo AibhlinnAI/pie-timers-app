@@ -9,8 +9,8 @@
 /* Bump when index.html or the manifest changes, or an installed copy
    keeps the old one: both are served from this cache. v2: the manifest
    asks for fullscreen, so an installed phone copy hides Android's status
-   and navigation bars. */
-var CACHE = 'stall41-v2';
+   and navigation bars. v3: error pages are no longer stored. */
+var CACHE = 'stall41-v3';
 
 var FILES = [
   './',
@@ -26,7 +26,9 @@ self.addEventListener('install', function (event) {
     caches.open(CACHE)
       .then(function (cache) {
         return Promise.all(FILES.map(function (url) {
-          return cache.add(new Request(url, { cache: 'reload' })).catch(function () { return null; });
+          /* All or nothing, as in app/sw.js: a failed file fails the
+             install, so the old worker and its complete cache carry on. */
+          return cache.add(new Request(url, { cache: 'reload' }));
         }));
       })
       .then(function () { return self.skipWaiting(); })
@@ -56,8 +58,16 @@ self.addEventListener('fetch', function (event) {
     event.respondWith(
       fetch(request)
         .then(function (response) {
-          var copy = response.clone();
-          caches.open(CACHE).then(function (c) { c.put('./', copy); });
+          /* Only a good page replaces the stored one, as in app/sw.js. On a
+             server error, the stored page is better than the error. */
+          if (response.ok && response.type === 'basic') {
+            var copy = response.clone();
+            caches.open(CACHE).then(function (c) { c.put('./', copy); });
+            return response;
+          }
+          if (response.status >= 500) {
+            return caches.match('./').then(function (hit) { return hit || response; });
+          }
           return response;
         })
         .catch(function () { return caches.match('./'); })

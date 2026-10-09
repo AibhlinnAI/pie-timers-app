@@ -78,6 +78,12 @@ jobs:
       - name: Run the first-open count checks
         run: node tools/check-visits.js
 
+      # The service workers: only good pages are stored for offline use,
+      # a server error shows the stored copy, a failed precache file fails
+      # the whole install, and every precache entry is a real file.
+      - name: Run the service worker checks
+        run: node tools/check-sw.js
+
       # The calendar-sync edge function: its parser, its scheduled run, and
       # index.ts itself with Deno and the network stubbed. Type stripping is
       # what lets Node run the .ts file as it ships. Nothing is deployed.

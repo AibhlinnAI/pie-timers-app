@@ -121,15 +121,23 @@ If first-party analytics are ever added, they must be aggregate,
 non-identifying, and disclosed in `privacy.html` before shipping — not
 after.
 
-**Visit counts today (from 30 Sep 2026):** `pietimers.aibhlinn.ai` is proxied
-through Cloudflare (orange cloud). The only visit numbers are the totals on
-Cloudflare's own dashboard, built from its server logs; nothing is added to
-the page for them. Cloudflare features that inject scripts into pages must
-stay **off** for this zone: Web Analytics (RUM) automatic setup, Rocket
-Loader, Email Address Obfuscation and Bot Fight Mode. Any one of them would
-put third-party bytes into the app, breaking this rule and rule 4. The check
-is that a page served through the proxy is byte-identical to `main`.
-Disclosed in `privacy.html` sections 6 and 9.
+**Cloudflare: DNS only, deliberately (decided 10 Oct 2026).**
+`pietimers.aibhlinn.ai` is a DNS only (grey cloud) record. Cloudflare answers
+the name lookup and never sees the app's traffic, so it counts nothing. An
+earlier note here said the record had been proxied from 30 Sep 2026. It never
+was: the disclosure went live, the switch did not happen. Switching it was
+then researched and deferred until after Launch Month, because:
+
+- GitHub's own certificate renewal is reported to fail while the record is
+  proxied, and under Full (strict) an expired certificate is error 526 on
+  every page. Keeping it working means a grey-cloud renewal routine every
+  few weeks.
+- About twenty Cloudflare features would change the app's pages, headers or
+  cookies, several of them on by default, and all of them must stay off.
+- The free plan's totals are rough: requests (every file), not pages.
+
+`DEPLOY.md` 3.1 has what to do before ever switching. The first-open count
+below is the visit number meanwhile.
 
 **First opens:** `app/visits.js` adds one to a daily total in
 `public.visit_counts` (`supabase/schema-visit-counts.sql`) the first time the
@@ -172,9 +180,13 @@ privacy policy alone.
 
 ## 4. Every byte comes from our own origin
 
-The app makes no third-party request at all, and that is a consequence of
-section 3 rather than a separate rule. Two things follow, and both are easy
-to undo by accident:
+Every file the app is made of comes from our own origin, and that is a
+consequence of section 3 rather than a separate rule. The only requests to
+anyone else are the services the app needs to do its job, each named in
+`privacy.html` section 6: Supabase for accounts and sync; Cloudflare
+Turnstile, loaded only while the sign-in form is open; and Paddle's
+checkout, loaded only when someone goes to subscribe. Two things follow, and
+both are easy to undo by accident:
 
 - **The typeface is self-hosted.** `app/fonts/` carries Instrument Sans as
   two woff2 files (one variable face per subset, covering weights 400–700)
@@ -184,8 +196,9 @@ to undo by accident:
   here is why not: a CDN font is a third-party request on every page load,
   fails to resolve with the network off, and reads badly beside the footer
   promise on the same page. Both files are precached in `sw.js`.
-- **No CDN, no npm, no build step.** Nothing arrives at a browser that is
-  not in this repository.
+- **No CDN, no npm, no build step.** Apart from the Turnstile and Paddle
+  scripts above, nothing arrives at a browser that is not in this
+  repository.
 
 Aptos remains the first fallback in the stack, but Aptos ships only with
 Microsoft 365 and recent Windows — never on Android, iOS or Mac. Self-hosting

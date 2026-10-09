@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v118';
+var CACHE = 'countdown-timers-v119';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -64,15 +64,24 @@ var SHELL = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE)
-      // addAll is all-or-nothing; cache individually so one 404 is survivable.
+      /* All or nothing. If any shell file fails to arrive (a dropped
+         connection, a 5xx, an error page from anything in front of Pages),
+         the install fails and the browser retries later, while the old
+         worker and its complete cache carry on. Skipping the failed file
+         instead, as this used to, still activated the new worker, whose
+         activate step then deleted the old cache: the offline shell came
+         up a file short with nothing to fall back on.
+
+         The reason it used to skip, that one 404 in this list would block
+         every update, is now a smoke-test failure instead:
+         tools/check-sw.js checks every entry here is a real file. */
       .then(function (cache) {
         return Promise.all(SHELL.map(function (url) {
           /* cache:'reload' goes past the browser's HTTP cache to the server.
              Pages keeps files for ten minutes, so a plain add() soon after
              a deploy could store the OLD app.js under the NEW cache name,
              and it would then be served until the next bump. */
-          return cache.add(new Request(url, { cache: 'reload' }))
-            .catch(function () { return null; });
+          return cache.add(new Request(url, { cache: 'reload' }));
         }));
       })
       .then(function () { return self.skipWaiting(); })
@@ -109,8 +118,23 @@ self.addEventListener('fetch', function (event) {
     event.respondWith(
       fetch(request)
         .then(function (response) {
-          var copy = response.clone();
-          caches.open(CACHE).then(function (c) { c.put(request, copy); });
+          /* Only a good page replaces the stored one. This used to store
+             whatever came back, so one error page (a Pages 404 or 5xx, or
+             an error from anything in front of Pages) overwrote the copy
+             that works offline, and was then shown offline. */
+          if (response.ok && response.type === 'basic') {
+            var copy = response.clone();
+            caches.open(CACHE).then(function (c) { c.put(request, copy); });
+            return response;
+          }
+          /* The server is failing: the stored copy is better than its
+             error page. A 404 is an answer, not a failure, so it is shown,
+             and a redirect passes straight through to the browser. */
+          if (response.status >= 500) {
+            return caches.match(request).then(function (hit) {
+              return hit || response;
+            });
+          }
           return response;
         })
         .catch(function () {

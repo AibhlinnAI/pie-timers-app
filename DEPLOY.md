@@ -84,15 +84,49 @@ Two things that are easy to get wrong here, and both fail quietly:
   healthy while the domain never verifies.
 - Leave the proxy **grey**. Orange-clouded, GitHub cannot validate the domain
   and the certificate stays pending forever, which looks like a GitHub fault.
-  You can enable the proxy later, but then Cloudflare's SSL/TLS mode must be
-  Full (strict) or you get a redirect loop.
+  Leave it grey afterwards too: see 3.1 before ever switching it.
 
 Then repo → **Settings → Pages → Custom domain** → `pietimers.aibhlinn.ai` → Save.
-`app/CNAME` already contains this, so the setting survives every redeploy.
+The domain is kept in Settings from then on. `app/CNAME` holds the same name,
+but GitHub may ignore that file for a deploy made by Actions, as this one is,
+so after a **Remove** the domain has to be entered here again by hand.
 
 Wait for the DNS check to go green, then tick **Enforce HTTPS**. This can take
 up to an hour while the certificate is issued. Do not skip this step: without HTTPS
 the service worker will not register and push notifications cannot work at all.
+
+### 3.1 The Cloudflare proxy: not used, and why
+
+`pietimers.aibhlinn.ai` stays **DNS only**. Turning it orange was researched on
+9–10 Oct 2026 and deferred until after Launch Month. If it is ever revisited,
+these come first, in this order:
+
+1. **Disclose it.** `privacy.html` sections 6 and 9 must say that Cloudflare
+   passes the app's files on, keeps server logs, and gives daily totals, and
+   that change must be live before the cloud turns orange. Today they say
+   none of this, because none of it happens.
+2. **Plan for certificate renewal.** GitHub renews the site's certificate
+   itself, and that is reported to fail while the record is proxied. Under
+   Full (strict), an expired certificate is error 526 on every page. The
+   routine is: grey the cloud, wait for the new certificate, orange it again.
+   Certificate lifetimes are shortening, so this comes round every few weeks.
+3. **Turn off everything that changes a response, before the switch.** Not
+   four settings but about twenty, several on by default: Email Address
+   Obfuscation (it would rewrite every `mailto:` link), Automatic HTTPS
+   Rewrites, Rocket Loader, Cloudflare Fonts, Speed Brain, Early Hints, Web
+   Analytics automatic setup, Zaraz, Bot Fight Mode and its JavaScript
+   Detections, Replace insecure JavaScript libraries, Always Online, Network
+   Error Logging and client-side script monitoring, plus anything Cloudflare
+   has switched on since. Pin each one off for this hostname with a
+   Configuration Rule, and bypass the cache with a Cache Rule.
+4. **Then check, from outside.** Every page served through the proxy must be
+   byte-identical to the repo, with no added `nel`, `report-to`,
+   `speculation-rules` or `set-cookie` header. `deploy.yml`'s tracker check
+   cannot see anything added at Cloudflare's edge.
+
+Only Flexible SSL/TLS (or Off) causes the redirect loop with Enforce HTTPS.
+Full (strict) is the right mode because it also checks GitHub's certificate,
+which is exactly why a lapsed one takes the site down.
 
 ## 4. Check the site
 
