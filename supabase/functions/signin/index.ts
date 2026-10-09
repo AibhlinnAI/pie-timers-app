@@ -20,6 +20,9 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const TURNSTILE_SECRET = Deno.env.get("TURNSTILE_SECRET_KEY") ?? "";
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 
+/* The one account that is never emailed: see the check in the handler. */
+const REVIEW_EMAIL = (Deno.env.get("REVIEW_EMAIL") ?? "").trim().toLowerCase();
+
 /* Throttles. Deliberately generous — a real person hitting these is
    already having a bad time, and the bot check does the heavy lifting. */
 const MAX_PER_EMAIL_PER_HOUR = 5;
@@ -151,6 +154,19 @@ Deno.serve(async (request) => {
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return json({ error: "Enter a valid email address." }, 400);
   }
+
+  /* The store review account signs in with a fixed code instead (see
+     review-signin), so nothing is ever emailed to it. Sending anyway
+     would be worse than useless: minting that account's session starts
+     Supabase's 60-second resend wait, so a reviewer who signed out and
+     straight back in would get an error here and never see the code box.
+     Answered before the bot check and the throttle, neither of which has
+     anything to protect when nothing is sent. That also tells anyone who
+     asks that this one address is special, which is why nothing about the
+     review account depends on the address staying secret. The header
+     panel relies on this order when Turnstile will not finish
+     (identity-bridge.js). */
+  if (REVIEW_EMAIL && email === REVIEW_EMAIL) return json({ ok: true });
 
   const ip = request.headers.get("cf-connecting-ip") ??
              request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "";

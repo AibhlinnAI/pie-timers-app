@@ -4971,8 +4971,11 @@
     });
 
     /* Verifying the code signs this device in with no redirect:
-       CT.auth.onChange fires, renderAccount() swaps to the signed-in
-       panel, and there is nothing more to do on success. */
+       CT.auth.onChange fires and renderAccount() swaps to the signed-in
+       panel. Both buttons are still put back on success, out of sight.
+       Signing out or deleting the account brings this form back without
+       reloading the page, and a code button left on "Signing in…" then
+       refused the next code until the app was closed. */
     var CODE_SUBMIT_LABEL = null;
     $('codeForm').addEventListener('submit', function (event) {
       event.preventDefault();
@@ -4984,7 +4987,13 @@
       button.disabled = true;
       button.textContent = 'Signing in…';
       authMessage('');
-      CT.auth.verifyEmailOtp(email, code).catch(function (err) {
+      CT.auth.verifyEmailOtp(email, code).then(function () {
+        button.disabled = false;
+        button.textContent = CODE_SUBMIT_LABEL;
+        clearTimeout(magicResendTimer);
+        $('magicSubmit').textContent = MAGIC_SUBMIT_LABEL;
+        $('magicSubmit').disabled = false;
+      }, function (err) {
         button.disabled = false;
         button.textContent = CODE_SUBMIT_LABEL;
         authMessage(err.message, true);

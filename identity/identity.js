@@ -293,18 +293,36 @@
 
        type 'email' is GoTrue's unified passwordless type, which settles
        both a brand-new account and a returning one, matching the
-       create_user:true request that sent the code. */
+       create_user:true request that sent the code.
+
+       A product may supply `verifyCode` to init(), to settle a code
+       Supabase has just refused. It resolves to a token payload to
+       sign in with, or null to let Supabase's refusal stand, and it
+       rejects only when it has something better to tell the person.
+       Pie Timers uses it for the one account store reviewers sign in
+       with, because a reviewer cannot read an inbox. It runs only after
+       a refusal (a 4xx), never after a network failure, so a real code
+       never goes anywhere but Supabase while Supabase can be reached. */
     verifyEmailOtp: function (email, code) {
+      var address = (email || '').trim();
+      var token = (code || '').replace(/\s+/g, '');
       return request(authUrl('/verify'), {
         method: 'POST',
         headers: { apikey: cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'email',
-          email: (email || '').trim(),
-          token: (code || '').replace(/\s+/g, '')
-        })
+        body: JSON.stringify({ type: 'email', email: address, token: token })
       }).then(function (data) {
         return adoptTokenResponse(data);
+      }, function (refused) {
+        var fallback = cfg && cfg.verifyCode;
+        if (typeof fallback !== 'function' || !(refused.status >= 400 && refused.status < 500)) {
+          throw refused;
+        }
+        return Promise.resolve().then(function () {
+          return fallback(address, token);
+        }).then(function (data) {
+          if (!data) throw refused;
+          return adoptTokenResponse(data);
+        });
       });
     },
 

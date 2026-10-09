@@ -32,7 +32,8 @@ under dark text until the app defined it.
 
 ```js
 // identity.js
-Aibhlinn.identity.init({ supabaseUrl, supabaseAnonKey, redirectUrl? })
+Aibhlinn.identity.init({ supabaseUrl, supabaseAnonKey, redirectUrl?,
+                         prepareSignIn?, signIn?, verifyCode? })   // optional product delegates, below
 Aibhlinn.identity.signInWithEmail(email)
 Aibhlinn.identity.verifyEmailOtp(email, code)   // finish sign-in with the emailed code (the email carries no link)
 Aibhlinn.identity.signInWithGoogle()
@@ -60,6 +61,22 @@ Aibhlinn.identityUI.mount({
 // without the person's tap. Cases: tools/check-email-typos.js.
 Aibhlinn.emailTypos.suggest(address)   // the corrected address, or null
 ```
+
+### Product delegates
+
+All three are optional. With none supplied, identity talks to Supabase directly
+and nothing else.
+
+| Delegate | Called | Answer |
+| --- | --- | --- |
+| `prepareSignIn(host)` | when the sign-in panel opens | anything; a bot check may draw into `host` |
+| `signIn(email, ctx)` | instead of posting to `/auth/v1/otp` | the result, or `null` to let identity send it itself |
+| `verifyCode(email, code)` | only after Supabase refuses a code with a 4xx, never on a network failure | a token payload to sign in with, `null` to let the refusal stand, or a rejection with a message for the person |
+
+Pie Timers supplies all three in `app/identity-bridge.js`. `verifyCode` is how
+the one store-review account signs in with a fixed code
+(`supabase/functions/review-signin`), because a store reviewer cannot read an
+inbox. A second app that never goes through store review simply leaves it out.
 
 A product never imports Pie Timers' code to use any of the above — that is
 the whole point of this folder existing outside `app/`.
