@@ -173,8 +173,10 @@ How to read them:
   explain it (an event, a printed code, a Play release), is abuse: anyone
   holding the public key can add to a total. There is no second count to
   check it against: `pietimers.aibhlinn.ai` is DNS only in Cloudflare, so
-  Cloudflare sees no visits (`DEPLOY.md` 3.1). For `play`, Play Console's
-  install figures are a separate check.
+  our Cloudflare account keeps no logs or totals of the app (`DEPLOY.md`
+  3.1). The project's API traffic does pass through Cloudflare, as
+  Supabase's own network provider, but that is Supabase's account, not
+  ours. For `play`, Play Console's install figures are a separate check.
 - Before sharing numbers outside the business, merge any cell under 5 into a
   bigger group.
 
