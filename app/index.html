@@ -743,10 +743,13 @@
         </label>
       </div>
 
+      <!-- The advice below is the web's. In the Play app the switch is
+           Android's own, not a site setting, and app.js swaps the wording
+           (PLAY_PERMISSION_ADVICE). -->
       <div class="notice notice--warn" id="permissionNotice" hidden>
         <strong>Notifications are blocked.</strong>
-        Milestone alerts will still appear inside the app, but your browser won't show
-        system notifications until you allow them for this site in its site settings.
+        <span id="permissionAdvice">Milestone alerts will still appear inside the app, but your browser won't show
+        system notifications until you allow them for this site in its site settings.</span>
       </div>
 
       <div class="notice notice--info" id="insecureNotice" hidden>
@@ -1092,6 +1095,6 @@
 <script src="notify.js"></script>
 <script src="sync.js?v=113"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=117"></script>
+<script src="app.js?v=122"></script>
 </body>
 </html>
