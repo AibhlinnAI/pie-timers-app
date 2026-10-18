@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v122';
+var CACHE = 'countdown-timers-v123';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -49,7 +49,7 @@ var SHELL = [
   'notify.js',
   'sync.js?v=113',
   'qrcode.js',
-  'app.js?v=122',
+  'app.js?v=123',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',

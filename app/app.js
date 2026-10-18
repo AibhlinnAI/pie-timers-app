@@ -625,7 +625,7 @@
         : state));
       return true;
     } catch (e) {
-      toast('Could not save — device storage is unavailable.');
+      toast('Could not save. Device storage is unavailable.');
       return false;
     }
   }
@@ -3079,7 +3079,7 @@
 
     buildAppointmentList();
     render();
-    toast('Added — counting down on the Dashboard.');
+    toast('Added. It\'s counting down on the Dashboard.');
   });
 
   /* Default the form to today so adding something takes two fields, not three.
@@ -3985,7 +3985,7 @@
 
   function notify(title, body, tag) {
     if (alertsHushed) return;
-    toast(title + ' — ' + body);
+    toast(title + ': ' + body);
     if (state.settings.sound) chime();
     if (CT.notify) CT.notify.show(title, body, tag);
   }
@@ -4096,7 +4096,7 @@
       input.focus();
       input.select();
       try { document.execCommand('copy'); done(); }
-      catch (e) { toast('Could not copy — select the link and copy by hand instead.'); }
+      catch (e) { toast('Could not copy. Select the link and copy it by hand instead.'); }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(input.value).then(done).catch(fallback);
@@ -4211,7 +4211,7 @@
           : 'Notifications are not allowed by the browser.');
         return;
       }
-      notify('Pie Timers', 'Test notification — alerts are working.', 'test');
+      notify('Pie Timers', 'Test notification. Alerts are working.', 'test');
     });
   });
 
