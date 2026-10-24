@@ -3079,7 +3079,7 @@
 
     buildAppointmentList();
     render();
-    toast('Added. It\'s counting down on the Dashboard.');
+    toast('Added. The next appointment counts down on the Dashboard.');
   });
 
   /* Default the form to today so adding something takes two fields, not three.

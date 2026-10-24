@@ -1227,19 +1227,22 @@ function checkBeforeAfter() {
     const view = (app, all, table) => ids.filter((id) => all || LIVE.test(id)).map((id) => id + '=' + snap(app.$(id))).join('\n') +
       '\ntitle=' + app.dom.doc.title + (all || table ? '\ntbody=' + snap(app.$('weekPreview').querySelector('tbody')) : '');
     /* The one wording the baseline may differ by: the toast now joins an
-       alert's title and body with a colon, not an em dash. */
+       alert's title and body with a colon, not an em dash. This maps the
+       first em dash in the old toast, so a scenario must not put one in a
+       title. A failure still prints what the old app really showed. */
     const sinceBaseline = (text) => text.replace(/^(toast=.*?) — /m, '$1: ');
     let diffs = [];
     let ticks = 0;
     const compare = (when, all, table) => {
       if (all) ids = [...oldApp.dom.byId.keys()].sort();
-      const a = sinceBaseline(view(oldApp, all, table));
+      const raw = view(oldApp, all, table);
+      const a = sinceBaseline(raw);
       const b = view(newApp, all, table);
       if (a !== b && diffs.length < 3) {
         const la = a.split('\n');
         const lb = b.split('\n');
         const i = la.findIndex((line, k) => line !== lb[k]);
-        diffs.push(`${show(when)}\n  then ${la[i]}\n  now  ${lb[i]}`);
+        diffs.push(`${show(when)}\n  then ${raw.split('\n')[i]}\n  now  ${lb[i]}`);
       }
     };
     compare(CLOCK.real, true);
