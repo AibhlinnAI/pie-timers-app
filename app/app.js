@@ -4128,7 +4128,9 @@
             state.settings[key] = false;
             el.checked = false;
             save();
-            toast('Notifications were not allowed by the browser.');
+            toast(IN_PLAY_APP
+              ? 'Notifications were not allowed on this phone.'
+              : 'Notifications were not allowed by the browser.');
           } else if (key === 'push') {
             CT.notify.refreshSubscription().then(function (sub) {
               toast(sub ? 'Background alerts are on.' : 'Background alerts need an account.');
@@ -4146,6 +4148,29 @@
       render();
     });
   });
+
+  /* What the "Notifications are blocked" box advises. The wording in
+     index.html points at the browser's site settings, which is right in
+     a browser tab and in an installed web app, an iPhone home screen icon
+     included. In the Play app it is wrong: the wrapper delegates
+     notifications, so the permission the page reads is Android's own
+     notification switch for Pie Timers, and Chrome reads that switch only
+     when Chrome itself starts. On 14 Oct 2026, on Android 17, switching
+     it on and reopening the app left the box up; restarting the phone
+     cleared it. Hence the restart.
+
+     The same flag as the prices, CT.inPlayApp. The span is looked up
+     rather than assumed, because a stale index.html can meet this file. */
+  var PLAY_PERMISSION_ADVICE =
+    'Milestone alerts will still appear inside the app, but your phone won\'t show ' +
+    'system notifications until you allow them. On your phone (not in this app), ' +
+    'open Settings > Apps > Pie Timers > Notifications and switch them on. ' +
+    'Then restart your phone and open Pie Timers again.';
+  (function advisePlayAppPermission() {
+    if (!IN_PLAY_APP) return;
+    var advice = $('permissionAdvice');
+    if (advice) advice.textContent = PLAY_PERMISSION_ADVICE;
+  }());
 
   /* Keep the settings panel honest about what will actually be delivered. */
   function updateNotificationNotices() {
@@ -4181,7 +4206,9 @@
     CT.notify.requestPermission().then(function (result) {
       updateNotificationNotices();
       if (result !== 'granted') {
-        toast('Notifications are not allowed by the browser.');
+        toast(IN_PLAY_APP
+          ? 'Notifications are not allowed on this phone.'
+          : 'Notifications are not allowed by the browser.');
         return;
       }
       notify('Pie Timers', 'Test notification — alerts are working.', 'test');
