@@ -32,9 +32,15 @@ AUDIT-FINDINGS.md
 
 # Private working documents. These are session notes written to Mal, not
 # product documentation, and they were never meant for a public repo. Keep
-# your copies locally. If you are about to commit either one, don't.
+# your copies locally. If you are about to commit any of them, don't.
 docs/Pie-Timers-GTM-Four-Ideas.md
 docs/Tester-Recruitment-and-ADHD-Conference.md
+# The Play Console working pack and the tester tour sent on WhatsApp.
+# The pack holds support and contact details; the tour has dated copies
+# beside it, hence the wildcard. The Play listing itself is public on
+# Google Play, but these working notes about it are not.
+docs/play-listing/
+docs/Tester-Tour-WhatsApp*.md
 
 # The message board Claude sessions write to each other. Tracked briefly
 # on 20 Sep 2026 and untracked the same day, deliberately. It is a

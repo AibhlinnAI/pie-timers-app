@@ -271,7 +271,7 @@ before anything is counted:
 6. **Google Play, before anything counts.** The Play app counts too (as
    `play`), so the Play-facing statements must change first:
    - **Data safety:** decide the answer and record it in the Play Console pack
-     (`docs/play-listing/Play-Console-Pack.md` section 5, which today says
+     (a private working file, not in this repo; its section 5 today says
      "Not collected: ... app interactions"). Most likely: App activity → App
      interactions: collected, for Analytics, not shared. Google counts "the
      number of times they visit a page" as app interactions, and anonymised
