@@ -7,6 +7,7 @@
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
 var CACHE = 'countdown-timers-v123';
+var CACHE = 'countdown-timers-v124';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache

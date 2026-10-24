@@ -144,10 +144,9 @@ then researched and deferred until after Launch Month, because:
 - The free plan's totals are rough: requests (every file), not pages.
 
 `DEPLOY.md` 3.1 has what to do before ever switching. Meanwhile the
-first-open count below is the only visit number planned. It ships switched
-off (`countFirstOpens: false` in `app/config.js`), and until `DEPLOY.md`
-5.5 step 7 switches it on there is no visit number at all; 5.5 records the
-date when it does.
+first-open count below is the only visit number. It is switched by
+`countFirstOpens` in `app/config.js`, which `DEPLOY.md` 5.5 step 7 turned on;
+before that there was no visit number at all.
 
 **First opens:** `app/visits.js` adds one to a daily total in
 `public.visit_counts` (`supabase/schema-visit-counts.sql`) the first time the

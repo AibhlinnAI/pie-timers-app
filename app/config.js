@@ -38,9 +38,10 @@ window.CT.config = {
      Supabase → Authentication → URL Configuration → Redirect URLs. */
   redirectUrl: '',
 
-  /* The first-open count (app/visits.js, privacy.html section 9). Off
-     until supabase/schema-visit-counts.sql has run and the privacy
-     policy that discloses it is live.
+  /* The first-open count (app/visits.js, privacy.html section 9). On
+     since 10 Oct 2026, once supabase/schema-visit-counts.sql had run,
+     the privacy policy that discloses it was live (#35) and the Play
+     Data safety answers matched it (DEPLOY.md 5.5).
 
      NOT an instant kill switch. sw.js serves this file cache-first
      under an unversioned URL, so a browser whose first open is still
@@ -49,7 +50,7 @@ window.CT.config = {
      once, revoke the function server-side first (DEPLOY.md 5.5, "To
      stop counting"), then set this to false WITH a CACHE bump in
      sw.js so the requests stop being made at all. */
-  countFirstOpens: false,
+  countFirstOpens: true,
 
   /* One-click Google Calendar. Off until Google has verified the app.
 

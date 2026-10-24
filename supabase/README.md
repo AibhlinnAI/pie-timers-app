@@ -158,9 +158,9 @@ How to read them:
   use Play Console for those.
 - Google's pre-launch report opens the Play app on 5–10 freshly wiped test
   devices for every upload to a testing track, and each one looks exactly
-  like a new person. Keep the report off while counting is on (DEPLOY.md
-  5.5, step 6) until the wrapper sends `#count=off` on those devices. If it
-  ran anyway, release days show extra `play | none` first opens. Google's
+  like a new person. The report cannot be turned off (DEPLOY.md 5.5, step
+  6), so until the wrapper sends `#count=off` on those devices, read
+  `play | none` on a day a build was uploaded as mostly robots. Google's
   own review of a release can add one or two as well.
 - A day's rows are rewritten together shortly after midnight Adelaide time
   (the `countdown-settle-visit-counts` job), so no row keeps a trace of the
