@@ -9,8 +9,9 @@
 /* Bump when index.html or the manifest changes, or an installed copy
    keeps the old one: both are served from this cache. v2: the manifest
    asks for fullscreen, so an installed phone copy hides Android's status
-   and navigation bars. v3: error pages are no longer stored. */
-var CACHE = 'stall41-v3';
+   and navigation bars. v3: error pages are no longer stored. v4: the
+   page title reads "Stall 41 · Pie Timers". */
+var CACHE = 'stall41-v4';
 
 var FILES = [
   './',

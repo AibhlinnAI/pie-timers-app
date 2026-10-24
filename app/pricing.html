@@ -32,7 +32,7 @@
     location.replace('index.html#in-app');
   }());
 </script>
-<title>Pricing — Pie Timers</title>
+<title>Pricing · Pie Timers</title>
 <meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed.">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -118,7 +118,7 @@
       <button class="plan-card" id="buyMonthly" type="button">
         <span class="plan-name">Monthly</span>
         <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
-        <span class="plan-note">Try before you pay — cancel any time</span>
+        <span class="plan-note">Try before you pay, cancel any time</span>
       </button>
     </div>
 
@@ -209,7 +209,7 @@
     if (!billingOn) {
       status.textContent = '';
     } else if (ent.entitled && !trialing) {
-      status.textContent = "You're already on AibhlínnAI Premium — manage or cancel from the app's Settings.";
+      status.textContent = "You're already on AibhlínnAI Premium. Manage or cancel from the app's Settings.";
     } else if (CT.auth.isSignedIn()) {
       status.textContent = '';
     } else {
@@ -222,7 +222,7 @@
      interaction stays on this one page. */
   function promptSignIn() {
     var status = $('pricingStatus');
-    status.textContent = 'Sign in above first — an email address is all you need, then choose a plan again.';
+    status.textContent = 'Sign in above first. An email address is all you need, then choose a plan again.';
     status.classList.add('is-error');
     var host = $('topbarSignin');
     var control = host && host.querySelector('button, a');

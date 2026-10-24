@@ -49,7 +49,7 @@ var SHELL = [
   'notify.js',
   'sync.js?v=113',
   'qrcode.js',
-  'app.js?v=123',
+  'app.js?v=125',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',
