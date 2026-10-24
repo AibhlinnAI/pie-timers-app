@@ -1226,11 +1226,17 @@ function checkBeforeAfter() {
     let ids = [];
     const view = (app, all, table) => ids.filter((id) => all || LIVE.test(id)).map((id) => id + '=' + snap(app.$(id))).join('\n') +
       '\ntitle=' + app.dom.doc.title + (all || table ? '\ntbody=' + snap(app.$('weekPreview').querySelector('tbody')) : '');
-    /* The one wording the baseline may differ by: the toast now joins an
-       alert's title and body with a colon, not an em dash. This maps the
-       first em dash in the old toast, so a scenario must not put one in a
-       title. A failure still prints what the old app really showed. */
-    const sinceBaseline = (text) => text.replace(/^(toast=.*?) — /m, '$1: ');
+    /* The wordings the baseline may differ by, all em dashes that became
+       plain punctuation: the toast joins an alert's title and body with a
+       colon; an appointment on another day reads "Tuesday · Dentist"; the
+       week table's language tooltips read "Vryheid: freedom in Afrikaans".
+       The toast and the appointment map only their first em dash, so a
+       scenario must not put one in a title. A failure still prints what
+       the old app really showed. */
+    const sinceBaseline = (text) => text
+      .replace(/^(toast=.*?) — /m, '$1: ')
+      .replace(/^(apptSmall=.*?) — /m, '$1 · ')
+      .replace(/^tbody=.*$/m, (line) => line.split(' — freedom in ').join(': freedom in '));
     let diffs = [];
     let ticks = 0;
     const compare = (when, all, table) => {
