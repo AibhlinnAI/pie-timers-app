@@ -162,7 +162,7 @@
     var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (https || local) {
       done('pass', 'Served over ' + location.protocol +
-        ' — service workers and push are permitted here.');
+        ', so service workers and push are permitted here.');
     } else if (location.protocol === 'file:') {
       done('warn', 'Opened from a file. Service workers, push and sign-in ' +
         'redirects will not work. Deploy the app and run this page again.');
@@ -214,7 +214,7 @@
   }
 
   function checkSupabaseRest() {
-    var done = row('Supabase — API reachable');
+    var done = row('Supabase: API reachable');
     if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
       done('skip', 'No Supabase URL or anon key in config.js. The app runs ' +
         'local-only: no accounts, no sync, no push.');
@@ -237,7 +237,7 @@
         }
         if (res.status === 404) {
           done('fail', 'Project answers, but the schema is not applied. ' +
-            'Run the SQL files in order — see DEPLOY.md.');
+            'Run the SQL files in order. See DEPLOY.md.');
           return false;
         }
         if (!res.ok) { done('fail', 'HTTP ' + res.status + ' from PostgREST.'); return false; }
@@ -251,7 +251,7 @@
   }
 
   function checkAuthSettings() {
-    var done = row('Supabase — sign-in service');
+    var done = row('Supabase: sign-in service');
     return get(cfg.supabaseUrl + '/auth/v1/settings', { headers: anonHeaders() })
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -260,7 +260,7 @@
         var providers = data.external || {};
         var notes = [];
         notes.push(providers.email === false
-          ? 'Email sign-in is DISABLED — magic links will fail'
+          ? 'Email sign-in is DISABLED, so magic links will fail'
           : 'Email sign-in enabled');
         /* The sign-in panel renders 'Continue with Google' unconditionally
            (identity-ui.js), so a disabled provider is not a missing feature --
@@ -269,7 +269,7 @@
         notes.push(providers.google
           ? 'Google enabled'
           : 'Google NOT enabled, but the sign-in panel still shows a Continue ' +
-            'with Google button — clicking errors');
+            'with Google button, and clicking it errors');
         var bad = providers.email === false;
         done(bad ? 'fail' : (providers.google ? 'pass' : 'warn'), notes.join('. ') + '.');
       }).catch(function (err) {
@@ -302,7 +302,7 @@
       if (Array.isArray(parsed) && parsed.length > 0) {
         done('fail', 'SECURITY: returned ' + parsed.length + ' row(s) to an ' +
           'unauthenticated request. Row-level security is not enabled on this ' +
-          'table. Anyone with the anon key — which is public — can read the rows.');
+          'table. Anyone with the anon key, which is public, can read the rows.');
       } else {
         done('pass', 'Exists, and returns nothing without a session.');
       }
@@ -365,7 +365,7 @@
       if (res.status === 404) {
         done('fail', 'Not deployed. ' + (note || ''));
       } else if (res.status === 503) {
-        done('warn', 'Reachable but returned 503 — usually a missing ' +
+        done('warn', 'Reachable but returned 503. This is usually a missing ' +
           'environment secret. Check the function logs.');
       } else {
         done('pass', 'Deployed (answered HTTP ' + res.status + ' to an empty request).');
@@ -376,7 +376,7 @@
   }
 
   function checkVapid() {
-    var done = row('Web Push — VAPID key');
+    var done = row('Web Push: VAPID key');
     var key = cfg.vapidPublicKey || '';
     if (!key) {
       done('skip', 'Not set. Alerts still work while the app is open; ' +
@@ -401,14 +401,14 @@
   }
 
   function checkPushSupport() {
-    var done = row('Web Push — browser support');
+    var done = row('Web Push: browser support');
     var bits = [];
     if (!('serviceWorker' in navigator)) bits.push('no service worker');
     if (!('PushManager' in window)) bits.push('no PushManager');
     if (!('Notification' in window)) bits.push('no Notification API');
     if (bits.length) {
       done('warn', 'This browser: ' + bits.join(', ') +
-        '. Others may still support push — iOS needs the app added to the ' +
+        '. Others may still support push. iOS needs the app added to the ' +
         'Home Screen first.');
     } else {
       done('pass', 'Supported here. Permission is currently "' +
@@ -429,7 +429,7 @@
     var done = row('Turnstile bot check');
     if (!cfg.turnstileSiteKey) {
       done('warn', 'Not set. Sign-in requests go straight to Supabase with no ' +
-        'throttling — fine while you are the only user, not once sign-up is public.');
+        'throttling. That is fine while you are the only user, not once sign-up is public.');
       return;
     }
     done(/^0x/.test(cfg.turnstileSiteKey) ? 'pass' : 'warn',
@@ -442,7 +442,7 @@
     var p = cfg.paddle || {};
     if (!p.clientToken) {
       done('skip', 'Not configured. Every signed-in account is treated as ' +
-        'entitled — correct for a private build, wrong once you charge.');
+        'entitled. That is correct for a private build, wrong once you charge.');
       return;
     }
     var problems = [];
@@ -469,12 +469,12 @@
   function checkPaddleWebhookNote() {
     var done = row('Paddle webhook');
     if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
-    done('warn', 'Cannot be verified from the browser — the exchange is server to server. ' +
+    done('warn', 'Cannot be verified from the browser, because the exchange is server to server. ' +
       'Paddle -> Notifications must have an ACTIVE destination pointing at the ' +
       'paddle-webhook function URL, subscribed to subscription.created, ' +
       '.updated and .canceled, with its signing secret in Supabase as ' +
       'PADDLE_WEBHOOK_SECRET. Without a destination, checkout still takes ' +
-      'money and nobody is ever entitled — silently. Prove the path with a real ' +
+      'money and nobody is ever entitled, silently. Prove the path with a real ' +
       'purchase, then refund; there is no test event for Production.');
   }
 
@@ -483,13 +483,13 @@
      "transaction_checkout_not_enabled" in the response body, behind an
      overlay that only says "Something went wrong". */
   function checkPaddleCheckoutNote() {
-    var done = row('Paddle checkout — account settings');
+    var done = row('Paddle checkout: account settings');
     if (!(cfg.paddle && cfg.paddle.clientToken)) { done('skip', 'Billing not configured.'); return; }
     done('warn', 'Confirm in Paddle: Checkout -> Checkout settings has a ' +
       'Default payment link, and Website approval lists ' + location.hostname +
       ' as approved, not Pending. Subdomains are reviewed individually. If ' +
       'checkout shows "Something went wrong", read the transaction-checkout ' +
-      'response in the Network tab before suspecting anything else — ' +
+      'response in the Network tab before suspecting anything else. ' +
       '"transaction_checkout_not_enabled" means one of these two is missing.');
   }
 
@@ -549,7 +549,7 @@
      because identity-schema.sql creates the schema without granting access, and
      the resulting failure looks exactly like the one above. */
   function checkIdentityGrantsNote() {
-    var done = row('Identity schema — role grants');
+    var done = row('Identity schema: role grants');
     done('warn', 'Not checkable from a browser. Run this in the SQL editor; ' +
       'all four must be true: ' +
       "select has_schema_privilege('service_role','identity','USAGE'), " +
@@ -565,7 +565,7 @@
       '1. Sign in with a real email and confirm the link arrives, not in spam. ' +
       '2. Change your hours on one device and confirm they appear on another. ' +
       '3. Buy the monthly plan for real and confirm three rows appear in ' +
-      'identity.product_entitlements, then refund — Production has no ' +
+      'identity.product_entitlements, then refund. Production has no ' +
       'test events and no test cards. ' +
       '4. Delete a throwaway account and confirm the rows are gone. ' +
       '5. Close the app and confirm a milestone alert still arrives.');
@@ -635,7 +635,7 @@
   document.getElementById('runBtn').addEventListener('click', run);
 
   document.getElementById('copyBtn').addEventListener('click', function () {
-    var text = 'Pie Timers diagnostics — ' + new Date().toISOString() + '\n' +
+    var text = 'Pie Timers diagnostics: ' + new Date().toISOString() + '\n' +
       location.href + '\n\n' +
       rows.map(function (r) {
         return '[' + LABEL[r.state] + '] ' + r.name + '\n    ' + r.detail;
