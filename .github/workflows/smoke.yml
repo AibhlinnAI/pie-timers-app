@@ -86,6 +86,17 @@ jobs:
       - name: Run the service worker checks
         run: node tools/check-sw.js
 
+      # The ABN is one identifier: written with plain spaces, a narrow
+      # screen can wrap it across two lines. Every published copy uses
+      # non-breaking spaces (ABN&nbsp;70&nbsp;810&nbsp;791&nbsp;817).
+      - name: Check the ABN never wraps
+        run: |
+          if grep -rnE 'ABN[[:space:]]+[0-9]|70[[:space:]]+810[[:space:]]+791' app/ --include='*.html'; then
+            echo "::error::Write the ABN with &nbsp; between its parts, so it never splits across lines."
+            exit 1
+          fi
+          echo "Every published ABN is held together."
+
       # The calendar-sync edge function: its parser, its scheduled run, and
       # index.ts itself with Deno and the network stubbed. Type stripping is
       # what lets Node run the .ts file as it ships. Nothing is deployed.
