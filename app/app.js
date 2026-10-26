@@ -198,7 +198,7 @@
 
   function freedomTitle(day, column) {
     var f = freedomEntry(day, column || 'start');
-    return f.word + ' — freedom in ' + f.lang;
+    return f.word + ': freedom in ' + f.lang;
   }
 
   var MILESTONES = [30, 15, 10, 5]; // minutes remaining
@@ -1668,7 +1668,7 @@
     $('apptBig').textContent = formatCompact(timer.remainingSec);
     $('apptSmall').textContent = (sameDay
       ? 'until ' + appointment.title
-      : when.toLocaleDateString(LOCALE, { weekday: 'long' }) + ' — ' + appointment.title)
+      : when.toLocaleDateString(LOCALE, { weekday: 'long' }) + ' · ' + appointment.title)
       + ' · ' + tierCaption(timer);
 
     $('apptStatus').textContent = appointment.title + ' | ' +
@@ -3225,7 +3225,7 @@
         meta.className = 'is-error';
       } else if (feed.last_synced) {
         meta.textContent = feed.event_count + ' event' +
-          (feed.event_count === 1 ? '' : 's') + ' — updated ' +
+          (feed.event_count === 1 ? '' : 's') + ', updated ' +
           new Date(feed.last_synced).toLocaleTimeString(LOCALE);
       } else {
         meta.textContent = 'Not synced yet.';
@@ -4720,25 +4720,25 @@
 
   function planLabel(ent) {
     if (!CT.billing.enabled()) return 'All features enabled';
-    if (ent.complimentary) return 'Complimentary access — thank you for being here';
+    if (ent.complimentary) return 'Complimentary access. Thank you for being here';
 
     if (isTrial(ent) && ent.entitled) {
       var left = daysLeft(ent);
-      return 'Free trial — ' + left + (left === 1 ? ' day left' : ' days left');
+      return 'Free trial: ' + left + (left === 1 ? ' day left' : ' days left');
     }
 
     if (!ent.entitled) {
       return isTrial(ent)
-        ? 'Free — your trial has ended'
-        : 'Free — everything on this device';
+        ? 'Free: your trial has ended'
+        : 'Free: everything on this device';
     }
 
     var name = ent.plan === 'monthly' ? 'Monthly' : 'Annual';
     if (ent.cancelAtPeriodEnd && ent.currentPeriodEnd) {
-      return name + ' — ends ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
+      return name + ', ends ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
     }
     if (ent.currentPeriodEnd) {
-      return name + ' — renews ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
+      return name + ', renews ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
     }
     return name;
   }
@@ -4787,7 +4787,7 @@
           ' left of your free trial. ' + (IN_PLAY_APP
             ? 'Everything is switched on, and nothing happens automatically ' +
               'when the trial ends.'
-            : 'Everything is switched on — no card needed, ' +
+            : 'Everything is switched on. No card is needed, ' +
               'and nothing happens automatically when the trial ends.');
       }
     }
@@ -4984,7 +4984,7 @@
 
       if (CT.config.turnstileEnabled && !token) {
         CT.turnstile.mount($('turnstileHost'));
-        authMessage('Just a moment — completing the security check.', true);
+        authMessage('Just a moment while we complete the security check.', true);
         button.disabled = true;
         waitForTurnstileToken(8000).then(function (waited) {
           if (waited) { sendCode(email, button, waited); return; }

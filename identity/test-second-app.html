@@ -2,7 +2,7 @@
 <html lang="en-AU">
 <head>
 <meta charset="utf-8">
-<title>Identity isolation test — not a real app</title>
+<title>Identity isolation test (not a real app)</title>
 <!-- ============================================================
      This page pretends to be a second AibhlínnAI product — call it
      "Pomodoro" — that has never seen a line of Pie Timers code. It
@@ -21,7 +21,7 @@
 <body>
 <h1>Identity isolation test</h1>
 <p>Pretends to be a second AibhlínnAI app. Imports only <code>identity.js</code>
-and <code>entitlements.js</code> — nothing from <code>app/</code>.</p>
+and <code>entitlements.js</code>, nothing from <code>app/</code>.</p>
 <pre id="out">Waiting for supabaseUrl and supabaseAnonKey in the query string…</pre>
 
 <script src="identity.js"></script>
@@ -55,7 +55,7 @@ and <code>entitlements.js</code> — nothing from <code>app/</code>.</p>
   if (window.Aibhlinn.identity.isSignedIn()) {
     window.Aibhlinn.entitlements.hasCapability(PRODUCT_ID, 'can_sync').then(function (allowed) {
       print('hasCapability("' + PRODUCT_ID + '", "can_sync"): ' + allowed);
-      print('(false is correct here — nobody has been granted that product/capability pair)');
+      print('(false is correct here, because nobody has been granted that product/capability pair)');
     });
   } else {
     print('Not signed in. Sign in via the real app first (shares the same account),');
