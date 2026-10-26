@@ -6,6 +6,11 @@ hand into somebody else's dashboard, where the size is fixed by them.
 | File | Where the file goes | Constraint |
 |---|---|---|
 | `pie-timers-oauth-120.png` | Google Cloud → OAuth consent screen → App logo | 120×120 PNG |
+| `aibhlinn-emoji-128.png` | Custom emoji (Discord, Slack, Teams), name `aibhlinnai` | 128×128 PNG, under 128 KB |
+| `aibhlinn-emoji-light-128.png` | Light-mode custom emoji, name `aibhlinnai_light` | 128×128 PNG, under 128 KB |
+| `aibhlinn-emoji-gmail-24.png` | Gmail: pasted inline in a message, or in a signature | 24×24 PNG (Gmail shows images at their own size) |
+| `aibhlinn-emoji-light-bold-gmail-24.png` | Gmail, white theme only | 24×24 PNG |
+| `aibhlinn-emoji-light-bold-128.png` | Bolder light-mode emoji, name `aibhlinnai_light` (use instead of the regular one) | 128×128 PNG, under 128 KB |
 
 ## Colours
 
@@ -15,6 +20,60 @@ hand into somebody else's dashboard, where the size is fixed by them.
 | Brand blue, white backdrop | `#2E3A63` | The on-light variant: the same hue lifted until the hue reads as blue against white. This is the "AibhlínnAI" wordmark colour on a light surface — the sign-in email (`DEPLOY.md` §6.4), and anywhere else the mark sits on white. Mixed case always — `AibhlínnAI`, never all-caps. |
 | Titanium | `#CED1D8` | The wordmark on a **dark** ground — the brushed metal of the "Aí" monogram and the wordmark in `app/aibhlinn-logo.png`, which is a gradient rather than a flat fill. Sampled from the artwork: highlight `#F8FAFD`, upper mid `#DDE0E7`, body `#CED1D8`, lower mid `#AEB1B8`, shadow `#8E9199` down to `#656976`. Note R < G < B throughout — a *cool* metal, which is what lets the metal sit on the navy without going yellow. Where a gradient is possible, prefer one; `#CED1D8` is the flat stand-in. This is the on-dark counterpart to `#2E3A63` on light; the two are the same wordmark in different lights, so never use the blue on dark or the metal on white. |
 | Pie Timers purple | `#1C1024` | This *app's* colour, not the suite's — the app background, the PWA `theme-color`, and the OAuth tile below. `#4B2A5A` is the lighter tint. A second suite app picks its own app colour and keeps the blue wordmark. |
+
+## aibhlinn-emoji-128.png
+
+The "Aí" monogram as a custom emoji. Made from `app/aibhlinn-mark-512.png`
+rather than the 40px mark, so the edges stay crisp.
+
+- Cropped to a 372px square around the letters, so the monogram fills
+  about 80% of the width. Emoji show at roughly 22px in chat, and the
+  full-bleed mark leaves the letters too small at that size.
+- Rounded corners (22% radius) with transparency outside, so the navy
+  reads as a tile on light and dark themes alike.
+- 17 KB, inside Slack's 128 KB and Discord's 256 KB limits.
+
+## aibhlinn-emoji-light-128.png
+
+The light-mode partner to the emoji above: the monogram in brand blue
+`#2E3A63` on a transparent background, with no tile. Use it where the
+navy tile looks heavy on a white chat theme.
+
+- Made from `app/aibhlinn-mark-512.png`. The letters are cut out by
+  brightness (the metal is above 160 and the navy below 50, with a
+  smooth ramp between) and filled with flat `#2E3A63`. The metal is
+  never used on white (see Colours).
+- Cropped a little tighter (340px square) than the tiled version,
+  because there is no tile to fill.
+- Disappears on dark themes, the same way the blue wordmark does. Use
+  the tiled version there.
+- 7 KB.
+
+## aibhlinn-emoji-light-bold-128.png
+
+The light-mode emoji with heavier strokes. The regular light version
+keeps the brand letter weight, which is thin at the ~22px emoji size.
+This one thickens it so it reads at a glance.
+
+- Same cut-out and crop as `aibhlinn-emoji-light-128.png`, then the
+  letter shape is grown about 12px on every side at 1024px working
+  size (Gaussian blur, then a low threshold), which rounds the
+  corners slightly instead of squaring them. The A's counter and the
+  gap under the accent stay open.
+- Upload one light version or the other under `aibhlinnai_light`, not
+  both. Two near-identical emoji just clutter the picker.
+- 7 KB.
+
+## Gmail versions (24px)
+
+Gmail has no custom emoji, so the emoji goes in as an inline image, and
+Gmail shows an inline image at its own pixel size. 24px sits beside
+normal body text the way an emoji does; the 128px files would show as a
+large picture. Both are LANCZOS downscales of the 128px files.
+
+Prefer the tiled `aibhlinn-emoji-gmail-24.png` in email. You cannot
+know whether the reader uses dark mode, and on a dark Gmail theme the
+blue-on-transparent version almost disappears.
 
 ## pie-timers-oauth-120.png
 
