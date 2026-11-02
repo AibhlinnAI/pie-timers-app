@@ -269,13 +269,19 @@
   document.addEventListener('DOMContentLoaded', function () {
     watchEntitlement();
 
+    /* No Google button inside the WebView Play app, where Google refuses
+       its sign-in (app.js, IN_WEBVIEW_APP). Read here because app.js sets
+       the flag after this file has loaded, as with CT.inPlayApp above. */
+    var showGoogle = !CT.inWebViewApp;
+
     var header = document.getElementById('topbarSignin');
     if (header) {
       window.Aibhlinn.identityUI.mount({
         target: header,
         renderStatus: renderPlanStatus,
         productName: 'Pie Timers',
-        showSuiteContext: true
+        showSuiteContext: true,
+        showGoogle: showGoogle
       });
     }
 
@@ -285,7 +291,8 @@
         target: secondary,
         renderStatus: renderPlanStatus,
         productName: 'Pie Timers',
-        showSuiteContext: false // already said once, in the header
+        showSuiteContext: false, // already said once, in the header
+        showGoogle: showGoogle
       });
     }
   });

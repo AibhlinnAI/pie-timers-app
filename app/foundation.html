@@ -8,11 +8,12 @@
 <script>
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || /(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '');
     var marked = (location.hash || '').slice(1) === 'in-app';
     var stored = false;
     try {
-      /* Only the referrer persists — see pricing.html and app.js. */
+      /* Only the app's own signals persist — see pricing.html and app.js. */
       if (fromApp) sessionStorage.setItem(KEY, '1');
       stored = sessionStorage.getItem(KEY) === '1';
     } catch (e) { /* storage blocked: referrer and marker are all there is */ }

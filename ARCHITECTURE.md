@@ -244,8 +244,19 @@ backstop, `billing.js` refuses to open checkout or the portal there.
 `privacy.html` and `terms.html` hide their links to pricing and refunds, each
 reading the same sessionStorage key.
 
-Only the referrer counts, never display mode (`inAppWindow()`). An installed
-web app or an iPhone home screen icon is still the web, and keeps its prices.
+From release 4 the Play app is a WebView app rather than a Trusted Web
+Activity (decided 28 Oct 2026). A WebView sends no referrer, so its wrapper
+adds `PieTimersAndroid/<version code>` to its user agent, on every request,
+and every check above reads that too (`WEBVIEW_UA` in `app/app.js`). Testers
+keep the TWA until they update, so both signals stay. In the WebView app only
+(`IN_WEBVIEW_APP`, `CT.inWebViewApp`), Google sign-in is hidden, because
+Google refuses it in an embedded WebView, and the notification settings say
+that only in-app alerts work there: a WebView has no Notification or Push
+API.
+
+Only the app's own signals count, never display mode (`inAppWindow()`). An
+installed web app or an iPhone home screen icon is still the web, and keeps
+its prices.
 
 Offers are gated out rather than reworded on purpose. Editing copy per
 context is how this constraint quietly breaks six months later, when someone

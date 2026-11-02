@@ -15,7 +15,10 @@
      the history.replaceState that strips the marker. */
   (function () {
     try {
+      /* The TWA's referrer, or the WebView app's user-agent token: see
+         PLAY_SIGNAL in app.js. */
       var play = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+        || /(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '')
         || (location.hash || '').slice(1) === 'in-app';
       if (!play) {
         try { play = sessionStorage.getItem('countdown-timers/play-app') === '1'; } catch (e) { /* blocked */ }
@@ -755,6 +758,13 @@
         system notifications until you allow them for this site in its site settings.</span>
       </div>
 
+      <!-- The WebView Play app has no Notification or Push API, so app.js
+           shows this there in place of the blocked box above. -->
+      <div class="notice notice--info" id="webviewNotifNotice" hidden>
+        <strong>No phone notifications in the Android app yet.</strong>
+        Milestone alerts and the chime still work while Pie Timers is open.
+      </div>
+
       <div class="notice notice--info" id="insecureNotice" hidden>
         <strong>Opened as a local file.</strong>
         Background alerts and installation need the app served over HTTPS (or from
@@ -853,12 +863,14 @@
            rather than after the Google alternative below. -->
       <p class="status-line" id="authMessage" role="status" aria-live="polite"></p>
 
-      <div class="or"><span>or</span></div>
+      <!-- data-hide-in-webview: Google refuses its sign-in inside the
+           WebView Play app, so app.js hides this route there. -->
+      <div class="or" data-hide-in-webview><span>or</span></div>
 
       <!-- Google's official button artwork, via the shared class in
            identity/identity-ui.css -- not .btn-google, which stays for the
            Calendar connect button. -->
-      <button class="aib-signin-google" id="googleSignIn" type="button" aria-label="Sign in with Google"></button>
+      <button class="aib-signin-google" id="googleSignIn" type="button" aria-label="Sign in with Google" data-hide-in-webview></button>
     </section>
 
     <!-- Signed in -->
@@ -1089,15 +1101,15 @@
 <script src="identity/identity.js?v=117"></script>
 <script src="identity/email-typos.js"></script>
 <script src="identity/entitlements.js"></script>
-<script src="identity/identity-ui.js"></script>
+<script src="identity/identity-ui.js?v=129"></script>
 <script src="config.js"></script>
 <script src="visits.js?v=118"></script>
-<script src="identity-bridge.js?v=117"></script>
+<script src="identity-bridge.js?v=129"></script>
 <script src="supabase.js?v=117"></script>
-<script src="billing.js"></script>
+<script src="billing.js?v=129"></script>
 <script src="notify.js"></script>
 <script src="sync.js?v=113"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=128"></script>
+<script src="app.js?v=129"></script>
 </body>
 </html>

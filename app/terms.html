@@ -15,6 +15,7 @@
      Play app is the Payments-policy one. */
   (function () {
     var play = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || /(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '')
       || (location.hash || '').slice(1) === 'in-app';
     var canTell = false;
     try {
@@ -213,12 +214,15 @@
      would be the worse failure. */
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    /* The TWA's referrer, or the WebView app's user-agent token, which
+       is on every page it loads: see PLAY_SIGNAL in app.js. */
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || /(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '');
     var marked = (location.hash || '').slice(1) === 'in-app';
     var stored = false;
     var canTell = false;
     try {
-      /* Only the referrer persists. A pasted or shared #in-app URL must
+      /* Only the app's own signals persist. A pasted or shared #in-app URL must
          cost one pageview, never a whole session — see app.js. */
       if (fromApp) sessionStorage.setItem(KEY, '1');
       stored = sessionStorage.getItem(KEY) === '1';

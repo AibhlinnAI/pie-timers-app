@@ -223,7 +223,18 @@
      the referrer, on the launch page only, so that is remembered for the
      rest of the visit. load() reads this on the next line, so it has to
      stay above it. If the referrer is ever missing, inAppWindow() still
-     keeps the seed out of the app's own window. */
+     keeps the seed out of the app's own window.
+
+     From release 4 the Play app is a WebView app instead (decided
+     28 Oct 2026). A WebView sends no referrer and has no Digital Goods
+     API, so its wrapper adds "PieTimersAndroid/<version code>" to the
+     user agent of every request, and that is its signal. Testers keep
+     the TWA until they update, so both are read. The user agent cannot
+     be pasted or shared in a link, and a desktop browser told to send
+     it only hides prices from itself. pricing.html, foundation.html,
+     privacy.html, terms.html, the pre-paint gate in index.html and
+     billing.js each repeat this test: change them together. */
+  var WEBVIEW_UA = /(^|\s)PieTimersAndroid\/\d/;
   var PLAY_SIGNAL = (function () {
     var KEY = 'countdown-timers/play-app';
     /* Only the referrer is trusted enough to PERSIST. The wrapper sets it
@@ -237,10 +248,11 @@
        mode and take an ordinary customer out of the purchase and
        cancellation flow for the rest of their session. */
     var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromWebView = WEBVIEW_UA.test(navigator.userAgent || '');
     var marked = (location.hash || '').slice(1) === 'in-app';
     var stored = false;
     try {
-      if (fromApp) sessionStorage.setItem(KEY, '1');
+      if (fromApp || fromWebView) sessionStorage.setItem(KEY, '1');
       stored = sessionStorage.getItem(KEY) === '1';
     } catch (e) { /* storage blocked: referrer and marker are all there is */ }
 
@@ -269,16 +281,22 @@
     }
 
     return {
-      inApp: fromApp || stored || marked || fromStore,
+      inApp: fromApp || fromWebView || stored || marked || fromStore,
       /* Signals that cannot be pasted, shared or bookmarked. The marker
          is deliberately excluded: it is how a stray URL gets in, and
          acting on it beyond this one pageview is what turns a mistake
          into a stuck browser session. */
-      trusted: fromApp || stored || fromStore
+      trusted: fromApp || fromWebView || stored || fromStore,
+      webView: fromWebView
     };
   }());
 
   var IN_PLAY_APP = PLAY_SIGNAL.inApp;
+  /* The WebView build only, never the TWA. Google refuses its sign-in in
+     an embedded WebView, and a WebView has no Notification or Push API,
+     so there the Google button is hidden and the notification settings
+     say what the app can do. Both decided 1 Nov 2026. */
+  var IN_WEBVIEW_APP = PLAY_SIGNAL.webView;
 
   /* Carry the flag across same-origin navigations in the URL itself.
      sessionStorage is the right scope -- it is per browsing context, so
@@ -327,6 +345,7 @@
      or an iPhone home screen icon is still the web, and keeps its
      prices. */
   CT.inPlayApp = IN_PLAY_APP;
+  CT.inWebViewApp = IN_WEBVIEW_APP;
   var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription.';
 
   /* Markup that only ever belongs to an offer carries data-hide-in-play.
@@ -343,6 +362,17 @@
        spans, because .setting span is a block. */
     var accountHint = $('accountRowHint');
     if (accountHint) accountHint.textContent = 'Sign in, sync, delete your account.';
+  }());
+
+  /* Google answers its sign-in inside a WebView with 403
+     disallowed_useragent, so the WebView build offers the emailed code
+     only, which is also what the Play review account uses. Markup that is
+     only the Google route carries data-hide-in-webview; identity-bridge.js
+     drops the button from the header panel the same way. */
+  (function hideGoogleSignInInWebView() {
+    if (!IN_WEBVIEW_APP) return;
+    var google = document.querySelectorAll('[data-hide-in-webview]');
+    for (var i = 0; i < google.length; i++) google[i].hidden = true;
   }());
 
   /* What load() found under STORE_KEY, for loadBreaks(): 'none' on a first
@@ -4121,7 +4151,13 @@
       state.settings[key] = el.checked;
       save();
 
-      if ((key === 'alerts' || key === 'push') && el.checked) {
+      /* Not in the WebView app. It has no Notification API, so the answer
+         would be 'unsupported', Milestone alerts would flip straight back
+         off, and that would sync to the account's other devices. Its
+         in-app alerts need no permission. Background alerts are disabled
+         there (updateNotificationNotices), so only Milestone alerts can
+         reach this. */
+      if ((key === 'alerts' || key === 'push') && el.checked && !IN_WEBVIEW_APP) {
         CT.notify.requestPermission().then(function (result) {
           if (result !== 'granted') {
             // Permission refused — don't leave a switch claiming delivery will work.
@@ -4175,13 +4211,22 @@
   /* Keep the settings panel honest about what will actually be delivered. */
   function updateNotificationNotices() {
     var perm = CT.notify.permission();
-    $('permissionNotice').hidden = perm !== 'denied';
+    $('permissionNotice').hidden = IN_WEBVIEW_APP || perm !== 'denied';
     $('insecureNotice').hidden = CT.notify.supported;
+    /* Looked up rather than assumed, as permissionAdvice is above. */
+    var webViewNotice = $('webviewNotifNotice');
+    if (webViewNotice) webViewNotice.hidden = !IN_WEBVIEW_APP;
 
     var pushBox = $('optPush');
     var hint = $('pushHint');
 
-    if (!CT.notify.pushSupported) {
+    /* Disabled, never switched off: a push setting that came down from
+       another device stays as it is there. Firebase Cloud Messaging is
+       the later update that would change this. */
+    if (IN_WEBVIEW_APP) {
+      pushBox.disabled = true;
+      setUnavailable(hint, 'Not in the Android app yet. Alerts inside the app still work while it is open.');
+    } else if (!CT.notify.pushSupported) {
       pushBox.disabled = true;
       setUnavailable(hint, 'Not available in this browser, or the app is not served over HTTPS.');
     } else if (!CT.config.pushConfigured) {
@@ -4203,6 +4248,12 @@
   }
 
   $('testNotification').addEventListener('click', function () {
+    /* The WebView app's alerts are the in-app ones, so its test is one of
+       those: the toast, and the chime when it is on. */
+    if (IN_WEBVIEW_APP) {
+      notify('Pie Timers', 'Test alert. Alerts inside the app are working.', 'test');
+      return;
+    }
     CT.notify.requestPermission().then(function (result) {
       updateNotificationNotices();
       if (result !== 'granted') {

@@ -6,18 +6,21 @@
 <!-- Never shown inside the Google Play app, which may carry no prices and
      no route to paying outside Play Billing. The same check as IN_PLAY_APP
      in app.js: the Play wrapper opens the site with its package as the
-     referrer, and the visit remembers that in sessionStorage. A Play visit
+     referrer (the TWA) or sends PieTimersAndroid/<version> in its user
+     agent (the WebView app), and the visit remembers that in
+     sessionStorage. A Play visit
      that lands here goes straight back to the app, before anything is
      drawn. Referrer only, never display mode, so an installed web app
      still gets this page. -->
 <script>
   (function () {
     var KEY = 'countdown-timers/play-app';
-    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '');
+    var fromApp = /^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')
+      || /(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '');
     var marked = (location.hash || '').slice(1) === 'in-app';
     var stored = false;
     try {
-      /* Only the referrer persists — a pasted #in-app URL must cost one
+      /* Only the app's own signals persist — a pasted #in-app URL must cost one
          pageview, never a whole session. See app.js. */
       if (fromApp) sessionStorage.setItem(KEY, '1');
       stored = sessionStorage.getItem(KEY) === '1';
