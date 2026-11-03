@@ -1,0 +1,7 @@
+<resources>
+    <!-- The night half of Theme.PieTimers (see values/themes.xml). -->
+    <style name="Theme.PieTimers" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:colorBackground">@color/app_background</item>
+    </style>
+</resources>

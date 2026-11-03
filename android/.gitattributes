@@ -1,0 +1,5 @@
+# The wrapper scripts must keep their own line endings wherever they are
+# checked out, and the jar must never be touched.
+gradlew     text eol=lf
+*.bat       text eol=crlf
+*.jar       binary

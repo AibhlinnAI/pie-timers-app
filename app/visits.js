@@ -69,7 +69,9 @@
      'other', absent becomes ''. Both forms, and count=off, are taken
      off the address bar for everyone, counting or not, so a tag is
      never bookmarked, shared on or cached as its own page. Any other
-     query or fragment is left exactly as it was. */
+     query or fragment is left exactly as it was, including what follows
+     them in the same fragment: the Android app's #count=off&moved=1
+     leaves #moved=1 for app.js. */
   function readAddress() {
     var found = { source: '', off: false };
     try {
@@ -85,8 +87,13 @@
         query.delete('src');
         query.delete('count');
         var rest = query.toString();
-        history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') +
-          (inHash ? '' : hash));
+        var restHash = hash;
+        if (inHash) {
+          inHash.delete('src');
+          inHash.delete('count');
+          restHash = inHash.toString() ? '#' + inHash.toString() : '';
+        }
+        history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + restHash);
       }
     } catch (e) { /* the address keeps its tag; nothing else changes */ }
     return found;

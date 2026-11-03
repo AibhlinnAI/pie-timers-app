@@ -1,0 +1,9 @@
+<resources>
+    <!-- The site's theme-color, behind the system bars and the splash. -->
+    <color name="app_background">#1C1024</color>
+    <color name="text">#F4EEF8</color>
+    <color name="text_muted">#C9BDD3</color>
+    <!-- The pie's orange, from the icon. -->
+    <color name="accent">#FF8A00</color>
+    <color name="on_accent">#1C1024</color>
+</resources>

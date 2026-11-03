@@ -456,11 +456,26 @@
 
     if (problems.length) {
       done('fail', problems.join('; ') + '.');
+    } else if (inPlayApp()) {
+      /* The Play app's verified link takes every path on this site, so a
+         link to this page opens inside it, where no price may show. */
+      done('pass', p.environment + ' environment, price IDs look right. ' +
+        'Prices are not shown inside the Android app.');
     } else {
       done('pass', p.environment + ' environment, price IDs look right. ' +
         'Confirm the displayed prices still match Paddle: ' +
         p.annualPrice + p.annualPeriod + ', ' + p.monthlyPrice + p.monthlyPeriod + '.');
     }
+  }
+
+  /* The same signals as IN_PLAY_APP in app.js, which this page does not
+     load: the TWA's referrer, the WebView app's user-agent token, the
+     visit's stored flag and the one-pageview marker. */
+  function inPlayApp() {
+    if (/^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')) return true;
+    if (/(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '')) return true;
+    if ((location.hash || '').slice(1) === 'in-app') return true;
+    try { return sessionStorage.getItem('countdown-timers/play-app') === '1'; } catch (e) { return false; }
   }
 
   /* Paddle removed per-destination test events: Simulations run in Sandbox

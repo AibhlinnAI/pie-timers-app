@@ -1,0 +1,5 @@
+<resources>
+    <!-- A test build sits beside the Play app, so it must not look like it. -->
+    <string name="app_name">Pie Timers test</string>
+    <string name="launcher_name">Pie Timers test</string>
+</resources>

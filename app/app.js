@@ -982,14 +982,60 @@
     return h12 + ':' + pad(m) + seconds + ' ' + suffix;
   }
 
+  /* ──────────────────── Moved from the old app ────────────────────
+     Releases 1 to 3 of the Play app were a TWA, which kept the week in
+     Chrome's storage. From release 4 the app is a WebView with storage of
+     its own, so a tester who updates opens it empty, their week still
+     safe in Chrome. The app says so on that first launch only
+     (#count=off&moved=1; visits.js takes the count=off), and this panel
+     then shows how to bring the week across, until it is hidden, a file
+     is imported or a sync pull brings the account's copy.
+
+     Only in the WebView app, and only when nothing had been saved here:
+     the marker in a pasted link does nothing anywhere else. The reminder
+     is its own key, not a setting, so it is never exported or synced. */
+  var MOVED_KEY = 'countdown-timers/moved-notice';
+  (function readMovedMarker() {
+    var hash = location.hash || '';
+    if (!/^#(.*&)?moved=1(&|$)/.test(hash)) return;
+    try {
+      var rest = new URLSearchParams(hash.slice(1));
+      rest.delete('moved');
+      history.replaceState(null, '', location.pathname + location.search +
+        (rest.toString() ? '#' + rest.toString() : ''));
+    } catch (e) { /* the marker stays in the address bar; harmless */ }
+    if (!IN_WEBVIEW_APP || loadedStore.found !== 'none') return;
+    try { localStorage.setItem(MOVED_KEY, '1'); } catch (e) { /* no storage, no reminder */ }
+  }());
+
+  function movedNoticeShowing() {
+    if (!IN_WEBVIEW_APP) return false;
+    try { return localStorage.getItem(MOVED_KEY) === '1'; } catch (e) { return false; }
+  }
+
+  function renderMovedNotice() {
+    var panel = $('movedNotice');
+    if (panel) panel.hidden = !movedNoticeShowing();
+  }
+
+  function retireMovedNotice() {
+    try { localStorage.removeItem(MOVED_KEY); } catch (e) { /* nothing to retire */ }
+    renderMovedNotice();
+    renderWelcome();
+  }
+
+  $('movedDismiss').addEventListener('click', retireMovedNotice);
+
   /* ─────────────────────────── Onboarding ───────────────────────────
      One panel, dismissible, never a wizard. A multi-step setup flow is
      friction at exactly the moment someone is deciding whether this is
      worth the effort. */
 
+  /* Held back while the moved-from-the-old-app panel is up: that person
+     is not new, and one panel at a time is plenty. */
   function renderWelcome() {
     var panel = $('welcome');
-    if (panel) panel.hidden = !!state.settings.onboarded;
+    if (panel) panel.hidden = !!state.settings.onboarded || movedNoticeShowing();
   }
 
   function completeOnboarding() {
@@ -4311,6 +4357,8 @@
            file's own updatedAt let the next pull, within a minute, quietly
            put the server's copy back over what was just imported. */
         var stored = save();
+        // The week has come across from the old app.
+        if (stored) retireMovedNotice();
         // Everything a sync pull refreshes, and the first-run panels, which
         // the file's onboarded flags may now retire.
         syncSettingInputs();
@@ -5521,6 +5569,8 @@
       buildAppointmentList();
       renderAccount();
       render();
+      // The account's week is here, so the old app's is no longer needed.
+      retireMovedNotice();
       return sendOwn;
     },
 
@@ -5624,6 +5674,7 @@
   renderAppointmentsPlanGate();
   renderAccount();
   renderCalendarPanel();
+  renderMovedNotice();
   renderWelcome();
   renderTesterInvite();
   startLoop();
