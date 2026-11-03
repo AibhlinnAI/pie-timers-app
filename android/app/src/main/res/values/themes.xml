@@ -1,5 +1,8 @@
 <resources>
-    <style name="Theme.PieTimers" parent="android:Theme.Material.NoActionBar">
+    <!-- A light theme by day and a dark one at night (values-night). From
+         Android 13 a WebView takes prefers-color-scheme from the app's theme,
+         so this is what lets the site's "Match my device" follow the phone. -->
+    <style name="Theme.PieTimers" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/app_background</item>
         <item name="android:colorBackground">@color/app_background</item>
     </style>

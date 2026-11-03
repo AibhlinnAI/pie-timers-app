@@ -2,21 +2,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets the page's navigator.onLine and online/offline events follow
+         the real connection, which sync waits on. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- allowBackup as release 3 (the TWA) had it. -->
+    <!-- No backup and no device transfer. Release 3 (the TWA) had
+         allowBackup on, but its data lived in Chrome, so nothing of the
+         person's was in it. Here the WebView's storage is the app's own and
+         holds the schedule and the sign-in session. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.PieTimers.Starting"
         android:usesCleartextTraffic="false">
 
-        <!-- configChanges: the page keeps its state through a rotation, a
-             keyboard or a dark-mode switch instead of being reloaded. -->
+        <!-- configChanges: the page keeps its state through a rotation or a
+             keyboard instead of being reloaded. Not uiMode: a dark mode
+             switch recreates the screen so the page's "Match my device"
+             theme follows it. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:label="@string/launcher_name"
             android:launchMode="singleTask"

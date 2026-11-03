@@ -65,6 +65,33 @@ packages folder, then from that folder:
 jarsigner -keystore "<previous package folder>\signing.keystore" app-release.aab my-key-alias
 ```
 
-`jarsigner` asks for the two passwords itself. Then run the bundle checks in
-`DEPLOY.md` section 9 ("Check the bundle"): the new bundle must carry the
-same certificate as release 3.
+`jarsigner` asks for the two passwords itself. Before uploading, check the
+signed bundle against the last one Play accepted (Git Bash, no password;
+work on copies of the two `.aab` files in an empty folder, never on the
+package folders, which hold the key):
+
+```bash
+AAB=new.aab; PREV=previous.aab
+# Signed: expect META-INF/MANIFEST.MF, one .SF and one .RSA
+unzip -Z1 "$AAB" | grep '^META-INF/'
+# Same upload key as before: expect "same key"
+fp() { unzip -p "$1" 'META-INF/*.RSA' | openssl pkcs7 -inform DER -print_certs | openssl x509 -noout -fingerprint -sha256; }
+[ -n "$(fp "$AAB")" ] && [ "$(fp "$AAB")" = "$(fp "$PREV")" ] && echo "same key" || echo "NOT the same key: do not upload"
+# Right app and version: package, versionCode, versionName, min and target SDK
+unzip -p "$AAB" base/manifest/AndroidManifest.xml | LC_ALL=C tr -cs '[:print:]' '\n' \
+  | grep -A1 -E '^(package|versionCode|versionName|minSdkVersion|targetSdkVersion)$' | grep -v '^--$' | paste - -
+```
+
+Each value printed by the last check ends in a stray character or two; it
+reads the file's text, not the compiled numbers.
+
+## Two things the app tells the site
+
+- **First opens.** On Google's pre-launch test devices, and on a tester's
+  first launch after updating from the TWA, the app opens the site with
+  `#count=off`, so `app/visits.js` does not count a first open that is not a
+  person's. A new install still counts.
+- **Backups.** There are none: `allowBackup` is off and
+  `data_extraction_rules.xml` excludes everything from cloud backup and
+  device transfer, because the WebView's storage holds the schedule and
+  the sign-in session.

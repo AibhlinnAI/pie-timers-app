@@ -12,7 +12,8 @@ android {
         // Release 3 (the TWA) needed Android 7; keep the same devices.
         minSdk = 24
         targetSdk = 36
-        // One higher than the last release Play accepted (DEPLOY.md section 9).
+        // One higher than any version code ever uploaded to Play, including
+        // a bundle whose draft release was then discarded. 3 was the last.
         versionCode = 4
         versionName = "1.0.3"
     }

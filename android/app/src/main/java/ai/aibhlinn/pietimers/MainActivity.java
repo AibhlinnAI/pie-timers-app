@@ -3,11 +3,15 @@ package ai.aibhlinn.pietimers;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +25,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
@@ -29,10 +34,13 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.SystemBarStyle;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import org.json.JSONObject;
 
@@ -45,12 +53,14 @@ import java.io.OutputStream;
  * opened the site in Chrome. Everything a person sees is still the website;
  * this class only hosts it, and adds what a plain WebView lacks: a splash
  * screen, an offline screen with Retry, Back that walks the page's history,
- * a file picker for Import settings and a save dialog for Export settings.
+ * full screen for the dashboard, a file picker for Import settings and a
+ * save dialog for Export settings.
  */
 public class MainActivity extends ComponentActivity {
 
     private static final String HOST = "pietimers.aibhlinn.ai";
-    private static final String START_URL = "https://" + HOST + "/index.html";
+    private static final String SITE = "https://" + HOST + "/";
+    private static final String START_URL = SITE + "index.html";
 
     /* The site hides prices, checkout and Google sign-in when it sees this,
        and stops offering system notifications (WEBVIEW_UA in app/app.js, and
@@ -64,10 +74,20 @@ public class MainActivity extends ComponentActivity {
 
     /* Export settings is the only file the site offers to save. */
     private static final String EXPORT_NAME = "countdown-timers-settings.json";
+    private static final String STATE_PENDING_SAVE = "pendingSave";
+    private static final String PREFS = "app";
+    private static final String PREF_LAUNCHED = "launched";
 
+    private FrameLayout root;
     private WebView web;
     private View offline;
     private boolean ready;
+    /* Whether the main frame of the load in progress failed. */
+    private boolean mainFrameFailed;
+
+    private View fullScreenView;
+    private WebChromeClient.CustomViewCallback fullScreenCallback;
+    private OnBackPressedCallback back;
 
     private ValueCallback<Uri[]> pendingChooser;
     private ActivityResultLauncher<Intent> chooser;
@@ -90,7 +110,8 @@ public class MainActivity extends ComponentActivity {
         /* From Android 15 an app draws behind the system bars, and the site
            has no safe-area padding of its own, so the bars and the keyboard
            are kept off the page here. */
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root), (v, insets) -> {
+        root = findViewById(R.id.root);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()
                     | WindowInsetsCompat.Type.displayCutout()
                     | WindowInsetsCompat.Type.ime());
@@ -102,6 +123,7 @@ public class MainActivity extends ComponentActivity {
         offline = findViewById(R.id.offline);
         findViewById(R.id.retry).setOnClickListener(v -> retry());
 
+        if (savedInstanceState != null) pendingSave = savedInstanceState.getByteArray(STATE_PENDING_SAVE);
         chooser = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (pendingChooser == null) return;
             pendingChooser.onReceiveValue(
@@ -113,19 +135,21 @@ public class MainActivity extends ComponentActivity {
 
         setUpWebView();
 
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+        /* Enabled only while there is something in the app to go back to,
+           so Android's predictive Back can show its back-to-home preview
+           the rest of the time. */
+        back = new OnBackPressedCallback(false) {
             @Override
             public void handleOnBackPressed() {
-                if (web != null && offline.getVisibility() != View.VISIBLE && web.canGoBack()) {
+                if (fullScreenView != null) {
+                    if (fullScreenCallback != null) fullScreenCallback.onCustomViewHidden();
+                } else if (web != null && web.canGoBack()) {
                     web.goBack();
-                    return;
                 }
-                /* Nothing to go back to: Back does what it does for any app. */
-                setEnabled(false);
-                getOnBackPressedDispatcher().onBackPressed();
-                setEnabled(true);
+                updateBack();
             }
-        });
+        };
+        getOnBackPressedDispatcher().addCallback(this, back);
 
         if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) return;
         web.loadUrl(urlFor(getIntent()));
@@ -133,6 +157,9 @@ public class MainActivity extends ComponentActivity {
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setUpWebView() {
+        /* No white flash before the first paint: the splash's own colour. */
+        web.setBackgroundColor(ContextCompat.getColor(this, R.color.app_background));
+
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -159,25 +186,62 @@ public class MainActivity extends ComponentActivity {
     }
 
     /* A link to the site opens that page; anything else opens the app. */
-    private static String urlFor(Intent intent) {
-        Uri data = intent == null ? null : intent.getData();
-        if (Intent.ACTION_VIEW.equals(intent == null ? null : intent.getAction()) && isOurs(data)) {
-            return data.toString();
+    private String urlFor(Intent intent) {
+        if (intent != null && Intent.ACTION_VIEW.equals(intent.getAction())) {
+            String link = siteUrl(intent.getData());
+            if (link != null) return link;
         }
-        return START_URL;
+        return startUrl();
     }
 
+    /* The link exactly as it will be loaded, if it is on the site. Another
+       app can hand over a Uri whose getHost() and toString() disagree (an
+       authority such as "evil.example/@pietimers.aibhlinn.ai"), so the
+       string itself is checked: with the trailing slash in the prefix,
+       nothing after it can change the host. */
+    private static String siteUrl(Uri uri) {
+        if (uri == null) return null;
+        String s = uri.toString();
+        return s.regionMatches(true, 0, SITE, 0, SITE.length()) ? s : null;
+    }
+
+    /* For URLs Chromium has already parsed (navigations, the page showing),
+       where the host and the string cannot disagree. */
     private static boolean isOurs(Uri uri) {
         return uri != null && "https".equals(uri.getScheme()) && HOST.equalsIgnoreCase(uri.getHost());
+    }
+
+    /* Two launches that are not a person's first open, so the site is told
+       not to count them (#count=off; app/visits.js marks the visit counted
+       and sends nothing): Google's pre-launch test devices, which run every
+       upload on freshly wiped phones, and a tester's first launch after
+       updating from the TWA, whose first open was counted in Chrome. A new
+       install still counts. */
+    private String startUrl() {
+        boolean testLab = "true".equals(
+                Settings.System.getString(getContentResolver(), "firebase.test.lab"));
+
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        boolean firstLaunch = !prefs.getBoolean(PREF_LAUNCHED, false);
+        if (firstLaunch) prefs.edit().putBoolean(PREF_LAUNCHED, true).apply();
+
+        boolean updated = false;
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            updated = info.lastUpdateTime > info.firstInstallTime;
+        } catch (Exception e) {
+            // Unknown: count it, as a new install would be.
+        }
+        return testLab || (firstLaunch && updated) ? START_URL + "#count=off" : START_URL;
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (web != null && Intent.ACTION_VIEW.equals(intent.getAction()) && isOurs(intent.getData())) {
-            web.loadUrl(intent.getData().toString());
-        }
+        if (web == null || !Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        String link = siteUrl(intent.getData());
+        if (link != null) web.loadUrl(link);
     }
 
     /* Pages on the site stay in the app. Every other link goes to whatever
@@ -211,14 +275,28 @@ public class MainActivity extends ComponentActivity {
         ready = true;
         offline.setVisibility(View.VISIBLE);
         web.setVisibility(View.INVISIBLE);
+        updateBack();
     }
 
-    private void retry() {
+    private void hideOffline() {
         offline.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
+        updateBack();
+    }
+
+    /* Chromium's error page has replaced the failed URL in history, so
+       reload() would only reload that page: load the address again. */
+    private void retry() {
+        hideOffline();
         String url = web.getUrl();
-        if (url == null || !isOurs(Uri.parse(url))) web.loadUrl(START_URL);
-        else web.reload();
+        web.loadUrl(url != null && isOurs(Uri.parse(url)) ? url : START_URL);
+    }
+
+    private void updateBack() {
+        if (back == null) return;
+        boolean offlineShowing = offline != null && offline.getVisibility() == View.VISIBLE;
+        back.setEnabled(fullScreenView != null
+                || (!offlineShowing && web != null && web.canGoBack()));
     }
 
     private final class Client extends WebViewClient {
@@ -230,13 +308,28 @@ public class MainActivity extends ComponentActivity {
         }
 
         @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            mainFrameFailed = false;
+        }
+
+        /* A load that got through takes the offline screen down, however it
+           was started: Try again, a link from another app, or the page. */
+        @Override
         public void onPageFinished(WebView view, String url) {
             ready = true;
+            if (!mainFrameFailed && offline.getVisibility() == View.VISIBLE) hideOffline();
         }
 
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame()) showOffline();
+            if (!request.isForMainFrame()) return;
+            mainFrameFailed = true;
+            showOffline();
+        }
+
+        @Override
+        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+            updateBack();
         }
 
         /* The page's renderer was killed (low memory) or crashed. Start the
@@ -271,6 +364,37 @@ public class MainActivity extends ComponentActivity {
                 Toast.makeText(MainActivity.this, R.string.no_app_for_files, Toast.LENGTH_LONG).show();
             }
             return true;
+        }
+
+        /* The dashboard's Full screen button asks the page for full screen,
+           which a WebView hands to the app as a view to show over everything.
+           Without this the button does nothing. */
+        @Override
+        public void onShowCustomView(View view, CustomViewCallback callback) {
+            if (fullScreenView != null) {
+                callback.onCustomViewHidden();
+                return;
+            }
+            fullScreenView = view;
+            fullScreenCallback = callback;
+            root.addView(view, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            WindowInsetsControllerCompat bars =
+                    WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+            bars.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            bars.hide(WindowInsetsCompat.Type.systemBars());
+            updateBack();
+        }
+
+        @Override
+        public void onHideCustomView() {
+            if (fullScreenView == null) return;
+            root.removeView(fullScreenView);
+            fullScreenView = null;
+            fullScreenCallback = null;
+            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                    .show(WindowInsetsCompat.Type.systemBars());
+            updateBack();
         }
     }
 
@@ -310,11 +434,13 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    /* "wt": replacing an earlier, longer export must not leave its tail
+       behind, which would make the JSON unreadable. */
     private void writePendingSave(Uri uri) {
         byte[] bytes = pendingSave;
         pendingSave = null;
         if (uri == null || bytes == null) return;
-        try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+        try (OutputStream out = getContentResolver().openOutputStream(uri, "wt")) {
             if (out == null) throw new java.io.IOException("no stream");
             out.write(bytes);
         } catch (Exception e) {
@@ -322,24 +448,29 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
-    /* onPause() does not stop the page's JavaScript, so alerts due while
-       the app is in the background still run until Android freezes it. */
+    /* Paused when the app is out of sight, not merely out of focus: in
+       split screen on Android 7 to 9 an unfocused app is paused but still
+       showing, and its pies must keep moving. The page's JavaScript runs on
+       either way, so alerts still fire until Android freezes the app. */
     @Override
-    protected void onPause() {
-        if (web != null) web.onPause();
-        super.onPause();
+    protected void onStart() {
+        super.onStart();
+        if (web != null) web.onResume();
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        if (web != null) web.onResume();
+    protected void onStop() {
+        if (web != null) web.onPause();
+        super.onStop();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         if (web != null) web.saveState(outState);
+        /* The save dialog can outlive this activity (rotation, low memory),
+           and the bytes must still be here when it answers. */
+        if (pendingSave != null) outState.putByteArray(STATE_PENDING_SAVE, pendingSave);
     }
 
     @Override
