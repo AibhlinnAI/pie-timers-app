@@ -85,12 +85,17 @@ unzip -p "$AAB" base/manifest/AndroidManifest.xml | LC_ALL=C tr -cs '[:print:]' 
 Each value printed by the last check ends in a stray character or two; it
 reads the file's text, not the compiled numbers.
 
-## Two things the app tells the site
+## Three things the app tells the site
 
 - **First opens.** On Google's pre-launch test devices, and on a tester's
   first launch after updating from the TWA, the app opens the site with
   `#count=off`, so `app/visits.js` does not count a first open that is not a
   person's. A new install still counts.
+- **Moved from the old app.** That first launch after the update also
+  carries `moved=1` (`#count=off&moved=1`). The TWA kept the week in
+  Chrome's storage, which this app cannot read, so the site shows a panel
+  with the steps to bring it across: Export settings in Chrome, Import
+  settings here.
 - **Backups.** There are none: `allowBackup` is off and
   `data_extraction_rules.xml` excludes everything from cloud backup and
   device transfer, because the WebView's storage holds the schedule and

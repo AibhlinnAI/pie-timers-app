@@ -254,6 +254,14 @@ Google refuses it in an embedded WebView, and the notification settings say
 that only in-app alerts work there: a WebView has no Notification or Push
 API.
 
+The WebView has storage of its own, so a tester updating from the TWA opens
+release 4 empty, with their week still in Chrome. On that first launch the
+app opens `index.html#count=off&moved=1`; `visits.js` takes `count=off` and
+leaves the rest, and `app.js` then shows a panel ("Your week is still in
+Chrome") with the Export and Import steps, until it is hidden, a file is
+imported or a sync pull brings the account's week. A new install gets no
+marker and no panel.
+
 Only the app's own signals count, never display mode (`inAppWindow()`). An
 installed web app or an iPhone home screen icon is still the web, and keeps
 its prices.

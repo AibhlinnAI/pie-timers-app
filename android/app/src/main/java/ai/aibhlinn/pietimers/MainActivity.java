@@ -216,7 +216,12 @@ public class MainActivity extends ComponentActivity {
        and sends nothing): Google's pre-launch test devices, which run every
        upload on freshly wiped phones, and a tester's first launch after
        updating from the TWA, whose first open was counted in Chrome. A new
-       install still counts. */
+       install still counts.
+
+       The second also gets moved=1. The TWA kept the person's week in
+       Chrome's storage, which this app cannot read, so it opens empty; the
+       site then shows, once, how to bring the week across (app/app.js,
+       movedNotice). */
     private String startUrl() {
         boolean testLab = "true".equals(
                 Settings.System.getString(getContentResolver(), "firebase.test.lab"));
@@ -232,7 +237,8 @@ public class MainActivity extends ComponentActivity {
         } catch (Exception e) {
             // Unknown: count it, as a new install would be.
         }
-        return testLab || (firstLaunch && updated) ? START_URL + "#count=off" : START_URL;
+        if (firstLaunch && updated) return START_URL + "#count=off&moved=1";
+        return testLab ? START_URL + "#count=off" : START_URL;
     }
 
     @Override

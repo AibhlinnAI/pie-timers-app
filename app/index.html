@@ -33,7 +33,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231C1024'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='12'%20fill='%2332493C'/%3E%3Cpath%20d='M16%2016%2022.71%2010.19A8.88%208.88%200%201%201%2016%207.12z'%20fill='%23FF8A00'/%3E%3C/svg%3E">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="styles.css?v=113">
+<link rel="stylesheet" href="styles.css?v=130">
 <link rel="stylesheet" href="identity/identity-ui.css">
 </head>
 <body>
@@ -126,6 +126,35 @@
       </div>
       <p class="status-line" id="testerStatus" role="status" aria-live="polite"></p>
       <button class="btn btn-ghost" id="testerDismiss" type="button">Not right now</button>
+    </section>
+
+    <!-- The WebView Play app only, for a tester updating from releases 1
+         to 3 (the TWA), whose week is still in Chrome's storage. Typed
+         into the address bar, not tapped: a tapped link to the site opens
+         the app again. See "Moved from the old app" in app.js. -->
+    <section class="panel moved-notice" id="movedNotice" hidden>
+      <header class="panel-head">
+        <div>
+          <h2>Your week is still in Chrome</h2>
+          <p class="sub">This update gives Pie Timers its own storage, so it
+          starts empty here. Nothing is lost. To bring your week across:</p>
+        </div>
+      </header>
+      <ol>
+        <li>Open Chrome (or the browser the old app opened in). Type
+        <strong>pietimers.aibhlinn.ai</strong> into the address bar and go
+        there.</li>
+        <li>Open <strong>Settings</strong> and tap <strong>Export
+        settings</strong>.</li>
+        <li>Come back to this app, open <strong>Settings</strong>, tap
+        <strong>Import settings</strong> and choose the file you just
+        saved.</li>
+      </ol>
+      <p class="sub">Signed in on the old app? You can sign in here instead
+      and tap <strong>Sync now</strong> in Settings. That brings back the
+      copy your account last saved, which may be older than the one in
+      Chrome.</p>
+      <button class="btn btn-ghost" id="movedDismiss" type="button">Hide this</button>
     </section>
 
     <!-- First run only. Says what the app is in one glance, for a cold
@@ -1103,13 +1132,13 @@
 <script src="identity/entitlements.js"></script>
 <script src="identity/identity-ui.js?v=129"></script>
 <script src="config.js"></script>
-<script src="visits.js?v=118"></script>
+<script src="visits.js?v=130"></script>
 <script src="identity-bridge.js?v=129"></script>
 <script src="supabase.js?v=117"></script>
 <script src="billing.js?v=129"></script>
 <script src="notify.js"></script>
 <script src="sync.js?v=113"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=129"></script>
+<script src="app.js?v=130"></script>
 </body>
 </html>

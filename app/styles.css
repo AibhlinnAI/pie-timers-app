@@ -1357,6 +1357,12 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 .tester-invite .sub{ margin-top:4px; max-width:52ch; }
 .tester-invite #testerDismiss{ margin-top:12px; }
 
+/* ──────────────────────── Moved from the old app ────────────────────────
+   The same .panel, with its three steps as a plain numbered list. */
+.moved-notice ol{ margin:0; padding-left:22px; max-width:60ch; font-size:.92rem; }
+.moved-notice li{ margin-bottom:8px; line-height:1.5; }
+.moved-notice #movedDismiss{ margin-top:14px; }
+
 /* ───────────────────────── Account ───────────────────────── */
 .signin-form{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
 .field--grow{ flex:1 1 260px; }

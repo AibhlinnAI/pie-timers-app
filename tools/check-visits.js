@@ -242,6 +242,11 @@ check('18 rejected fetch: flag still 1', r.store.get(FLAG) === '1');
 // 19 non-src hash untouched
 r = run({ url: 'https://pietimers.aibhlinn.ai/#in-app' });
 check('19 #in-app kept', r.address === '/#in-app', r.address);
+// The Android app's first launch after updating from the TWA: counting
+// is off, and the rest of the fragment is left for app.js.
+r = run({ url: 'https://pietimers.aibhlinn.ai/index.html#count=off&moved=1' });
+check('19 #count=off&moved=1 keeps #moved=1, counts nothing',
+  r.fetches.length === 0 && r.store.get(FLAG) === '1' && r.address === '/index.html#moved=1', r.address);
 
 // 20 once per browser, ever: later opens the same day, the next day, from
 // another tagged code or in the Play app send nothing
@@ -441,6 +446,15 @@ check('S9 visits.js passes the deploy guard pattern', guard && !new RegExp(guard
     .flatMap((f) => readText(path.join(dir, f)).match(/"https:\/\/pietimers\.aibhlinn\.ai\/index\.html[^"]*"/g) || []);
   check('S11 the Windows screensaver loads the app with #count=off',
     urls.length > 0 && urls.every((x) => /#count=off"$/.test(x)), urls);
+}
+
+// The Android app (release 4 on) is a WebView with storage of its own:
+// Google's test devices and a tester's first launch after updating from the
+// TWA open the app with #count=off, the second with moved=1 after it.
+{
+  const java = readText(path.join(ROOT, 'android/app/src/main/java/ai/aibhlinn/pietimers/MainActivity.java'));
+  check('S12 the Android app opens with #count=off on test devices and after the update',
+    java.includes('START_URL + "#count=off&moved=1"') && java.includes('START_URL + "#count=off"'));
 }
 
 process.on('exit', () => {

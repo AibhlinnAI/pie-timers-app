@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v129';
+var CACHE = 'countdown-timers-v130';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -26,7 +26,7 @@ var SHELL = [
      is deliberately absent: a cached health check is a lie. */
   'terms.html',
   'privacy.html',
-  'styles.css?v=113',
+  'styles.css?v=130',
   'styles.css',
   /* The self-hosted face. Precached because styles.css asks for these
      and nothing else fetches them offline — without both the app still
@@ -35,7 +35,7 @@ var SHELL = [
   'fonts/instrument-sans-latin.woff2',
   'fonts/instrument-sans-latin-ext.woff2',
   'config.js',
-  'visits.js?v=118',
+  'visits.js?v=130',
   'identity-bridge.js?v=129',
   'identity/identity.js?v=117',
   'identity/email-typos.js',
@@ -49,7 +49,7 @@ var SHELL = [
   'notify.js',
   'sync.js?v=113',
   'qrcode.js',
-  'app.js?v=129',
+  'app.js?v=130',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',
