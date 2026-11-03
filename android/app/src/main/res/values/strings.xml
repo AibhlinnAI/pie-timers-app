@@ -1,0 +1,14 @@
+<resources>
+    <!-- Both as release 3 had them: the app's name in Settings and the
+         Play Store, and the shorter one under the home screen icon. -->
+    <string name="app_name">Pie Timers - Visual Countdown</string>
+    <string name="launcher_name">Pie Timers</string>
+
+    <string name="offline_title">Pie Timers can\'t reach the internet</string>
+    <string name="offline_body">It needs a connection the first time it opens. After that it keeps working offline.</string>
+    <string name="offline_retry">Try again</string>
+
+    <string name="no_app_for_link">No app on this phone can open that link.</string>
+    <string name="no_app_for_files">No app on this phone can pick or save files.</string>
+    <string name="save_failed">The file could not be saved.</string>
+</resources>

@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+
+# Never here, whatever the root .gitignore says: the upload key, its
+# passwords and anything signed with it live in the private packages folder.
+*.keystore
+*.jks
+*.aab
+*.apk
+signing-key-info.txt

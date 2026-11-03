@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The same icon as release 3, which PWABuilder made: the maskable image,
+     inset 8.5dp, on white, with an empty foreground. The PNGs beside this
+     file were taken from release 3's package. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background>
+        <layer-list>
+            <item android:drawable="@android:color/white" />
+            <item
+                android:bottom="8.5dp"
+                android:drawable="@mipmap/ic_maskable"
+                android:left="8.5dp"
+                android:right="8.5dp"
+                android:top="8.5dp" />
+        </layer-list>
+    </background>
+    <foreground android:drawable="@android:color/transparent" />
+</adaptive-icon>
