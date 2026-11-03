@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v128';
+var CACHE = 'countdown-timers-v129';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -36,20 +36,20 @@ var SHELL = [
   'fonts/instrument-sans-latin-ext.woff2',
   'config.js',
   'visits.js?v=118',
-  'identity-bridge.js?v=117',
+  'identity-bridge.js?v=129',
   'identity/identity.js?v=117',
   'identity/email-typos.js',
   'identity/entitlements.js',
-  'identity/identity-ui.js',
+  'identity/identity-ui.js?v=129',
   'identity/identity-ui.css',
   /* Drawn by identity-ui.css as the Google sign-in button. */
   'identity/google-signin-light-pill.svg',
   'supabase.js?v=117',
-  'billing.js',
+  'billing.js?v=129',
   'notify.js',
   'sync.js?v=113',
   'qrcode.js',
-  'app.js?v=128',
+  'app.js?v=129',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',

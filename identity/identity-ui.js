@@ -18,7 +18,9 @@
        openLabel: 'Open Pie Timers',       // shown once signed in
        openHref: 'index.html',
        productName: 'Pie Timers',
-       showSuiteContext: true              // the one-line "works across all our apps"
+       showSuiteContext: true,             // the one-line "works across all our apps"
+       showGoogle: true                    // false where Google refuses its sign-in,
+                                           // e.g. inside an Android WebView
      });
 
    What this deliberately does NOT do:
@@ -54,7 +56,8 @@
       openLabel: 'Open',
       openHref: '#',
       productName: 'this app',
-      showSuiteContext: true
+      showSuiteContext: true,
+      showGoogle: true
     }, options);
 
     var wrap = el('div', { class: 'aib-signin', style: 'position:relative;display:inline-block;' });
@@ -165,15 +168,19 @@
 
     panel.appendChild(form);
 
-    panel.appendChild(el('div', { class: 'aib-signin-divider', text: 'or' }));
-
     /* Google's own pre-approved button artwork, unmodified (see the
        comment on .aib-signin-google). The artwork carries the words, so
-       the accessible name has to say the same thing. */
-    var googleBtn = el('button', {
-      type: 'button', class: 'aib-signin-google', 'aria-label': 'Sign in with Google'
-    });
-    panel.appendChild(googleBtn);
+       the accessible name has to say the same thing. Left out whole, with
+       its divider, where the product says Google cannot work: Google
+       refuses its sign-in inside an embedded WebView. */
+    var googleBtn = null;
+    if (opts.showGoogle) {
+      panel.appendChild(el('div', { class: 'aib-signin-divider', text: 'or' }));
+      googleBtn = el('button', {
+        type: 'button', class: 'aib-signin-google', 'aria-label': 'Sign in with Google'
+      });
+      panel.appendChild(googleBtn);
+    }
 
     wrap.appendChild(btn);
     wrap.appendChild(panel);
@@ -407,9 +414,11 @@
       typo.hidden = true;
     });
 
-    googleBtn.addEventListener('click', function () {
-      identity.signInWithGoogle();
-    });
+    if (googleBtn) {
+      googleBtn.addEventListener('click', function () {
+        identity.signInWithGoogle();
+      });
+    }
 
     function render() {
       if (identity.isSignedIn()) renderSignedIn();

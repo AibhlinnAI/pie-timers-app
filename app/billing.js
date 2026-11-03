@@ -197,6 +197,9 @@
     if (window.CT && window.CT.inPlayApp) return true;
     if (typeof window.getDigitalGoodsService === 'function') return true;
     if (/^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')) return true;
+    /* The WebView Play app sends no referrer and has no
+       getDigitalGoodsService; this token is its signal (app.js). */
+    if (/(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '')) return true;
     if ((location.hash || '').slice(1) === 'in-app') return true;
     try {
       return sessionStorage.getItem('countdown-timers/play-app') === '1';
