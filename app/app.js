@@ -368,7 +368,9 @@
      disallowed_useragent, so the WebView build offers the emailed code
      only, which is also what the Play review account uses. Markup that is
      only the Google route carries data-hide-in-webview; identity-bridge.js
-     drops the button from the header panel the same way. */
+     drops the button from the header panel the same way. So does the sign-in
+     panel's promise of alerts while the app is closed, which a WebView
+     cannot deliver. */
   (function hideGoogleSignInInWebView() {
     if (!IN_WEBVIEW_APP) return;
     var google = document.querySelectorAll('[data-hide-in-webview]');
