@@ -258,9 +258,12 @@ The WebView has storage of its own, so a tester updating from the TWA opens
 release 4 empty, with their week still in Chrome. On that first launch the
 app opens `index.html#count=off&moved=1`; `visits.js` takes `count=off` and
 leaves the rest, and `app.js` then shows a panel ("Your week is still in
-Chrome") with the Export and Import steps, until it is hidden, a file is
-imported or a sync pull brings the account's week. A new install gets no
-marker and no panel.
+Chrome") until it is hidden or a file is imported. A new install gets no
+marker and no panel. The panel says to sign in first, then import: on a
+device never in step with the account, the account's copy wins at sign-in
+(`sync.js`), so a week imported before signing in would be replaced by the
+account's older one. For the same reason a sync pull does not hide the
+panel.
 
 Only the app's own signals count, never display mode (`inAppWindow()`). An
 installed web app or an iPhone home screen icon is still the web, and keeps

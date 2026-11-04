@@ -368,7 +368,9 @@
      disallowed_useragent, so the WebView build offers the emailed code
      only, which is also what the Play review account uses. Markup that is
      only the Google route carries data-hide-in-webview; identity-bridge.js
-     drops the button from the header panel the same way. */
+     drops the button from the header panel the same way. So does the sign-in
+     panel's promise of alerts while the app is closed, which a WebView
+     cannot deliver. */
   (function hideGoogleSignInInWebView() {
     if (!IN_WEBVIEW_APP) return;
     var google = document.querySelectorAll('[data-hide-in-webview]');
@@ -988,8 +990,11 @@
      its own, so a tester who updates opens it empty, their week still
      safe in Chrome. The app says so on that first launch only
      (#count=off&moved=1; visits.js takes the count=off), and this panel
-     then shows how to bring the week across, until it is hidden, a file
-     is imported or a sync pull brings the account's copy.
+     then shows how to bring the week across, until it is hidden or a
+     file is imported. A sync pull does not retire it: the account's copy
+     can be older than the week in Chrome (testers' rows stopped updating
+     when their trials ended), so after signing in the person still needs
+     the steps to check against.
 
      Only in the WebView app, and only when nothing had been saved here:
      the marker in a pasted link does nothing anywhere else. The reminder
@@ -5569,8 +5574,6 @@
       buildAppointmentList();
       renderAccount();
       render();
-      // The account's week is here, so the old app's is no longer needed.
-      retireMovedNotice();
       return sendOwn;
     },
 
