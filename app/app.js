@@ -988,8 +988,11 @@
      its own, so a tester who updates opens it empty, their week still
      safe in Chrome. The app says so on that first launch only
      (#count=off&moved=1; visits.js takes the count=off), and this panel
-     then shows how to bring the week across, until it is hidden, a file
-     is imported or a sync pull brings the account's copy.
+     then shows how to bring the week across, until it is hidden or a
+     file is imported. A sync pull does not retire it: the account's copy
+     can be older than the week in Chrome (testers' rows stopped updating
+     when their trials ended), so after signing in the person still needs
+     the steps to check against.
 
      Only in the WebView app, and only when nothing had been saved here:
      the marker in a pasted link does nothing anywhere else. The reminder
@@ -5569,8 +5572,6 @@
       buildAppointmentList();
       renderAccount();
       render();
-      // The account's week is here, so the old app's is no longer needed.
-      retireMovedNotice();
       return sendOwn;
     },
 

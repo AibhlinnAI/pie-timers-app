@@ -131,13 +131,20 @@
     <!-- The WebView Play app only, for a tester updating from releases 1
          to 3 (the TWA), whose week is still in Chrome's storage. Typed
          into the address bar, not tapped: a tapped link to the site opens
-         the app again. See "Moved from the old app" in app.js. -->
+         the app again. Signing in comes first: on a new device the
+         account's copy wins at sign-in, so a week imported before signing
+         in would be replaced by an older one. See "Moved from the old app"
+         in app.js. -->
     <section class="panel moved-notice" id="movedNotice" hidden>
       <header class="panel-head">
         <div>
           <h2>Your week is still in Chrome</h2>
-          <p class="sub">This update gives Pie Timers its own storage, so it
-          starts empty here. Nothing is lost. To bring your week across:</p>
+          <p class="sub">This update gives Pie Timers its own storage, so the
+          app starts empty here. Nothing is lost.</p>
+          <p class="sub"><strong>Had an account? Sign in first</strong>, in
+          Settings. Your saved week comes back by itself, or with
+          <strong>Sync now</strong>. No account, or hours out of date after
+          signing in? Bring your week across from Chrome:</p>
         </div>
       </header>
       <ol>
@@ -150,10 +157,6 @@
         <strong>Import settings</strong> and choose the file you just
         saved.</li>
       </ol>
-      <p class="sub">Signed in on the old app? You can sign in here instead
-      and tap <strong>Sync now</strong> in Settings. That brings back the
-      copy your account last saved, which may be older than the one in
-      Chrome.</p>
       <button class="btn btn-ghost" id="movedDismiss" type="button">Hide this</button>
     </section>
 
@@ -1139,6 +1142,6 @@
 <script src="notify.js"></script>
 <script src="sync.js?v=113"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=130"></script>
+<script src="app.js?v=131"></script>
 </body>
 </html>
