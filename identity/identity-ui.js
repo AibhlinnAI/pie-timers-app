@@ -60,6 +60,12 @@
       showGoogle: true
     }, options);
 
+    /* One number per mount, shared by every id this panel makes: the
+       title's was fixed once, so two panels on a page both claimed it and
+       aria-labelledby could name the wrong one. */
+    var mountId = ++mounts;
+    var titleId = 'aibSigninTitle' + mountId;
+
     var wrap = el('div', { class: 'aib-signin', style: 'position:relative;display:inline-block;' });
 
     var btn = el('button', {
@@ -74,7 +80,7 @@
       class: 'aib-signin-panel',
       role: 'dialog',
       'aria-modal': 'false',
-      'aria-labelledby': 'aibSigninTitle',
+      'aria-labelledby': titleId,
       hidden: 'hidden'
     });
 
@@ -82,7 +88,7 @@
       type: 'button', class: 'aib-signin-close', 'aria-label': 'Close'
     }, [document.createTextNode('×')]));
 
-    panel.appendChild(el('h2', { id: 'aibSigninTitle', text: 'Sign in' }));
+    panel.appendChild(el('h2', { id: titleId, text: 'Sign in' }));
     panel.appendChild(el('p', {
       class: 'aib-sub',
       text: opts.showSuiteContext
@@ -112,7 +118,7 @@
        straight on with the send, and the address never changes without
        the tap. Asked at the send rather than on blur, so nothing moves
        under a finger already heading for the button. */
-    var typoId = 'aibSigninTypo' + (++mounts);
+    var typoId = 'aibSigninTypo' + mountId;
     var typoAddress = el('strong', {});
     var typo = el('div', {
       class: 'aib-signin-typo', role: 'group', 'aria-labelledby': typoId,

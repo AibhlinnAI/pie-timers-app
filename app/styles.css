@@ -414,6 +414,14 @@ button{ font:inherit; }
   --tag-size:   clamp(.58rem, 1.55vw, .82rem);
   --mark-size:  calc(var(--title-size) * 1.2 + 4px + var(--tag-size) * 1.3);
 }
+/* Up to 600px wide the header is stacked, so the brand has the whole row
+   and the tagline can grow with the screen: it sat at its 9.3px floor on
+   every phone, and a tester found the app's small text hard to read. Not
+   past 600px: there the brand shares its row with the clock, and a bigger
+   tagline pushes the clock onto a second row. */
+@media (max-width:600px){
+  .brand{ --tag-size: clamp(.58rem, 2.9vw, .82rem); }
+}
 /* The mark sits in a socket rather than on top of the header. In light
    theme the plate (#32493C) is the same green family as the header
    gradient — --header-mid *is* --forest — so without this the plate's
@@ -639,7 +647,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 }
 .daystrip-item{ background:var(--card); padding:14px 18px; }
 .daystrip-item .k{
-  display:block; font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  display:block; font-size:.75rem; font-weight:700; letter-spacing:.09em;
   color:var(--ink-muted);
 }
 .daystrip-item .v{
@@ -853,7 +861,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 
 .appt-tag{
   display:inline-block; margin-left:8px; font-style:normal;
-  font-size:.68rem; font-weight:700; letter-spacing:.01em;
+  font-size:.75rem; font-weight:700; letter-spacing:.01em;
   color:var(--appt); background:var(--appt-soft);
   padding:2px 7px; border-radius:999px; vertical-align:2px;
 }
@@ -877,7 +885,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .view-toggle-btn:hover{ color:var(--ink); }
 .view-toggle-btn.is-active{ background:var(--card); color:var(--ink); box-shadow:var(--shadow); }
 .view-toggle-btn:focus-visible{ outline:2px solid var(--forest); outline-offset:1px; }
-.view-toggle-btn .chip{ font-size:.66rem; padding:2px 8px; }
+.view-toggle-btn .chip{ font-size:.75rem; padding:2px 8px; }
 
 /* ───────────────────────── Calendar view (month grid) ───────────────────────── */
 .cal-nav{
@@ -890,7 +898,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 
 .cal-weekdays{
   display:grid; grid-template-columns:repeat(7,1fr);
-  font-size:.72rem; font-weight:700; color:var(--ink-muted);
+  font-size:.75rem; font-weight:700; color:var(--ink-muted);
   text-align:center; padding-bottom:6px;
 }
 
@@ -912,7 +920,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .cal-cell.is-selected{ border-color:var(--purple); background:var(--purple-tint); }
 .cal-cell.is-selected .cal-cell-num{ color:var(--purple); font-weight:700; }
 .cal-cell-badge{
-  font-size:.64rem; font-weight:700; line-height:1;
+  font-size:.75rem; font-weight:700; line-height:1;
   color:var(--on-dark); background:var(--purple);
   padding:2px 5px; border-radius:999px; min-width:1.4em; text-align:center;
 }
@@ -997,7 +1005,7 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
    nothing on the page says "account" until you're already signed in. */
 .section-label{
   margin:28px 0 10px;
-  font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  font-size:.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
   color:var(--ink-muted);
 }
 .section-label:first-child{ margin-top:0; }
@@ -1252,7 +1260,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 }
 .field{ display:flex; flex-direction:column; gap:6px; }
 .field span{
-  font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  font-size:.75rem; font-weight:700; letter-spacing:.09em;
   color:var(--ink-muted);
 }
 .field input, .field select{
@@ -1269,7 +1277,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   border-radius:var(--radius); padding:26px 24px; text-align:center; color:var(--on-dark);
 }
 .calc-block .k{
-  display:block; font-size:.68rem; font-weight:700; letter-spacing:.13em;
+  display:block; font-size:.75rem; font-weight:700; letter-spacing:.13em;
   color:var(--cream);
 }
 .calc-big{
@@ -1286,7 +1294,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
   border-radius:var(--radius-sm); padding:14px 16px; text-align:center;
 }
 .calc-cell .k{
-  display:block; font-size:.66rem; font-weight:700; letter-spacing:.09em;
+  display:block; font-size:.75rem; font-weight:700; letter-spacing:.09em;
   color:var(--ink-muted);
 }
 .calc-cell strong{
@@ -1464,13 +1472,13 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
    verified. 5.81:1 measured live against white. */
 .plan-badge{
   align-self:flex-start; margin-bottom:2px;
-  font-size:.72rem; font-weight:700; letter-spacing:.01em;
+  font-size:.75rem; font-weight:700; letter-spacing:.01em;
   color:#fff; background:var(--appt);
   padding:3px 9px; border-radius:999px;
 }
 
 .plan-name{
-  font-size:.68rem; font-weight:700; letter-spacing:.09em;
+  font-size:.75rem; font-weight:700; letter-spacing:.09em;
   color:var(--ink-muted);
 }
 .plan-price{
@@ -1583,7 +1591,7 @@ input[type="checkbox"]{ accent-color:var(--violet); width:18px; height:18px; cur
 
 .byline{
   margin:10px 0 0; text-align:center;
-  font-size:.74rem; color:var(--ink-muted); opacity:.75;
+  font-size:.75rem; color:var(--ink-muted); opacity:.75;
 }
 
 /* ───────────────────────── Focus view ─────────────────────────
