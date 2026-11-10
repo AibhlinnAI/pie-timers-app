@@ -206,7 +206,20 @@ while Milestone alerts is on as well (`settings.alerts`; `wantsPush` in the
 function reads both). A device whose account has Background alerts off
 removes its own subscription (`followPushSetting` in `app/sync.js`).
 `tools/check-push-gate.js` holds all three to that. Until v136 the switch
-gated nothing. Two things follow, and both are easy to undo by accident:
+gated nothing.
+
+The Android app from release 7 is the one place this differs. A WebView has
+no push service of its own, so the app registers with Google's Firebase
+Cloud Messaging and the function sends the alert there
+(`supabase/functions/notify-milestones/fcm.ts`), under the same two
+switches. Its row sits in `push_subscriptions` beside the browsers, with the
+endpoint `fcm:<device token>` and no keys. Unlike Web Push, Google can read
+that alert: the timer or break's name, how long is left, and the date.
+`privacy.html` sections 5 and 6 say so. The app holds no Analytics library
+and does not register with Firebase until Background alerts is switched on
+(`firebase_messaging_auto_init_enabled` is off in its manifest).
+
+Two things follow, and both are easy to undo by accident:
 
 - **The typeface is self-hosted.** `app/fonts/` carries Instrument Sans as
   two woff2 files (one variable face per subset, covering weights 400–700)
@@ -253,9 +266,14 @@ adds `PieTimersAndroid/<version code>` to its user agent, on every request,
 and every check above reads that too (`WEBVIEW_UA` in `app/app.js`). Testers
 keep the TWA until they update, so both signals stay. In the WebView app only
 (`IN_WEBVIEW_APP`, `CT.inWebViewApp`), Google sign-in is hidden, because
-Google refuses it in an embedded WebView, and the notification settings say
-that only in-app alerts work there: a WebView has no Notification or Push
-API.
+Google refuses it in an embedded WebView. A WebView also has no Notification
+or Push API. In releases 4 to 6 the notification settings therefore say that
+only in-app alerts work. From release 7 the app carries a JavaScript bridge,
+`PieTimersAndroidPush`, which `app/notify.js` uses in place of those APIs:
+the app shows each alert as a phone notification itself, and Firebase Cloud
+Messaging delivers them while it is closed (section 4). The site decides
+between the two by whether the bridge is there (`CT.notify.nativePush`,
+`NO_PHONE_NOTIFS` in `app/app.js`), not by the version in the user agent.
 
 The WebView has storage of its own, so a tester updating from the TWA opens
 release 4 empty, with their week still in Chrome. On that first launch the

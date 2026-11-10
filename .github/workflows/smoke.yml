@@ -93,6 +93,13 @@ jobs:
       - name: Run the push gate checks
         run: node tools/check-push-gate.js
 
+      # notify-milestones' send loop, run for real with Deno and the
+      # network stubbed: every device of an account gets the alert, an
+      # Android device goes through Firebase, and nothing about Firebase
+      # costs a browser its push. Nothing is deployed.
+      - name: Run the notify-milestones send tests
+        run: node --experimental-strip-types tools/notify-run-test.mjs
+
       # The ABN is one identifier: written with plain spaces, a narrow
       # screen can wrap it across two lines. Every published copy uses
       # non-breaking spaces (ABN&nbsp;70&nbsp;810&nbsp;791&nbsp;817).

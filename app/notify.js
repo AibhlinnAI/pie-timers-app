@@ -28,7 +28,74 @@
   var supported = ('serviceWorker' in navigator) &&
                   (location.protocol === 'https:' || location.hostname === 'localhost');
 
-  var pushSupported = supported && ('PushManager' in window);
+  /* ─────────────────────────── The Android app ───────────────────────────
+     The Play app is a WebView, and a WebView has no Notification and no
+     PushManager. From release 7 the app offers its own bridge instead,
+     PieTimersAndroidPush (android/.../MainActivity.java):
+
+       permission()             "granted" or "denied", straight away
+       request()                asks Android if it must, then answers
+       token()                  answers without asking
+       show(title, body, tag)   shows a phone notification now
+
+     request() and token() answer by calling window.PieTimersPushResult
+     with { permission, token }. The token is the phone's Firebase device
+     token. It is saved in push_subscriptions as the endpoint "fcm:<token>"
+     with no keys, beside the browsers, and notify-milestones sends to it
+     through Firebase Cloud Messaging.
+
+     An older Play app has no bridge. There nativePush is false, nothing
+     below changes, and app.js says to update the app. */
+  var nativeBridge = window.PieTimersAndroidPush || null;
+  var nativePush = !!(nativeBridge && typeof nativeBridge.request === 'function' &&
+                      typeof nativeBridge.show === 'function');
+
+  var NATIVE_ASKED_KEY = 'countdown-timers/phone-alerts-asked';
+  var NATIVE_ENDPOINT_KEY = 'countdown-timers/phone-alerts-endpoint';
+  var NATIVE_ANSWER_MS = 20000;
+
+  function stored(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function store(key, value) {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch (e) { /* storage blocked: asked again next time */ }
+  }
+
+  function nativeAllowed() {
+    try { return nativeBridge.permission() === 'granted'; } catch (e) { return false; }
+  }
+
+  /* Everyone waiting on the app's next answer gets it. */
+  var nativeWaiters = [];
+  if (nativePush) {
+    window.PieTimersPushResult = function (result) {
+      var waiting = nativeWaiters;
+      nativeWaiters = [];
+      waiting.forEach(function (resolve) { resolve(result || null); });
+    };
+  }
+
+  /* Calls request() or token() and resolves with the app's answer.
+     `patient` is the permission prompt, which waits on a person and so
+     has no time limit. Otherwise no answer in NATIVE_ANSWER_MS is null. */
+  function askNative(method, patient) {
+    return new Promise(function (resolve) {
+      var done = false;
+      function finish(result) {
+        if (done) return;
+        done = true;
+        resolve(result);
+      }
+      nativeWaiters.push(finish);
+      if (!patient) setTimeout(function () { finish(null); }, NATIVE_ANSWER_MS);
+      try { nativeBridge[method](); } catch (e) { finish(null); }
+    });
+  }
+
+  var pushSupported = nativePush || (supported && ('PushManager' in window));
 
   /* ─────────────────────────── Registration ─────────────────────────── */
 
@@ -66,12 +133,27 @@
 
   /* ─────────────────────────── Permission ─────────────────────────── */
 
+  /* In the Android app "not allowed" is where every phone starts on
+     Android 13 and later, so it only reads as 'denied' once this app
+     has asked and been refused. Until then it is 'default', as in a
+     browser that has not been asked. */
   function permission() {
+    if (nativePush) {
+      if (nativeAllowed()) return 'granted';
+      return stored(NATIVE_ASKED_KEY) ? 'denied' : 'default';
+    }
     if (typeof Notification === 'undefined') return 'unsupported';
     return Notification.permission;
   }
 
   function requestPermission() {
+    if (nativePush) {
+      if (nativeAllowed()) return Promise.resolve('granted');
+      /* Asked every time: Android shows its prompt while it still will,
+         and answers "no" at once when it will not. */
+      store(NATIVE_ASKED_KEY, '1');
+      return askNative('request', true).then(function () { return permission(); });
+    }
     if (typeof Notification === 'undefined') {
       return Promise.resolve('unsupported');
     }
@@ -86,6 +168,18 @@
   /* tag makes repeat deliveries of the same milestone collapse into one. */
   function show(title, body, tag) {
     if (permission() !== 'granted') return Promise.resolve(false);
+
+    /* The Android app shows it itself, and remembers the tag, so the
+       same milestone arriving from the server a moment later is not
+       shown twice (Notifier.java). */
+    if (nativePush) {
+      try {
+        nativeBridge.show(String(title || ''), String(body || ''), String(tag || 'countdown'));
+        return Promise.resolve(true);
+      } catch (e) {
+        return Promise.resolve(false);
+      }
+    }
 
     var options = {
       body: body,
@@ -148,6 +242,7 @@
      lasted until the next start.
      Safe to call repeatedly — an existing subscription is reused. */
   function refreshSubscription() {
+    if (nativePush) return refreshNative();
     if (!pushSupported || !CT.config.pushConfigured) return Promise.resolve(null);
     if (!CT.auth || !CT.auth.isSignedIn()) return Promise.resolve(null);
     if (!backgroundAlertsOn()) return Promise.resolve(null);
@@ -180,7 +275,52 @@
     });
   }
 
+  /* The Android app's half of refreshSubscription(): the same four
+     conditions, then the phone's token in place of a browser
+     subscription. Run each time the app opens (sync.js, after the pull),
+     which is also what picks up a token Firebase has replaced: the new
+     one is saved and the old row removed. */
+  function refreshNative() {
+    if (!CT.config.isConfigured) return Promise.resolve(null);
+    if (!CT.auth || !CT.auth.isSignedIn()) return Promise.resolve(null);
+    if (!backgroundAlertsOn()) return Promise.resolve(null);
+    if (!nativeAllowed()) return Promise.resolve(null);
+
+    return askNative('token').then(function (result) {
+      if (!result || !result.token) return null;
+      var endpoint = 'fcm:' + result.token;
+      var before = stored(NATIVE_ENDPOINT_KEY);
+      var tz = 'UTC';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { /* default */ }
+
+      return CT.db.savePushSubscription({ endpoint: endpoint, keys: {} }, tz).then(function () {
+        store(NATIVE_ENDPOINT_KEY, endpoint);
+        if (before && before !== endpoint) {
+          CT.db.removePushSubscription(before).catch(function () { /* the server drops a dead token itself */ });
+        }
+        return { endpoint: endpoint };
+      });
+    }).catch(function (err) {
+      console.warn('Phone alert registration failed:', err && err.message);
+      return null;
+    });
+  }
+
+  /* Removes this phone's row, so the server stops sending to it. The
+     token itself is left with Firebase: without the row nothing is ever
+     sent to it. If the row cannot be removed now (offline), the endpoint
+     is kept so the next call tries again. */
+  function unsubscribeNative() {
+    var endpoint = stored(NATIVE_ENDPOINT_KEY);
+    if (!endpoint) return Promise.resolve();
+    if (!CT.auth || !CT.auth.isSignedIn()) return Promise.resolve();
+    return CT.db.removePushSubscription(endpoint).then(function () {
+      store(NATIVE_ENDPOINT_KEY, null);
+    }).catch(function () { /* best effort */ });
+  }
+
   function unsubscribe() {
+    if (nativePush) return unsubscribeNative();
     if (!pushSupported) return Promise.resolve();
     return register().then(function (reg) {
       if (!reg) return null;
@@ -210,6 +350,9 @@
   CT.notify = {
     supported: supported,
     pushSupported: pushSupported,
+    /* True in the Android app from release 7: it shows notifications
+       itself, through the bridge above. */
+    nativePush: nativePush,
     register: register,
     permission: permission,
     requestPermission: requestPermission,

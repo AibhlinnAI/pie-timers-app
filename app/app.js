@@ -346,6 +346,14 @@
      prices. */
   CT.inPlayApp = IN_PLAY_APP;
   CT.inWebViewApp = IN_WEBVIEW_APP;
+
+  /* Whether this is a WebView app that cannot show a phone notification.
+     Releases 4 to 6 cannot. From release 7 the app has a bridge for them
+     (CT.notify.nativePush, notify.js), with Firebase Cloud Messaging
+     behind it for alerts while the app is closed, and is treated like a
+     browser that supports push. Read from the bridge, not from the
+     version in the user agent: the bridge is the thing itself. */
+  var NO_PHONE_NOTIFS = IN_WEBVIEW_APP && !(CT.notify && CT.notify.nativePush);
   var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription.';
 
   /* Markup that only ever belongs to an offer carries data-hide-in-play.
@@ -368,13 +376,17 @@
      disallowed_useragent, so the WebView build offers the emailed code
      only, which is also what the Play review account uses. Markup that is
      only the Google route carries data-hide-in-webview; identity-bridge.js
-     drops the button from the header panel the same way. So does the sign-in
-     panel's promise of alerts while the app is closed, which a WebView
-     cannot deliver. */
+     drops the button from the header panel the same way. The sign-in
+     panel's promise of alerts while the app is closed carries
+     data-hide-without-phone-alerts instead: an app from before release 7
+     cannot keep it, and a later one can. */
   (function hideGoogleSignInInWebView() {
     if (!IN_WEBVIEW_APP) return;
     var google = document.querySelectorAll('[data-hide-in-webview]');
     for (var i = 0; i < google.length; i++) google[i].hidden = true;
+    if (!NO_PHONE_NOTIFS) return;
+    var promises = document.querySelectorAll('[data-hide-without-phone-alerts]');
+    for (var j = 0; j < promises.length; j++) promises[j].hidden = true;
   }());
 
   /* What load() found under STORE_KEY, for loadBreaks(): 'none' on a first
@@ -4202,13 +4214,16 @@
       state.settings[key] = el.checked;
       save();
 
-      /* Not in the WebView app. It has no Notification API, so the answer
-         would be 'unsupported', Milestone alerts would flip straight back
-         off, and that would sync to the account's other devices. Its
-         in-app alerts need no permission. Background alerts are disabled
-         there (updateNotificationNotices), so only Milestone alerts can
-         reach this. */
-      if ((key === 'alerts' || key === 'push') && el.checked && !IN_WEBVIEW_APP) {
+      /* Milestone alerts never asks in the WebView app. Its in-app alerts
+         need no permission, and in a release without notifications the
+         answer would be 'unsupported': the switch would flip straight
+         back off, and that would sync to the account's other devices.
+         Background alerts asks wherever it can be switched at all: it is
+         disabled in a release without notifications
+         (updateNotificationNotices), and from release 7 the app asks
+         Android itself. */
+      var asks = key === 'push' ? !NO_PHONE_NOTIFS : key === 'alerts' && !IN_WEBVIEW_APP;
+      if (asks && el.checked) {
         CT.notify.requestPermission().then(function (result) {
           if (result !== 'granted') {
             // Permission refused — don't leave a switch claiming delivery will work.
@@ -4220,7 +4235,10 @@
               : 'Notifications were not allowed by the browser.');
           } else if (key === 'push') {
             CT.notify.refreshSubscription().then(function (sub) {
-              toast(sub ? 'Background alerts are on.' : 'Background alerts need an account.');
+              var signedIn = CT.auth && CT.auth.isSignedIn();
+              toast(sub ? 'Background alerts are on.'
+                : signedIn ? 'Could not set up alerts on this device. Check your connection and try again.'
+                : 'Background alerts need an account.');
             });
           }
           updateNotificationNotices();
@@ -4253,34 +4271,43 @@
     'system notifications until you allow them. On your phone (not in this app), ' +
     'open Settings > Apps > Pie Timers > Notifications and switch them on. ' +
     'Then restart your phone and open Pie Timers again.';
+  /* The WebView app from release 7 reads Android's switch directly, each
+     time it is asked, so there is nothing to restart: coming back to the
+     app is enough (the visibilitychange listener below). */
+  var APP_PERMISSION_ADVICE =
+    'Milestone alerts will still appear inside the app, but your phone won\'t show ' +
+    'them as notifications until you allow them. On your phone (not in this app), ' +
+    'open Settings > Apps > Pie Timers > Notifications and switch them on. ' +
+    'Then come back here and switch Background alerts on.';
   (function advisePlayAppPermission() {
     if (!IN_PLAY_APP) return;
     var advice = $('permissionAdvice');
-    if (advice) advice.textContent = PLAY_PERMISSION_ADVICE;
+    if (advice) advice.textContent = IN_WEBVIEW_APP ? APP_PERMISSION_ADVICE : PLAY_PERMISSION_ADVICE;
   }());
 
   /* Keep the settings panel honest about what will actually be delivered. */
   function updateNotificationNotices() {
     var perm = CT.notify.permission();
-    $('permissionNotice').hidden = IN_WEBVIEW_APP || perm !== 'denied';
+    $('permissionNotice').hidden = NO_PHONE_NOTIFS || perm !== 'denied';
     $('insecureNotice').hidden = CT.notify.supported;
     /* Looked up rather than assumed, as permissionAdvice is above. */
     var webViewNotice = $('webviewNotifNotice');
-    if (webViewNotice) webViewNotice.hidden = !IN_WEBVIEW_APP;
+    if (webViewNotice) webViewNotice.hidden = !NO_PHONE_NOTIFS;
 
     var pushBox = $('optPush');
     var hint = $('pushHint');
 
     /* Disabled, never switched off: a push setting that came down from
-       another device stays as it is there. Firebase Cloud Messaging is
-       the later update that would change this. */
-    if (IN_WEBVIEW_APP) {
+       another device stays as it is there. This is the Android app from
+       before release 7; a later one falls through to the checks every
+       browser gets. */
+    if (NO_PHONE_NOTIFS) {
       pushBox.disabled = true;
-      setUnavailable(hint, 'Not in the Android app yet. Alerts inside the app still work while it is open.');
+      setUnavailable(hint, 'Needs the latest Pie Timers from Google Play. Alerts inside the app still work while it is open.');
     } else if (!CT.notify.pushSupported) {
       pushBox.disabled = true;
       setUnavailable(hint, 'Not available in this browser, or the app is not served over HTTPS.');
-    } else if (!CT.config.pushConfigured) {
+    } else if (!(CT.notify.nativePush ? CT.config.isConfigured : CT.config.pushConfigured)) {
       pushBox.disabled = true;
       setUnavailable(hint,
         'Not switched on yet. Alerts inside the app still work as normal.',
@@ -4299,9 +4326,10 @@
   }
 
   $('testNotification').addEventListener('click', function () {
-    /* The WebView app's alerts are the in-app ones, so its test is one of
-       those: the toast, and the chime when it is on. */
-    if (IN_WEBVIEW_APP) {
+    /* In a WebView app without notifications the alerts are the in-app
+       ones, so its test is one of those: the toast, and the chime when
+       it is on. From release 7 the test is a real phone notification. */
+    if (NO_PHONE_NOTIFS) {
       notify('Pie Timers', 'Test alert. Alerts inside the app are working.', 'test');
       return;
     }
@@ -4796,7 +4824,16 @@
   }
 
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) render();
+    if (document.hidden) return;
+    render();
+    /* Someone back from the phone's own Settings, having allowed or
+       blocked notifications there. The Android app reads that switch
+       live, so the notices follow it, and a phone that has just been
+       allowed is registered without the switch being touched again. */
+    if (CT.notify && CT.notify.nativePush) {
+      updateNotificationNotices();
+      if (state.settings.push) CT.notify.refreshSubscription();
+    }
   });
 
   /* ─────────────────────────── Account tab ─────────────────────────── */
@@ -5280,8 +5317,15 @@
     });
 
     $('signOutBtn').addEventListener('click', function () {
-      CT.notify.unsubscribe();
-      CT.auth.signOut().then(function () {
+      /* The Android app's row is removed with the sign-in, so that has
+         to finish first, or the phone keeps getting this account's
+         alerts after it has signed out. Three seconds at most: signing
+         out must still work offline. A browser is as it always was. */
+      var removed = CT.notify.unsubscribe();
+      var ready = CT.notify.nativePush
+        ? Promise.race([removed, new Promise(function (r) { setTimeout(r, 3000); })])
+        : Promise.resolve();
+      ready.then(function () { return CT.auth.signOut(); }).then(function () {
         toast('Signed out. Your data stays on this device.');
         renderAccount();
       });

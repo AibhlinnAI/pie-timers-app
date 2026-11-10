@@ -5,6 +5,10 @@
     <!-- Lets the page's navigator.onLine and online/offline events follow
          the real connection, which sync waits on. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Milestone alerts as phone notifications, from release 7. Android 13
+         and later ask the person; the app asks only when Background alerts
+         is switched on, or the Settings test button is pressed. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- No backup and no device transfer. Release 3 (the TWA) had
          allowBackup on, but its data lived in Chrome, so nothing of the
@@ -19,6 +23,30 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PieTimers.Starting"
         android:usesCleartextTraffic="false">
+
+        <!-- Firebase is here for one thing: delivering a milestone alert
+             while the app is closed. Without these it would register the
+             phone with Firebase on first launch. With them nothing is
+             registered until someone switches Background alerts on and the
+             app asks for a token (reportPush in MainActivity). No Analytics
+             library is included; the second line keeps it off if one ever
+             arrives with another dependency. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+
+        <!-- An alert the server sent (PushService). Only Google Play
+             services may start it. -->
+        <service
+            android:name=".PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- configChanges: the page keeps its state through a rotation or a
              keyboard instead of being reloaded. Not uiMode: a dark mode

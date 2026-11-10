@@ -9,7 +9,8 @@
    stops a second run repeating one.
    ============================================================ */
 
-import { sendPush, type PushSubscription } from "./webpush.ts";
+import { sendPush, type PushSubscription, type SendResult } from "./webpush.ts";
+import { fcmToken, isFcmEndpoint, parseServiceAccount, sendFcm } from "./fcm.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -17,6 +18,10 @@ const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+/* The Firebase service account, for the Android app's device tokens
+   (fcm.ts). Null until the secret is set: Android devices are then
+   skipped and browsers carry on. */
+const FCM_ACCOUNT = parseServiceAccount(Deno.env.get("FCM_SERVICE_ACCOUNT"));
 
 // pg_cron calls this server-to-server, so CORS never applies --
 // these headers exist only so a browser (diagnostics.html's own health
@@ -553,53 +558,106 @@ async function run() {
   );
   const profileByUser = new Map(profiles.map((p) => [p.user_id, p]));
 
+  /* An Android device cannot be reached until the Firebase secret is
+     set. It is left out here, before anything is claimed, so it cannot
+     claim a milestone it then fails to deliver. */
+  const hasAndroid = subscriptions.some((s) => isFcmEndpoint(s.endpoint));
+  if (hasAndroid && !FCM_ACCOUNT) {
+    console.error("FCM_SERVICE_ACCOUNT is not set or is not a service account key: Android devices skipped.");
+  }
+
+  /* One account at a time, and every device it has. Until November 2026
+     this walked the subscriptions one by one and claimed each milestone
+     per ACCOUNT (the log's key has no device in it), so the first device
+     took the claim and every other device of the same account was
+     skipped: someone with a computer and a phone got each alert on one
+     of them only. Now a milestone is claimed once and sent to all of
+     the account's devices. */
+  const byUser = new Map<string, SubscriptionRow[]>();
+  for (const sub of subscriptions) {
+    if (isFcmEndpoint(sub.endpoint) && !FCM_ACCOUNT) continue;
+    const list = byUser.get(sub.user_id);
+    if (list) list.push(sub);
+    else byUser.set(sub.user_id, [sub]);
+  }
+
   let sent = 0;
 
-  for (const sub of subscriptions) {
-    /* One subscription at a time, each on its own. A user writes their
-       own profile row, so it can hold anything, and a throw while working
-       out, claiming or sending one user's alerts used to end the whole
-       run: every user after them lost their pushes, every minute, for as
-       long as the row stayed (found 27 Sep). Now it costs that user this
-       run's alerts, and the log says whose. */
+  for (const [userId, devices] of byUser) {
+    /* Each account on its own. A user writes their own profile row, so
+       it can hold anything, and a throw while working out, claiming or
+       sending one user's alerts used to end the whole run: every user
+       after them lost their pushes, every minute, for as long as the row
+       stayed (found 27 Sep). Now it costs that user this run's alerts,
+       and the log says whose. */
     try {
-      const profile = profileByUser.get(sub.user_id);
+      const profile = profileByUser.get(userId);
       if (!profile || !wantsPush(profile.settings)) continue;
 
-      for (const alert of dueAlerts(profile.schedule, sub.timezone || "UTC", new Date(), profile.settings, profile.breaks)) {
-        // Claim the milestone first. A duplicate key means another run
-        // already holds one, so this run must not send.
-        const claimed = await claim(sub.user_id, alert.isoDate, alert.key, alert.milestone);
-        if (!claimed) continue;
+      /* The clock is each device's own. Devices in one timezone share
+         one reading of the schedule; a device somewhere else gets its
+         own, and the claim still stops the same milestone going out
+         twice. */
+      const byZone = new Map<string, SubscriptionRow[]>();
+      for (const device of devices) {
+        const zone = device.timezone || "UTC";
+        const list = byZone.get(zone);
+        if (list) list.push(device);
+        else byZone.set(zone, [device]);
+      }
 
-        const result = await sendPush(
-          { endpoint: sub.endpoint, keys: sub.keys } as PushSubscription,
-          {
-            title: alert.label,
-            body: alert.body,
-            // Same tag scheme as the in-page alert, so the two collapse
-            // into a single notification rather than stacking.
-            tag: `${alert.isoDate}|${alert.key}|${alert.milestone}`,
-          },
-          { publicKey: VAPID_PUBLIC, privateKey: VAPID_PRIVATE, subject: VAPID_SUBJECT },
-        ).catch((err) => {
-          console.error(`push failed for ${sub.endpoint}: ${err.message}`);
-          return { ok: false, status: 0, gone: false };
-        });
+      for (const [zone, zoneDevices] of byZone) {
+        for (const alert of dueAlerts(profile.schedule, zone, new Date(), profile.settings, profile.breaks)) {
+          // Claim the milestone first. A duplicate key means another run
+          // already holds one, so this run must not send.
+          const claimed = await claim(userId, alert.isoDate, alert.key, alert.milestone);
+          if (!claimed) continue;
 
-        if (result.gone) {
-          await rest(`/push_subscriptions?id=eq.${sub.id}`, { method: "DELETE" })
-            .catch(() => {/* retried on the next run */});
-        } else if (result.ok) {
-          sent++;
+          for (const device of zoneDevices) {
+            /* One device failing must not cost the account's others. */
+            const result = await deliver(device, alert).catch((err) => {
+              console.error(`push failed for subscription ${device.id}: ${err.message}`);
+              return { ok: false, status: 0, gone: false };
+            });
+
+            if (result.gone) {
+              await rest(`/push_subscriptions?id=eq.${device.id}`, { method: "DELETE" })
+                .catch(() => {/* retried on the next run */});
+            } else if (result.ok) {
+              sent++;
+            }
+          }
         }
       }
     } catch (error) {
-      console.error("alerts failed for subscription", sub.id, "of user", sub.user_id, error);
+      console.error("alerts failed for user", userId, error);
     }
   }
 
   return { checked: subscriptions.length, sent };
+}
+
+/* One alert to one device: a browser by Web Push, the Android app by
+   Firebase Cloud Messaging. */
+function deliver(device: SubscriptionRow, alert: DueAlert): Promise<SendResult> {
+  const message = {
+    title: alert.label,
+    body: alert.body,
+    // Same tag scheme as the in-page alert, so the two collapse
+    // into a single notification rather than stacking.
+    tag: `${alert.isoDate}|${alert.key}|${alert.milestone}`,
+  };
+
+  if (isFcmEndpoint(device.endpoint)) {
+    // run() leaves these out while there is no account to send with.
+    return sendFcm(fcmToken(device.endpoint), message, FCM_ACCOUNT!);
+  }
+
+  return sendPush(
+    { endpoint: device.endpoint, keys: device.keys } as PushSubscription,
+    message,
+    { publicKey: VAPID_PUBLIC, privateKey: VAPID_PRIVATE, subject: VAPID_SUBJECT },
+  );
 }
 
 /* Returns false when this milestone was already claimed today. */

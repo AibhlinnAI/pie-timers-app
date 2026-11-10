@@ -1,5 +1,7 @@
 plugins {
     id("com.android.application") version "9.5.0" apply false
+    // Reads app/google-services.json (Firebase, for phone notifications).
+    id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
 /* This folder can sit on Google Drive, and build output is thousands of
