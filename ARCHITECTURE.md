@@ -200,10 +200,13 @@ Supabase, only when someone chooses Google sign-in or connects Google
 Calendar; and the browser's own push service (Google, Apple, Microsoft or
 Mozilla), which `app/notify.js` subscribes with and
 `supabase/functions/notify-milestones` posts each encrypted alert to, only
-once someone signed in has allowed notifications (`refreshSubscription`),
-while their alerts are switched on (`settings.alerts`). The Background alerts
-switch (`settings.push`) does not gate either today. Two things follow, and
-both are easy to undo by accident:
+once someone signed in has allowed notifications and switched Background
+alerts on (`settings.push`, which `refreshSubscription` reads), and only
+while Milestone alerts is on as well (`settings.alerts`; `wantsPush` in the
+function reads both). A device whose account has Background alerts off
+removes its own subscription (`followPushSetting` in `app/sync.js`).
+`tools/check-push-gate.js` holds all three to that. Until v136 the switch
+gated nothing. Two things follow, and both are easy to undo by accident:
 
 - **The typeface is self-hosted.** `app/fonts/` carries Instrument Sans as
   two woff2 files (one variable face per subset, covering weights 400–700)

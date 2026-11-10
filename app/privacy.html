@@ -88,7 +88,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>26 October 2026</strong> &middot;
+    Last updated: <strong>10 November 2026</strong> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <span data-hide-in-play><a href="terms.html#refunds">Refund Policy</a> &middot;</span>
     <a href="index.html">Back to the app</a>
@@ -182,8 +182,10 @@
     your other devices.</li>
     <li><strong>Your settings</strong>: theme, alert preferences and so on.</li>
     <li><strong>Push subscription details and your time zone</strong>: when you
-    are signed in and have allowed notifications, so we know when to send alerts
-    while the app is closed.</li>
+    are signed in, have allowed notifications and have Background alerts
+    switched on in Settings, so we know when to send alerts while the app is
+    closed. While Background alerts is off we send nothing through them, and
+    each device removes its own the next time it opens the app.</li>
     <li><strong>Subscription status</strong>: whether you are on a trial, paying,
     or have complimentary access.</li>
   </ul>
@@ -227,8 +229,8 @@
   and passes it on to our mailbox with Google, which holds it overseas. The
   services in section 6 that see only your IP address and browser are overseas
   too: GitHub, which serves the app's files, and Cloudflare's bot check. And if
-  alerts are on, each one passes through your browser's push service, encrypted
-  so that the service cannot read it. None of them can read your schedule, your
+  Background alerts is on, each alert passes through your browser's push
+  service, encrypted so that the service cannot read it. None of them can read your schedule, your
   appointments or your calendar.</p>
 
   <h2>6. Who else touches your data</h2>
@@ -241,7 +243,7 @@
       <tr><td>Google</td><td>What Google sign-in or Google Calendar needs, only if you use them. Any email you send us, and email we send you, because our mailbox is with Google</td><td>Authentication, reading your calendar, and holding our email</td></tr>
       <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
       <tr><td>Cloudflare</td><td>Your IP address and browser signals, from when you open the sign-in form until you close the app. Any email you send to an @aibhlinn.ai address, such as support@aibhlinn.ai</td><td>Checking that a person, not a bot, is using the sign-in form, and receiving email sent to us and passing it on to our mailbox</td></tr>
-      <tr><td>Your browser's push service (Google, Apple, Microsoft or Mozilla, depending on your browser)</td><td>An encrypted alert and when it is sent, only if you are signed in, have allowed notifications and have alerts switched on</td><td>Delivering alerts while the app is closed</td></tr>
+      <tr><td>Your browser's push service (Google, Apple, Microsoft or Mozilla, depending on your browser)</td><td>An encrypted alert and when it is sent, only if you are signed in, have allowed notifications and have both Milestone alerts and Background alerts switched on</td><td>Delivering alerts while the app is closed</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>
     </tbody>
   </table>

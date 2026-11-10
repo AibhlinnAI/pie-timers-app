@@ -1,11 +1,12 @@
 /* ============================================================
    notify-milestones — runs every minute from pg_cron.
 
-   For each user who has alerts switched on, works out where each
-   of today's timers sits in their own timezone and pushes the
-   milestones that have just come due. The notification_log table
-   is the idempotency guard: a milestone is written before
-   sending, and the primary key stops a second run repeating one.
+   For each user who has Milestone alerts and Background alerts
+   both switched on, works out where each of today's timers sits
+   in their own timezone and pushes the milestones that have just
+   come due. The notification_log table is the idempotency guard:
+   a milestone is written before sending, and the primary key
+   stops a second run repeating one.
    ============================================================ */
 
 import { sendPush, type PushSubscription } from "./webpush.ts";
@@ -508,6 +509,17 @@ function justReached(
   return remainingMinutes(before.minutes, before.day.start, target) !== 0;
 }
 
+/* Whether this profile's alerts go out as pushes. Milestone alerts
+   (settings.alerts) says there are alerts at all. Background alerts
+   (settings.push) says they may arrive while the app is closed, and only
+   `true` means on, the way the app's normalise() reads it: the switch is
+   off until someone turns it on. Until this was deployed (with app v136,
+   November 2026) only settings.alerts was read here, so the Background
+   alerts switch stopped nothing. */
+function wantsPush(settings: Settings | null | undefined) {
+  return !!settings?.alerts && settings?.push === true;
+}
+
 /* ─────────────────────────── Main ─────────────────────────── */
 
 interface SubscriptionRow {
@@ -552,7 +564,7 @@ async function run() {
        run's alerts, and the log says whose. */
     try {
       const profile = profileByUser.get(sub.user_id);
-      if (!profile || !profile.settings?.alerts) continue;
+      if (!profile || !wantsPush(profile.settings)) continue;
 
       for (const alert of dueAlerts(profile.schedule, sub.timezone || "UTC", new Date(), profile.settings, profile.breaks)) {
         // Claim the milestone first. A duplicate key means another run

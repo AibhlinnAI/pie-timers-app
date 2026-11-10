@@ -158,6 +158,40 @@
     });
   }
 
+  /* ─────────────────────────── Background alerts ─────────────────────────── */
+
+  /* Background alerts (settings.push) is one switch for the whole
+     account, and it syncs like every other setting. So each device
+     follows it: subscribed to push while it is on, and not at all while
+     it is off (unsubscribe() also removes this device's row from
+     push_subscriptions). Run after the first pull, and again whenever a
+     later pull changes the setting.
+
+     Before v136 this subscribed whatever the switch said, which put back
+     the subscription the switch had just removed.
+
+     One at a time, in the order asked: an unsubscribe still under way
+     would otherwise take away the subscription that a subscribe arriving
+     behind it had just saved. Each run reads the setting afresh. */
+  var pushFollowing = Promise.resolve();
+
+  function followPushSetting() {
+    pushFollowing = pushFollowing.then(function () {
+      return CT.app.getState().settings.push
+        ? CT.notify.refreshSubscription()
+        : CT.notify.unsubscribe();
+    }).catch(function () { /* the next run still goes ahead */ });
+  }
+
+  /* After the first pull; `answered` is what pull() resolved with. When
+     it got no answer (offline, a failed request, no plan), this copy's
+     setting may be behind the account's, and unsubscribing on a guess
+     would drop a subscription the account still wants. So "off" is only
+     acted on once a pull has compared this copy with the row. */
+  function followPushAfterPull(answered) {
+    if (answered || CT.app.getState().settings.push) followPushSetting();
+  }
+
   /* ─────────────────────────── Pull ─────────────────────────── */
 
   /* `manual` marks a pull the user asked for by pressing "Sync now".
@@ -232,11 +266,14 @@
            and says so when it has also taken the week they were saved
            with, and then they go up. */
         if (rowHasBreaks) incoming.breaks = row.breaks;
+        var pushWas = !!local.settings.push;
         var keptBreaks = CT.app.replaceState(incoming, {
           fromSync: true, rowAt: inStepWith(user) ? remoteAt : undefined
         }) === true;
         rowsTaken++;
         if (user) setSyncedAccount(user.id);
+        // Background alerts switched on or off on another device.
+        if (!!CT.app.getState().settings.push !== pushWas) followPushSetting();
 
         if (kept || keptBreaks) return push(true).then(function () { return true; });
         /* This copy is the row now, so nothing is waiting to go up. A push
@@ -392,7 +429,7 @@
           // Entitlement must be known before syncing decides what is permitted.
           .then(function () { return CT.billing.refresh(); })
           .then(function () { return pull(); })
-          .then(function () { CT.notify.refreshSubscription(); })
+          .then(followPushAfterPull)
           .catch(function (err) { setStatus('error', err.message); });
       } else {
         stopPolling();
@@ -404,7 +441,7 @@
       startPolling();
       CT.auth.loadUser()
         .then(pull)
-        .then(function () { CT.notify.refreshSubscription(); })
+        .then(followPushAfterPull)
         .catch(function (err) { setStatus('error', err.message); });
     } else {
       setStatus('signed-out');

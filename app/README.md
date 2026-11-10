@@ -247,10 +247,18 @@ per timer per day. There are two delivery paths:
 | | Works when | Needs |
 | --- | --- | --- |
 | In-app + service worker | App open, including a background tab or minimised window | Nothing |
-| Web Push | App fully closed | Account + VAPID key + the edge function |
+| Web Push | App fully closed | Account + VAPID key + the edge function + **Background alerts** switched on |
 
 Both paths tag a milestone identically (`YYYY-MM-DD\|timer\|milestone`), so a
 milestone shows **once** even if both deliver.
+
+**Background alerts** (`settings.push`) is what Web Push depends on, at both ends:
+a device subscribes only while it is on and removes its subscription when it is off
+(`notify.js`, `sync.js`), and `notify-milestones` sends only to accounts that have it
+and Milestone alerts both on. It is off by default and syncs with the other settings,
+so it is one switch for the whole account. `tools/check-push-gate.js` checks all of
+this. `supabase/migrate-background-alerts.sql` is the one-off that switched it on
+for the accounts already getting pushes when the switch started to count (v136).
 
 The timer maths is duplicated in `app.js` and in the edge function. Those two must
 stay in step or the push will fire at a different moment than the in-app alert —
