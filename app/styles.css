@@ -420,6 +420,34 @@ button{ font:inherit; }
   .topbar-right .now{ flex:0 1 auto; margin-left:auto; text-align:right; }
   .topbar-right .now-time{ white-space:nowrap; }
   .topbar-right .now-date{ text-wrap:balance; }
+
+  /* Signed in, the header is two full-width rows (Mal, 10 Nov 2026):
+       plan badge on the left, Sign out on the right;
+       the date on the left, the clock on the right, on one line.
+     Sign out is what marks the signed-in header, so :has() keys on it and
+     the signed-out header keeps Sign in beside the clock, as above. A
+     browser without :has() gets the layout above too.
+
+     identity-ui sets display:inline-block on its wrapper inline, which
+     only !important can outrank. Sign out's 14px of side padding is taken
+     back on the right so its text, not its hit area, lines up with the
+     clock's edge. */
+  .topbar-right:has(.aib-signout-btn) .topbar-signin{ flex:1 1 100%; }
+  .topbar-right:has(.aib-signout-btn) .topbar-signin > .aib-signin{
+    display:flex !important; align-items:center; flex-wrap:wrap; width:100%;
+  }
+  .topbar-right:has(.aib-signout-btn) .aib-signout-btn{ margin-left:auto; margin-right:-14px; }
+  .topbar-right:has(.aib-signout-btn) .now{
+    flex:1 1 100%; margin-left:0;
+    display:flex; flex-direction:row-reverse; flex-wrap:wrap; align-items:baseline;
+    justify-content:space-between; gap:4px 12px;
+  }
+  /* The time keeps to one line unless it is wider than the whole row (a
+     very large font with seconds showing), where breaking beats scrolling
+     the page sideways. The date gives way first: under 9em of room it
+     takes the next line to itself, still on the left. */
+  .topbar-right:has(.aib-signout-btn) .now-time{ flex:none; max-width:100%; white-space:normal; }
+  .topbar-right:has(.aib-signout-btn) .now-date{ flex:1 1 9em; margin-top:0; min-width:0; text-align:left; }
 }
 
 /* The mark stretches to the text block: top of "Pie Timers" to the bottom
