@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v132';
+var CACHE = 'countdown-timers-v133';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -26,7 +26,7 @@ var SHELL = [
      is deliberately absent: a cached health check is a lie. */
   'terms.html',
   'privacy.html',
-  'styles.css?v=132',
+  'styles.css?v=133',
   'styles.css',
   /* The self-hosted face. Precached because styles.css asks for these
      and nothing else fetches them offline — without both the app still

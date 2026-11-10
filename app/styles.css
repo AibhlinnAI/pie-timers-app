@@ -421,6 +421,13 @@ button{ font:inherit; }
    tagline pushes the clock onto a second row. */
 @media (max-width:600px){
   .brand{ --tag-size: clamp(.58rem, 2.9vw, .82rem); }
+  /* And it may take two lines. A phone set to a larger font size scales
+     this text again after the clamp (Android's WebView applies the system
+     font scale), so at the size above one line ran off the right edge of
+     a Pixel 6 at about 130%. Balanced, so the break falls between the two
+     sentences rather than leaving one word on its own. */
+  /* .brand in front so this outranks the nowrap rule further down. */
+  .brand .brand-text p{ white-space:normal; text-wrap:balance; }
 }
 /* The mark sits in a socket rather than on top of the header. In light
    theme the plate (#32493C) is the same green family as the header
