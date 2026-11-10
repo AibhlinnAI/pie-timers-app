@@ -1,5 +1,8 @@
 plugins {
     id("com.android.application")
+    // Needs app/google-services.json, which is NOT in this repo: see
+    // "Firebase" in android/README.md. The build stops without it.
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -44,4 +47,14 @@ dependencies {
     // compiles against API 36. core 1.19 needs compileSdk 37.
     implementation("androidx.activity:activity:1.13.0")
     implementation("androidx.core:core-splashscreen:1.2.0")
+
+    // Firebase Cloud Messaging only: milestone alerts while the app is
+    // closed. No Analytics. The BoM picks the version.
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    // The app has no fragments. Firebase's Play services libraries bring
+    // in a Fragment library from before 1.3.0, and with that one present
+    // the activity's permission prompt and file dialogs can lose their
+    // answers. Lint stops the release build over it; this lifts it.
+    implementation("androidx.fragment:fragment:1.8.9")
 }

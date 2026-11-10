@@ -248,9 +248,19 @@ per timer per day. There are two delivery paths:
 | --- | --- | --- |
 | In-app + service worker | App open, including a background tab or minimised window | Nothing |
 | Web Push | App fully closed | Account + VAPID key + the edge function + **Background alerts** switched on |
+| Firebase Cloud Messaging | Android app (release 7 on) fully closed | Account + the `FCM_SERVICE_ACCOUNT` secret + the edge function + **Background alerts** switched on |
 
 Both paths tag a milestone identically (`YYYY-MM-DD\|timer\|milestone`), so a
 milestone shows **once** even if both deliver.
+
+The Android app is a WebView, which has neither a Notification API nor Web Push.
+From release 7 it gives the page a bridge, `PieTimersAndroidPush`, and `notify.js`
+uses it wherever a browser would use those: the app shows the notification, and
+its Firebase device token is saved in `push_subscriptions` as the endpoint
+`fcm:<token>`. `notify-milestones` sends to those rows through
+`functions/notify-milestones/fcm.ts`. Every device an account has gets each alert:
+the milestone is claimed once per account and then sent to all of them
+(`tools/notify-run-test.mjs`). See `android/README.md` for the app's side.
 
 **Background alerts** (`settings.push`) is what Web Push depends on, at both ends:
 a device subscribes only while it is on and removes its subscription when it is off
@@ -629,6 +639,7 @@ supabase/
   functions/notify-milestones/
     index.ts            works out who to alert and when
     webpush.ts          VAPID signing + RFC 8291 encryption
+    fcm.ts              Firebase Cloud Messaging, for the Android app
   functions/delete-account/
     index.ts            permanently removes the calling user
   functions/signin/

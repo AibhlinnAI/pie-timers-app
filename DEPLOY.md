@@ -540,6 +540,29 @@ OAuth return — so do not remove the allowlist just because the email no longer
 Diagnostics verifies the public key decodes to a real 65-byte P-256 point,
 which catches the common mistake of pasting the private one.
 
+### 7.1 The Android app (Firebase Cloud Messaging)
+
+The Play app cannot use Web Push, so from release 7 its closed-app alerts go
+through Firebase. Three things have to exist, in this order:
+
+- [ ] A Firebase project with two Android apps registered in it:
+      `ai.aibhlinn.pietimers` and `ai.aibhlinn.pietimers.debug` (the test
+      build). Its `google-services.json` goes in the private packages folder,
+      never in this repo (`android/README.md`, "Firebase").
+- [ ] A service account key for that project (**Project settings → Service
+      accounts → Generate new private key**), saved as the Supabase secret
+      `FCM_SERVICE_ACCOUNT`: the whole JSON file as the value. It is a
+      credential. It goes in Supabase secrets and nowhere else.
+- [ ] `supabase functions deploy notify-milestones --no-verify-jwt`, **before**
+      release 7 reaches anyone. The function from before November 2026 does
+      not know an `fcm:` row: it claims the milestone, fails to send it, and
+      the account's browsers then get nothing for that milestone either.
+
+Without the secret the function skips Android devices and says so in its log
+once a run; browsers are unaffected. `node --experimental-strip-types
+tools/notify-run-test.mjs` checks all of this against stubs. Nothing but a
+real phone checks it against Google.
+
 ## 8. Paddle
 
 Paddle will ask for your terms and privacy URLs during seller verification:
