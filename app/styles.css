@@ -401,6 +401,26 @@ button{ font:inherit; }
    cluster drops to its own row under the brand — but Sign in and the
    clock never separate from each other within that row. */
 .topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:nowrap; }
+/* Up to 600px wide that holds only while the pair fits. Signed in, the
+   slot is a plan badge and Sign out, and beside those the clock was
+   squeezed until its time broke in two ("10:58 / AM") and its date ran to
+   three or four lines; on a 360px phone the row was wider than the screen.
+   A phone set to a larger font size made each of those worse. So here the
+   clock drops to a line of its own when the pair does not fit, and stays
+   beside Sign in when it does. The time never breaks; the date may take
+   two lines, balanced; Sign out may fall under the badge.
+
+   Either way the clock sits against the right edge with its date under
+   it, right-aligned, as it does on a wide screen (Mal, 10 Nov 2026). The
+   row takes the full width so there is a right edge to sit against, and
+   this outranks the 640px rule further down that turns the clock left. */
+@media (max-width:600px){
+  .topbar-right{ flex-wrap:wrap; width:100%; row-gap:10px; }
+  .topbar-right .topbar-signin{ flex:0 1 auto; min-width:0; }
+  .topbar-right .now{ flex:0 1 auto; margin-left:auto; text-align:right; }
+  .topbar-right .now-time{ white-space:nowrap; }
+  .topbar-right .now-date{ text-wrap:balance; }
+}
 
 /* The mark stretches to the text block: top of "Pie Timers" to the bottom
    of the tagline, and square. */
