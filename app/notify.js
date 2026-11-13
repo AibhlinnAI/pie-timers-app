@@ -9,7 +9,8 @@
 
    2. Web Push — sent by the Supabase edge function on a schedule,
       so milestones still arrive when the app is fully closed.
-      Needs an account and a VAPID key.
+      Needs an account, a VAPID key, and Background alerts switched
+      on (settings.push).
 
    Path 1 always runs. Path 2 layers on top when configured, and
    the service worker de-duplicates by tag so a milestone shows
@@ -132,11 +133,24 @@
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  /* Subscribe this device and hand the endpoint to Supabase.
+  /* The Background alerts switch (settings.push in app.js). Off until
+     someone turns it on. */
+  function backgroundAlertsOn() {
+    var state = CT.app && CT.app.getState ? CT.app.getState() : null;
+    return !!(state && state.settings && state.settings.push);
+  }
+
+  /* Subscribe this device and hand the endpoint to Supabase, but only
+     while Background alerts is switched on. Every caller comes through
+     this check: the switch itself, sync.js after a pull, and the service
+     worker's 'resubscribe' message. Before v136 nothing here read the
+     switch, so a device subscribed whatever it said, and switching it off
+     lasted until the next start.
      Safe to call repeatedly — an existing subscription is reused. */
   function refreshSubscription() {
     if (!pushSupported || !CT.config.pushConfigured) return Promise.resolve(null);
     if (!CT.auth || !CT.auth.isSignedIn()) return Promise.resolve(null);
+    if (!backgroundAlertsOn()) return Promise.resolve(null);
     if (permission() !== 'granted') return Promise.resolve(null);
 
     return register().then(function (reg) {
