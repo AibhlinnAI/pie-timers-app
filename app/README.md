@@ -258,7 +258,7 @@ a device subscribes only while it is on and removes its subscription when it is 
 and Milestone alerts both on. It is off by default and syncs with the other settings,
 so it is one switch for the whole account. `tools/check-push-gate.js` checks all of
 this. `supabase/migrate-background-alerts.sql` is the one-off that switched it on
-for the accounts already getting pushes when the switch started to count (v139).
+for the accounts already getting pushes when the switch started to count (v140).
 
 The timer maths is duplicated in `app.js` and in the edge function. Those two must
 stay in step or the push will fire at a different moment than the in-app alert —
