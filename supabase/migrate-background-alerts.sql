@@ -2,7 +2,7 @@
 -- Countdown Timers — Background alerts: keep them for the people
 -- who already get them
 --
--- A one-off for a project that ran the app from before v139. A new
+-- A one-off for a project that ran the app from before v140. A new
 -- project never needs it. Run in Supabase → SQL Editor. Safe to run
 -- twice: the second run finds nobody.
 --
@@ -11,10 +11,10 @@
 --
 -- THE ORDER MATTERS:
 --   1. run this file, and see still_off = 0 in step 3;
---   2. publish app v139 (merge to main) straight afterwards. If time
+--   2. publish app v140 (merge to main) straight afterwards. If time
 --      has passed since step 1, run this file again first;
 --   3. deploy notify-milestones.
--- The app must not go out first. From v139 a device whose Background
+-- The app must not go out first. From v140 a device whose Background
 -- alerts switch is off removes its own row from push_subscriptions the
 -- next time it opens. That row is the only record of who was getting
 -- alerts with the app closed, so after that there is nobody left here
@@ -22,12 +22,12 @@
 -- alerts stop, and come back when this has run.)
 -- ============================================================
 
--- Until v139 the Background alerts switch (settings.push) stopped
+-- Until v140 the Background alerts switch (settings.push) stopped
 -- nothing. Every signed-in device that had allowed notifications was
 -- subscribed, and notify-milestones sent to every subscription whose
 -- account had Milestone alerts (settings.alerts) on. The switch is off
 -- by default, so nearly everyone getting alerts with the app closed has
--- it off. From v139 and the function deployed with it, the switch
+-- it off. From v140 and the function deployed with it, the switch
 -- means what it says, and those people would lose their alerts without
 -- being told. Mal's decision, 10 Oct 2026: they keep them.
 --

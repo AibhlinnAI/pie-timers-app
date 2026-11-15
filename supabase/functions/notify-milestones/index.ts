@@ -513,7 +513,7 @@ function justReached(
    (settings.alerts) says there are alerts at all. Background alerts
    (settings.push) says they may arrive while the app is closed, and only
    `true` means on, the way the app's normalise() reads it: the switch is
-   off until someone turns it on. Until this was deployed (with app v139,
+   off until someone turns it on. Until this was deployed (with app v140,
    November 2026) only settings.alerts was read here, so the Background
    alerts switch stopped nothing. */
 function wantsPush(settings: Settings | null | undefined) {
