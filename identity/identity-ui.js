@@ -44,6 +44,61 @@
     return node;
   }
 
+  /* "Sign out?" asked once, before anything is signed out. A paid tester
+     report (Nov 2026) noted that Sign out acted on a single tap, and it
+     sits in the header where a thumb lands by accident.
+
+     A <dialog> built here rather than window.confirm(): confirm() is
+     silently refused in some embedded browsers, and a refusal reads as
+     "No" for ever. Built on first use, one per page, shared by every
+     Sign out control -- a product's own button can call
+     Aibhlinn.identityUI.confirmSignOut() and get the same question.
+
+     Resolves true or false, never rejects. Where <dialog> cannot open
+     as a modal it resolves true: signing out unasked is the old
+     behaviour, and being unable to sign out at all would be worse. */
+  var confirmDialog = null;
+  var confirmSettle = null;
+
+  function confirmSignOut() {
+    if (confirmSettle) return Promise.resolve(false);   // already asking
+
+    if (!confirmDialog) {
+      var cancel = el('button', { type: 'button', class: 'aib-confirm-cancel', text: 'Cancel' });
+      var ok = el('button', { type: 'button', class: 'aib-confirm-ok', text: 'Sign out' });
+      confirmDialog = el('dialog', { class: 'aib-confirm', 'aria-labelledby': 'aibConfirmTitle' }, [
+        el('h2', { id: 'aibConfirmTitle', text: 'Sign out?' }),
+        el('p', { text: 'Your schedule and settings stay on this device.' }),
+        el('div', { class: 'aib-confirm-actions' }, [cancel, ok])
+      ]);
+      cancel.addEventListener('click', function () { confirmDialog.close('cancel'); });
+      ok.addEventListener('click', function () { confirmDialog.close('ok'); });
+      /* Escape and the Android back button close a modal dialog with
+         whatever returnValue it last had; set it so they mean Cancel. */
+      confirmDialog.addEventListener('cancel', function () { confirmDialog.returnValue = 'cancel'; });
+      confirmDialog.addEventListener('close', function () {
+        var settle = confirmSettle;
+        confirmSettle = null;
+        if (settle) settle(confirmDialog.returnValue === 'ok');
+      });
+      document.body.appendChild(confirmDialog);
+    }
+
+    if (typeof confirmDialog.showModal !== 'function') return Promise.resolve(true);
+
+    return new Promise(function (resolve) {
+      confirmSettle = resolve;
+      confirmDialog.returnValue = 'cancel';
+      try {
+        confirmDialog.showModal();
+        confirmDialog.querySelector('.aib-confirm-cancel').focus();
+      } catch (e) {
+        confirmSettle = null;
+        resolve(true);
+      }
+    });
+  }
+
   /* One page can mount the panel more than once (Pie Timers does, in
      the header and in the upgrade card), and ids must not repeat. */
   var mounts = 0;
@@ -246,15 +301,18 @@
       }, [document.createTextNode('Sign out')]);
 
       out.addEventListener('click', function () {
-        out.disabled = true;
-        out.textContent = 'Signing out…';
-        /* Whatever happens, stop looking signed in. signOut() clears the
-           local session before calling the server, so a failed request
-           means the token was already gone -- not that the person is
-           still signed in. */
-        identity.signOut().catch(function () {}).then(function () {
-          out.disabled = false;
-          out.textContent = 'Sign out';
+        confirmSignOut().then(function (yes) {
+          if (!yes) return;
+          out.disabled = true;
+          out.textContent = 'Signing out…';
+          /* Whatever happens, stop looking signed in. signOut() clears the
+             local session before calling the server, so a failed request
+             means the token was already gone -- not that the person is
+             still signed in. */
+          identity.signOut().catch(function () {}).then(function () {
+            out.disabled = false;
+            out.textContent = 'Sign out';
+          });
         });
       });
 
@@ -438,5 +496,5 @@
     return { element: wrap };
   }
 
-  Aibhlinn.identityUI = { mount: mount };
+  Aibhlinn.identityUI = { mount: mount, confirmSignOut: confirmSignOut };
 })(window);

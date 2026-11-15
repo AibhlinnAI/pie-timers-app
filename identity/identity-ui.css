@@ -204,3 +204,35 @@
   color:var(--ink, #F3ECF7);
 }
 .aib-signout-btn:disabled{ opacity:.6; cursor:default; }
+
+/* "Sign out?" -- the one question identity-ui asks (identity-ui.js,
+   confirmSignOut). Small and centred; Cancel is focused first, so Enter
+   after a mis-tap keeps the person signed in. */
+.aib-confirm{
+  border:1px solid var(--line, #3A2A47);
+  border-radius:var(--radius, 14px);
+  padding:22px;
+  max-width:360px; width:calc(100vw - 32px);
+  background:var(--card, #241730);
+  color:var(--ink, #EFE6F5);
+  font:inherit;
+}
+.aib-confirm::backdrop{ background:rgba(46,24,56,.55); }
+.aib-confirm h2{ margin:0 0 8px; font-size:1.1rem; }
+.aib-confirm p{ margin:0; font-size:.9rem; line-height:1.5; color:var(--ink-muted, #B4A3C0); }
+.aib-confirm-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:20px; flex-wrap:wrap; }
+.aib-confirm-actions button{
+  min-height:44px; padding:0 18px;
+  border-radius:999px;
+  border:1px solid var(--line, #3A2A47);
+  background:transparent;
+  color:inherit;
+  font:inherit; font-size:.9rem; font-weight:600;
+  cursor:pointer;
+}
+.aib-confirm-actions .aib-confirm-ok{
+  background:var(--accent, #B07FE0);
+  border-color:var(--accent, #B07FE0);
+  color:#1C1024;
+}
+.aib-confirm-actions button:focus-visible{ outline:3px solid var(--ink, #EFE6F5); outline-offset:2px; }
