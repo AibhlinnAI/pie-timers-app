@@ -166,6 +166,7 @@
   --thead-bg:    var(--forest);
   --thead-fg:    #FFFFFF;
   --tabs-bg:     rgba(255,255,255,.72);
+  --tabs-solid:  #FFFFFF;
   --row-alt:     #FBF9FC;
   --tick-over:   #FFFFFF;
   --tick-under:  .28;
@@ -271,6 +272,7 @@
   --thead-bg:    #43284F;
   --thead-fg:    #EFE6F5;
   --tabs-bg:     rgba(22,16,27,.82);
+  --tabs-solid:  #16101B;
   --row-alt:     #2B1C37;
   --tick-over:   #16101B;
   --toast-bg:    #4B2A5A;
@@ -593,6 +595,21 @@ button{ font:inherit; }
   scrollbar-width:none;
 }
 .tabs::-webkit-scrollbar{ display:none; }
+
+/* "More this way." Sticks to the right edge of the bar while tabs are
+   hidden past it (app.js, watchTabsOverflow, shows and hides it). The
+   negative margin gives back the room it would otherwise take at the end
+   of the row, so the bar scrolls exactly as far as it did without it. */
+.tabs-more{
+  appearance:none; border:0; cursor:pointer;
+  position:sticky; right:calc(-1 * clamp(16px,4vw,40px));
+  flex:none; align-self:stretch;
+  width:56px; margin-left:-56px; padding:0 10px 0 0;
+  display:flex; align-items:center; justify-content:flex-end;
+  color:var(--tab-active);
+  background:linear-gradient(to right, transparent, var(--tabs-solid) 55%);
+}
+.tabs-more[hidden]{ display:none; }
 
 .tab{
   appearance:none; border:0; background:none; cursor:pointer;
@@ -1029,6 +1046,24 @@ main{ max-width:1180px; margin:0 auto; padding:clamp(18px,3.5vw,32px) clamp(16px
 .help ul{ margin:12px 0 0; padding-left:20px; font-size:.84rem; color:var(--ink-muted); }
 .help li{ margin-bottom:6px; line-height:1.5; }
 .help strong{ color:var(--ink); }
+
+/* Help and feedback, at the foot of Settings. One question per row, each
+   a <details>, so the panel is a short list until something is opened. */
+.faq{ border-top:1px solid var(--line); }
+.faq summary{
+  cursor:pointer; padding:13px 0; min-height:44px;
+  font-size:.9rem; font-weight:600; color:var(--ink);
+  list-style:none; display:flex; gap:8px; align-items:baseline;
+}
+.faq summary::-webkit-details-marker{ display:none; }
+.faq summary::before{ content:"▸"; color:var(--violet); flex:none; }
+.faq[open] summary::before{ content:"▾"; }
+.faq summary:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; border-radius:6px; }
+.faq p{ margin:0 0 14px; padding-left:20px; font-size:.87rem; line-height:1.55; color:var(--ink-muted); }
+.faq strong{ color:var(--ink); }
+.faq-foot{ border-top:1px solid var(--line); padding-top:16px; }
+.faq-foot p{ margin:0 0 12px; font-size:.87rem; line-height:1.55; color:var(--ink-muted); }
+.faq-foot p:last-child{ margin-bottom:0; }
 
 .mini-select{
   font:inherit; font-size:.85rem; padding:7px 10px;

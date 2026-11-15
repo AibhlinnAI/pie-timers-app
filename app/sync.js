@@ -167,7 +167,7 @@
      push_subscriptions). Run after the first pull, and again whenever a
      later pull changes the setting.
 
-     Before v136 this subscribed whatever the switch said, which put back
+     Before v139 this subscribed whatever the switch said, which put back
      the subscription the switch had just removed.
 
      One at a time, in the order asked: an unsubscribe still under way
