@@ -17,8 +17,8 @@ android {
         targetSdk = 36
         // One higher than any version code ever uploaded to Play, including
         // a bundle whose draft release was then discarded. 3 was the last.
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = 6
+        versionName = "1.0.5"
     }
 
     buildTypes {

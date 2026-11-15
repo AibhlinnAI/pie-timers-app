@@ -47,7 +47,7 @@ var SHELL = [
   'supabase.js?v=117',
   'billing.js?v=129',
   'notify.js?v=141',
-  'sync.js?v=139',
+  'sync.js?v=140',
   'qrcode.js',
   'app.js?v=141',
   'icon.svg',

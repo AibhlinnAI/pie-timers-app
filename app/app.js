@@ -4321,8 +4321,14 @@
      installed from Play: on the web there may be no listing to send
      anyone to. The row is looked up rather than assumed, because a stale
      index.html can meet this file. */
+  /* Off until the app is in production. Google Play takes no public
+     ratings for a test version, and on a tester's phone the listing
+     address can come back "not found" (seen 15 Nov 2026). Set this to
+     true once the production listing is live and the link has been
+     tapped on a phone. */
+  var RATING_OPEN = false;
   (function showRateLink() {
-    if (!IN_PLAY_APP) return;
+    if (!RATING_OPEN || !IN_PLAY_APP) return;
     var row = $('rateRow');
     if (row) row.hidden = false;
   }());
