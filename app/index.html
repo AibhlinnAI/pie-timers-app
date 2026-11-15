@@ -33,7 +33,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231C1024'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='12'%20fill='%2332493C'/%3E%3Cpath%20d='M16%2016%2022.71%2010.19A8.88%208.88%200%201%201%2016%207.12z'%20fill='%23FF8A00'/%3E%3C/svg%3E">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="styles.css?v=135">
+<link rel="stylesheet" href="styles.css?v=138">
 <link rel="stylesheet" href="identity/identity-ui.css">
 </head>
 <body>
@@ -84,6 +84,16 @@
             data-view="settings">Settings</button>
   </div>
   <span class="sync-pill" id="syncPill" title="Sync status"><i></i><span id="syncPillText">Local</span></span>
+  <!-- On a phone the bar is wider than the screen and Settings starts past
+       the right edge, with nothing to say so (paid tester report, Nov
+       2026). This arrow sits at the edge while there is more to the right
+       and brings it into view. Hidden from assistive technology and from
+       the tab order: the tabs themselves are all reachable there, and
+       focusing one scrolls it into view. -->
+  <button class="tabs-more" id="tabsMore" type="button" aria-hidden="true" tabindex="-1" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
 </nav>
 
 <main>
@@ -1058,6 +1068,79 @@
         <button class="btn btn-danger" id="deleteAccountBtn" type="button">Delete my account</button>
       </section>
     </section>
+
+
+    <!-- Help. A paid tester report (Nov 2026) found no help anywhere in the
+         app and no way to rate it. Last in Settings, after Account, so it
+         is in the same place whichever account panel is showing. Every
+         answer is something the app already does; when a feature changes,
+         change its answer here in the same pull request. -->
+    <p class="section-label" id="help" tabindex="-1">Help</p>
+
+    <section class="panel" id="helpPanel">
+      <header class="panel-head">
+        <div>
+          <h2>Help and feedback</h2>
+          <p class="sub">Short answers to the questions people ask most.</p>
+        </div>
+      </header>
+
+      <details class="faq">
+        <summary>How do I set my hours?</summary>
+        <p>Open the <strong>Schedule</strong> tab. Set a start, a lunch and a finish
+        for each day of the week. Untick a day to take it off.</p>
+      </details>
+      <details class="faq">
+        <summary>What do the pies on the Dashboard show?</summary>
+        <p>Each pie is a countdown. The coloured wedge shrinks as the time runs
+        out: one pie counts down to lunch, one to the end of your day, and a
+        third to your next appointment if you have added one. The marks around
+        the rim split what is left into even steps.</p>
+      </details>
+      <details class="faq">
+        <summary>How do I add an appointment?</summary>
+        <p>Open the <strong>Appointments</strong> tab and add a meeting, a call
+        or a pickup. The next one counts down on the Dashboard, and the one
+        after takes over when it passes.</p>
+      </details>
+      <details class="faq">
+        <summary>Why did my appointment pie start again?</summary>
+        <p>On purpose. It counts down the days first, then starts again for the
+        last 24 hours, then again for the last hour, so it always shows
+        something useful.</p>
+      </details>
+      <details class="faq">
+        <summary>When do I get alerts?</summary>
+        <p>At 30, 15, 10 and 5 minutes to go, and when lunch or home time
+        arrives, while Pie Timers is open. Switch them and the chime on or off
+        with <strong>Milestone alerts</strong> and <strong>Alert chime</strong>,
+        higher up this tab.</p>
+      </details>
+      <details class="faq">
+        <summary>Do I need an account?</summary>
+        <p>No. Everything on the Dashboard, Schedule and Appointments tabs works
+        without one, and your schedule stays on this device. Signing in is
+        optional and is for keeping more than one device in step.</p>
+      </details>
+      <details class="faq">
+        <summary>How do I sign out or delete my account?</summary>
+        <p>Both are under <strong>Account</strong> on this tab. Signing out leaves
+        your schedule on this device. Deleting your account is permanent.</p>
+      </details>
+
+      <div class="faq-foot">
+        <p>Something wrong, missing or confusing? Email
+        <a href="mailto:support@aibhlinn.ai">support@aibhlinn.ai</a>.
+        It goes straight to Mal, who makes Pie Timers.</p>
+        <!-- Shown only in the app installed from Google Play (app.js,
+             showRateLink): anywhere else there may be no Play listing to
+             rate. The link leaves the app and opens the Play Store. -->
+        <p id="rateRow" hidden>
+          <a class="btn btn-ghost" id="rateLink" target="_blank" rel="noopener"
+             href="https://play.google.com/store/apps/details?id=ai.aibhlinn.pietimers">Rate Pie Timers on Google Play</a>
+        </p>
+      </div>
+    </section>
   </section>
 
 
@@ -1137,15 +1220,15 @@
 <script src="identity/identity.js?v=117"></script>
 <script src="identity/email-typos.js"></script>
 <script src="identity/entitlements.js"></script>
-<script src="identity/identity-ui.js?v=132"></script>
+<script src="identity/identity-ui.js?v=138"></script>
 <script src="config.js"></script>
 <script src="visits.js?v=130"></script>
 <script src="identity-bridge.js?v=129"></script>
 <script src="supabase.js?v=117"></script>
 <script src="billing.js?v=129"></script>
-<script src="notify.js?v=137"></script>
-<script src="sync.js?v=136"></script>
+<script src="notify.js?v=140"></script>
+<script src="sync.js?v=139"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=137"></script>
+<script src="app.js?v=140"></script>
 </body>
 </html>

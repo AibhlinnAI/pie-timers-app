@@ -3,7 +3,7 @@
    Push gate check: does Background alerts (settings.push) really
    decide whether alerts arrive while the app is closed?
 
-   Until v136 the switch gated nothing. A device subscribed to push
+   Until v139 the switch gated nothing. A device subscribed to push
    whatever it said, sync.js subscribed again after every pull, and
    notify-milestones sent to every account with Milestone alerts on.
    Three places have to agree for the switch to mean what it says,
@@ -110,7 +110,7 @@ async function notifyChecks() {
 
   b = browser({ push: false, existing: true });
   sub = await b.notify.refreshSubscription();
-  check('N4 switch off with a subscription left from before v136: it is not saved again',
+  check('N4 switch off with a subscription left from before v139: it is not saved again',
     sub === null && b.calls.saved === 0, b.calls);
 
   b = browser({ push: true, permission: 'denied' });

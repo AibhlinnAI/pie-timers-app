@@ -50,7 +50,7 @@ window.CT.config = {
      once, revoke the function server-side first (DEPLOY.md 5.5, "To
      stop counting"), then set this to false WITH a CACHE bump in
      sw.js so the requests stop being made at all. */
-  countFirstOpens: true,
+  countFirstOpens: false,
 
   /* One-click Google Calendar. Off until Google has verified the app.
 

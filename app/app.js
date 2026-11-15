@@ -1837,6 +1837,38 @@
 
   /* Arrow keys along the bar, Home/End to the ends — the keyboard contract
      a tablist promises the moment the role is claimed. */
+  /* The arrow at the right edge of the tab bar (index.html, #tabsMore):
+     shown while the bar has tabs past its right edge, gone once it has
+     been scrolled to the end or when everything fits. A tap brings the
+     rest into view. Looked up rather than assumed, because a stale
+     index.html can meet this file. */
+  (function watchTabsOverflow() {
+    var bar = document.querySelector('.tabs');
+    var more = $('tabsMore');
+    if (!bar || !more) return;
+
+    function update() {
+      more.hidden = bar.scrollLeft + bar.clientWidth >= bar.scrollWidth - 8;
+    }
+
+    more.addEventListener('click', function () {
+      var still = document.documentElement.hasAttribute('data-calm') ||
+        (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      bar.scrollTo({ left: bar.scrollWidth, behavior: still ? 'auto' : 'smooth' });
+    });
+
+    bar.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    /* The sync pill changes width as its text changes, and fonts arrive
+       late; both move the end of the bar without a scroll or a resize. */
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(update);
+      ro.observe(bar);
+      [].forEach.call(bar.children, function (child) { ro.observe(child); });
+    }
+    update();
+  }());
+
   $('tabList').addEventListener('keydown', function (event) {
     var keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
     if (keys.indexOf(event.key) === -1) return;
@@ -4285,6 +4317,16 @@
     if (advice) advice.textContent = IN_WEBVIEW_APP ? APP_PERMISSION_ADVICE : PLAY_PERMISSION_ADVICE;
   }());
 
+  /* "Rate Pie Timers on Google Play", in Settings > Help. Only in the app
+     installed from Play: on the web there may be no listing to send
+     anyone to. The row is looked up rather than assumed, because a stale
+     index.html can meet this file. */
+  (function showRateLink() {
+    if (!IN_PLAY_APP) return;
+    var row = $('rateRow');
+    if (row) row.hidden = false;
+  }());
+
   /* Keep the settings panel honest about what will actually be delivered. */
   function updateNotificationNotices() {
     var perm = CT.notify.permission();
@@ -5316,18 +5358,27 @@
       CT.auth.signInWithGoogle();
     });
 
+    /* Asked first, with the same dialog as the header's Sign out
+       (identity-ui.js, confirmSignOut), so one tap cannot sign anyone
+       out by accident. If that module has not loaded, sign out as
+       before rather than leave a button that does nothing. */
     $('signOutBtn').addEventListener('click', function () {
-      /* The Android app's row is removed with the sign-in, so that has
-         to finish first, or the phone keeps getting this account's
-         alerts after it has signed out. Three seconds at most: signing
-         out must still work offline. A browser is as it always was. */
-      var removed = CT.notify.unsubscribe();
-      var ready = CT.notify.nativePush
-        ? Promise.race([removed, new Promise(function (r) { setTimeout(r, 3000); })])
-        : Promise.resolve();
-      ready.then(function () { return CT.auth.signOut(); }).then(function () {
-        toast('Signed out. Your data stays on this device.');
-        renderAccount();
+      var ui = window.Aibhlinn && window.Aibhlinn.identityUI;
+      var asked = ui && ui.confirmSignOut ? ui.confirmSignOut() : Promise.resolve(true);
+      asked.then(function (yes) {
+        if (!yes) return;
+        /* The Android app's row is removed with the sign-in, so that has
+           to finish first, or the phone keeps getting this account's
+           alerts after it has signed out. Three seconds at most: signing
+           out must still work offline. A browser is as it always was. */
+        var removed = CT.notify.unsubscribe();
+        var ready = CT.notify.nativePush
+          ? Promise.race([removed, new Promise(function (r) { setTimeout(r, 3000); })])
+          : Promise.resolve();
+        ready.then(function () { return CT.auth.signOut(); }).then(function () {
+          toast('Signed out. Your data stays on this device.');
+          renderAccount();
+        });
       });
     });
 

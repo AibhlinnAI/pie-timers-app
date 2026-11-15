@@ -237,7 +237,7 @@
   /* Subscribe this device and hand the endpoint to Supabase, but only
      while Background alerts is switched on. Every caller comes through
      this check: the switch itself, sync.js after a pull, and the service
-     worker's 'resubscribe' message. Before v136 nothing here read the
+     worker's 'resubscribe' message. Before v139 nothing here read the
      switch, so a device subscribed whatever it said, and switching it off
      lasted until the next start.
      Safe to call repeatedly — an existing subscription is reused. */
