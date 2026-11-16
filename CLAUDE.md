@@ -32,6 +32,21 @@ memory, so it is the only way a fact learned in one session reaches the next.
   neither was committed. `!! PUBLIC REPO STARTS HERE !!.md` at the repo root
   and `!! FOLDER MAP !!.md` one level up exist to make that boundary visible.
 
+## The inbox agent's run log
+
+The Mailman reads AibhlínnAI email every morning and writes what it found to
+`fleet/runs/the-mailman.md`, in the AibhlínnAI folder above this repo. It
+never writes to the board, so the board alone does not tell you what has
+arrived.
+
+- **Read its newest entry before saying anything about email**: what has
+  arrived, what hasn't, or what a sender asked for.
+- It covers mail up to its own run time only. For anything later, read Gmail
+  yourself.
+- On 17 Nov 2026 a session reported as news an email The Mailman had sorted
+  two hours earlier, and told Mal a declaration was outstanding that he had
+  completed a week before.
+
 ## Things worth knowing before you act
 
 - **October 2026 is Launch Month.** Not 19 September — that was the ADHD
