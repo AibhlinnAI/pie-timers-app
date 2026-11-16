@@ -1,5 +1,6 @@
 package ai.aibhlinn.pietimers;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -8,6 +9,7 @@ import android.content.pm.PackageInfo;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -42,6 +44,9 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.OutputStream;
@@ -54,7 +59,8 @@ import java.io.OutputStream;
  * this class only hosts it, and adds what a plain WebView lacks: a splash
  * screen, an offline screen with Retry, Back that walks the page's history,
  * full screen for the dashboard, a file picker for Import settings and a
- * save dialog for Export settings.
+ * save dialog for Export settings. From release 7 it also shows milestone
+ * alerts as phone notifications (PushBridge below, Notifier, PushService).
  */
 public class MainActivity extends ComponentActivity {
 
@@ -93,6 +99,16 @@ public class MainActivity extends ComponentActivity {
     private ActivityResultLauncher<Intent> chooser;
     private byte[] pendingSave;
     private ActivityResultLauncher<String> saver;
+    private ActivityResultLauncher<String> notificationAsker;
+
+    /* Whether the app is on screen. A notification that arrives then is
+       shown without sound, because the page has its own toast and chime
+       for the same alert. Read from PushService, on another thread. */
+    private static volatile boolean visible;
+
+    static boolean isVisible() {
+        return visible;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,6 +148,10 @@ public class MainActivity extends ComponentActivity {
         });
         saver = registerForActivityResult(
                 new ActivityResultContracts.CreateDocument("application/json"), this::writePendingSave);
+        /* Android's own "Allow Pie Timers to send you notifications?"
+           Whatever the answer, the page is told. */
+        notificationAsker = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(), granted -> reportPush());
 
         setUpWebView();
 
@@ -177,6 +197,7 @@ public class MainActivity extends ComponentActivity {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
 
         web.addJavascriptInterface(new FileBridge(), "PieTimersAndroidFiles");
+        web.addJavascriptInterface(new PushBridge(), "PieTimersAndroidPush");
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
         web.setDownloadListener((url, userAgent, disposition, mimeType, length) -> {
@@ -440,6 +461,107 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    /* Phone notifications for milestone alerts, from release 7. The page
+       finds this object and knows the app can show them (app/notify.js);
+       an older app has no such object and the page says to update.
+
+       A WebView offers a JavaScript interface to every frame, and the
+       sign-in bot check is a frame from another site. So nothing here
+       hands anything back to its caller: permission() says only whether
+       notifications are allowed, and the device token goes to the main
+       frame alone, through reportPush(), and only while the site is the
+       page showing. What another frame could do is bring up the
+       permission prompt or post an alert, which is why show() checks the
+       page and Notifier clips what it is given. */
+    private final class PushBridge {
+
+        /* "granted" or "denied". Before Android 13 there is no prompt:
+           notifications are on unless the person switched them off. */
+        @JavascriptInterface
+        public String permission() {
+            return Notifier.allowed(MainActivity.this) ? "granted" : "denied";
+        }
+
+        /* Background alerts was switched on, or the test button pressed:
+           ask Android if it has to be asked, then tell the page the answer
+           and, when it is yes, this device's token. After two refusals
+           Android stops showing the prompt and answers no at once; the
+           page then says where the switch is in Settings. */
+        @JavascriptInterface
+        public void request() {
+            runOnUiThread(() -> {
+                if (!siteShowing()) return;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                        && !Notifier.allowed(MainActivity.this)) {
+                    try {
+                        notificationAsker.launch(Manifest.permission.POST_NOTIFICATIONS);
+                        return;
+                    } catch (IllegalStateException e) {
+                        // A request is already showing: answer as things stand.
+                    }
+                }
+                reportPush();
+            });
+        }
+
+        /* The page asking for the token again without a prompt, as it
+           does each time it opens while Background alerts is on. */
+        @JavascriptInterface
+        public void token() {
+            runOnUiThread(MainActivity.this::reportPush);
+        }
+
+        /* An alert the page has just raised itself. A milestone (its tag
+           has a "|") is quiet while the app is on screen; the Settings
+           test button's is not, so the person sees and hears what an
+           alert will be like. */
+        @JavascriptInterface
+        public void show(String title, String body, String tag) {
+            runOnUiThread(() -> {
+                if (!siteShowing()) return;
+                boolean milestone = tag != null && tag.indexOf('|') >= 0;
+                Notifier.show(MainActivity.this, title, body, tag, visible && milestone);
+            });
+        }
+    }
+
+    private boolean siteShowing() {
+        return web != null && isOurs(Uri.parse(String.valueOf(web.getUrl())));
+    }
+
+    /* Tells the page where notifications stand: {"permission": "granted"
+       or "denied", "token": the Firebase device token or null}. The token
+       is only fetched once notifications are allowed and the page has
+       asked, so a phone that never switches Background alerts on never
+       registers with Firebase (auto-init is off in the manifest). */
+    private void reportPush() {
+        if (!siteShowing()) return;
+        if (!Notifier.allowed(this)) {
+            sendPushResult(false, null);
+            return;
+        }
+        try {
+            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(this, task ->
+                    sendPushResult(true, task.isSuccessful() ? task.getResult() : null));
+        } catch (RuntimeException e) {
+            // Firebase could not start (no Google Play services, say).
+            sendPushResult(true, null);
+        }
+    }
+
+    private void sendPushResult(boolean granted, String token) {
+        if (!siteShowing()) return;
+        JSONObject result = new JSONObject();
+        try {
+            result.put("permission", granted ? "granted" : "denied");
+            result.put("token", token == null ? JSONObject.NULL : token);
+        } catch (JSONException e) {
+            return;
+        }
+        web.evaluateJavascript(
+                "window.PieTimersPushResult&&window.PieTimersPushResult(" + result + ");", null);
+    }
+
     /* "wt": replacing an earlier, longer export must not leave its tail
        behind, which would make the JSON unreadable. */
     private void writePendingSave(Uri uri) {
@@ -461,11 +583,13 @@ public class MainActivity extends ComponentActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        visible = true;
         if (web != null) web.onResume();
     }
 
     @Override
     protected void onStop() {
+        visible = false;
         if (web != null) web.onPause();
         super.onStop();
     }

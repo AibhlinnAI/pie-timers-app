@@ -12,3 +12,9 @@ local.properties
 *.aab
 *.apk
 signing-key-info.txt
+
+# The Firebase config. Google does not treat it as a secret, but it holds
+# an API key, and a key in a public repo is found and tried by strangers
+# within hours. It lives in the private packages folder beside the upload
+# key and is copied into the build copy (README, "Firebase").
+google-services.json

@@ -18,13 +18,67 @@ Its Play Console steps, bundle checks and phone check still apply.
   its save dialog.
 - Links to `https://pietimers.aibhlinn.ai` open in the app; every other link
   opens outside it.
+- From release 7: milestone alerts as phone notifications, including while
+  the app is closed (see "Phone notifications" below).
 
-## The one contract with the website
+## The two contracts with the website
 
-The app adds ` PieTimersAndroid/<version code>` to its user agent. The site
-reads it (`WEBVIEW_UA` in `app/app.js`) to hide prices, checkout and Google
-sign-in, and to stop offering system notifications. Change the spelling and
-prices come back inside the Play app.
+**The user agent.** The app adds ` PieTimersAndroid/<version code>` to its
+user agent. The site reads it (`WEBVIEW_UA` in `app/app.js`) to hide prices,
+checkout and Google sign-in. Change the spelling and prices come back inside
+the Play app.
+
+**The notification bridge**, from release 7. The app gives the page an object
+called `PieTimersAndroidPush`, and `app/notify.js` uses it in place of the
+Notification and Push APIs a WebView lacks. The site decides by whether the
+object is there, not by the version code: releases 4 to 6 have none, and the
+site tells them to update. Its four methods:
+
+| Method | What it does |
+| --- | --- |
+| `permission()` | Returns `"granted"` or `"denied"` straight away |
+| `request()` | Shows Android's notification prompt if it still can, then answers |
+| `token()` | Answers without a prompt |
+| `show(title, body, tag)` | Shows a phone notification now |
+
+`request()` and `token()` answer by calling `window.PieTimersPushResult` in
+the page with `{ permission, token }`, where `token` is the phone's Firebase
+device token or `null`. Rename the object, a method or that function on one
+side only and notifications stop with no error.
+
+## Phone notifications (release 7 on)
+
+- **While the app is running**, the page raises each alert and the app shows
+  it (`show`). Silent while the app is on screen, where the page has its own
+  toast and chime.
+- **While it is closed**, the site's `notify-milestones` function sends the
+  alert through Firebase Cloud Messaging and `PushService` shows it. That
+  needs an account, Premium, and both Milestone alerts and Background alerts
+  switched on, as it does in a browser.
+- **Once each.** Both carry the same tag, and `Notifier` remembers the tags it
+  has shown, so a milestone is never shown twice.
+- **Nothing is registered until it is asked for.** Firebase auto-init is off
+  in the manifest. The phone gets a device token only when someone switches
+  Background alerts on, and the page saves it against their account.
+- **No Analytics.** The only Firebase library is `firebase-messaging`.
+- A replaced token is picked up the next time the app opens. Until then
+  closed-app alerts to that phone stop.
+
+## Firebase (the owner only)
+
+The build needs `app/google-services.json` from the Firebase project, and it
+is **not in this repo**: it holds an API key, and this repo is public. Keep
+it in the private packages folder beside the upload key, and copy it into
+the build copy after the `robocopy` step:
+
+```powershell
+Copy-Item "<private packages folder>\google-services.json" "$src\app\"
+```
+
+The file must list both package names, `ai.aibhlinn.pietimers` and
+`ai.aibhlinn.pietimers.debug`, or the test build stops with "No matching
+client found". Without the file every build stops with "File
+google-services.json is missing". The server's half is `DEPLOY.md` §7.1.
 
 ## Building (Windows)
 
@@ -37,7 +91,8 @@ resource compiler refuses it, so build from a copy on local disk:
 
 ```powershell
 $src = "$env:LOCALAPPDATA\pie-timers-android-src"
-robocopy "<this folder>" $src /MIR /XF desktop.ini /XD .gradle build .kotlin
+robocopy "<this folder>" $src /MIR /XF desktop.ini google-services.json /XD .gradle build .kotlin
+Copy-Item "<private packages folder>\google-services.json" "$src\app\"
 cd $src
 .\gradlew.bat assembleDebug bundleRelease
 ```

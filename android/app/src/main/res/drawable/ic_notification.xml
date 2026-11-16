@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The status bar icon for a milestone alert: a pie with one slice lifted
+     out. Android draws only its shape, in white or the phone's own tint, so
+     the colour here is never seen. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11,4 A9,9 0 1,0 20,13 L11,13 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13,2 A9,9 0 0,1 22,11 L13,11 Z" />
+</vector>

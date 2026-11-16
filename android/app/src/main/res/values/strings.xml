@@ -11,4 +11,9 @@
     <string name="no_app_for_link">No app on this phone can open that link.</string>
     <string name="no_app_for_files">No app on this phone can pick or save files.</string>
     <string name="save_failed">The file could not be saved.</string>
+
+    <!-- The one kind of notification, as Android lists it under
+         Settings > Apps > Pie Timers > Notifications. -->
+    <string name="channel_milestones">Milestone alerts</string>
+    <string name="channel_milestones_about">30, 15, 10 and 5 minutes before lunch, a break or the end of your day, and when the time arrives.</string>
 </resources>
