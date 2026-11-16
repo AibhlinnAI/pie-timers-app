@@ -6,8 +6,9 @@
 -- project never needs it. Run in Supabase → SQL Editor. Safe to run
 -- twice: the second run finds nobody.
 --
--- NOT RUN YET on the live project (tgapmpbcqqnpsldehuqa). When it
--- has run, replace this line with the date and the three numbers.
+-- RUN on the live project (tgapmpbcqqnpsldehuqa) on 16 Nov 2026:
+-- to_switch_on 1, switched_on 1, then background_alerts_on 3 and
+-- still_off 0.
 --
 -- THE ORDER MATTERS:
 --   1. run this file, and see still_off = 0 in step 3;
