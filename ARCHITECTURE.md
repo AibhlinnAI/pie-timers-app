@@ -205,7 +205,7 @@ alerts on (`settings.push`, which `refreshSubscription` reads), and only
 while Milestone alerts is on as well (`settings.alerts`; `wantsPush` in the
 function reads both). A device whose account has Background alerts off
 removes its own subscription (`followPushSetting` in `app/sync.js`).
-`tools/check-push-gate.js` holds all three to that. Until v140 the switch
+`tools/check-push-gate.js` holds all three to that. Until v143 the switch
 gated nothing.
 
 The Android app from release 7 is the one place this differs. A WebView has

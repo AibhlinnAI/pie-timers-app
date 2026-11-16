@@ -4321,12 +4321,13 @@
      installed from Play: on the web there may be no listing to send
      anyone to. The row is looked up rather than assumed, because a stale
      index.html can meet this file. */
-  /* Off until the app is in production. Google Play takes no public
-     ratings for a test version, and on a tester's phone the listing
-     address can come back "not found" (seen 15 Nov 2026). Set this to
-     true once the production listing is live and the link has been
-     tapped on a phone. */
-  var RATING_OPEN = false;
+  /* On from 16 Nov 2026, at Mal's request, so testers see the option.
+     During closed testing the listing opens only for an account that is
+     in the tester group (anyone else gets "not found", seen 15 Nov 2026),
+     and Google keeps a tester's feedback private to the developer.
+     Checked on a Pixel 6 on 16 Nov: the listing opens and offers a star
+     rating and private feedback. */
+  var RATING_OPEN = true;
   (function showRateLink() {
     if (!RATING_OPEN || !IN_PLAY_APP) return;
     var row = $('rateRow');
