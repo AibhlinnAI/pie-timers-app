@@ -86,6 +86,13 @@ jobs:
       - name: Run the service worker checks
         run: node tools/check-sw.js
 
+      # Background alerts: a device subscribes to push only while the
+      # switch is on, sync.js follows the switch after each pull, and
+      # notify-milestones sends only when Milestone alerts and Background
+      # alerts are both on. Checks the files, not what is deployed.
+      - name: Run the push gate checks
+        run: node tools/check-push-gate.js
+
       # The ABN is one identifier: written with plain spaces, a narrow
       # screen can wrap it across two lines. Every published copy uses
       # non-breaking spaces (ABN&nbsp;70&nbsp;810&nbsp;791&nbsp;817).
