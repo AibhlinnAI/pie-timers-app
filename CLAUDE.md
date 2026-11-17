@@ -32,20 +32,28 @@ memory, so it is the only way a fact learned in one session reaches the next.
   neither was committed. `!! PUBLIC REPO STARTS HERE !!.md` at the repo root
   and `!! FOLDER MAP !!.md` one level up exist to make that boundary visible.
 
-## The inbox agent's run log
+## The crew's logs
 
-The Mailman reads AibhlínnAI email every morning and writes what it found to
-`fleet/runs/the-mailman.md`, in the AibhlínnAI folder above this repo. It
-never writes to the board, so the board alone does not tell you what has
-arrived.
+Scheduled agents check Pie Timers and write what they found to `fleet/`, in
+the AibhlínnAI folder above this repo, never to the board. **Before you report
+on the state of Pie Timers** (email, testing, releases, applying), read:
 
-- **Read its newest entry before saying anything about email**: what has
-  arrived, what hasn't, or what a sender asked for.
-- It covers mail up to its own run time only. For anything later, read Gmail
-  yourself.
-- On 17 Nov 2026 a session reported as news an email The Mailman had sorted
-  two hours earlier, and told Mal a declaration was outstanding that he had
-  completed a week before.
+- `fleet/TEAM-SHEET.md`: which agents ran this morning and what is waiting on
+  Mal. Overwritten every morning, so it holds one day only.
+- `fleet/runs/the-mailman.md`, newest entry: AibhlínnAI email, each morning.
+  Read it before saying what has arrived, what hasn't, or what a sender asked.
+- `fleet/runs/og-anunoby.md`, newest entry: the Play Console and Dashboard
+  figures and Play's production-access gate, read each morning.
+- `fleet/runs/kd.md`, newest entry, and the top of `fleet/RELEASE-CHECK.md`:
+  release readiness and the apply brief. Weekly or by hand, so often days old.
+- `fleet/DECISIONS.md`, `fleet/NEXT-PLAY.md` and `fleet/NEXT-CHECKLIST.md`,
+  where they exist: the one question waiting on Mal, the steps for the day
+  Google answers, and his next dated manual job.
+
+Each entry is dated. Say how old it is, and read the source yourself for
+anything later. **A crew log is a report to check, not proof**, and "unread"
+in one means not read, never zero. On 17 Nov 2026 a session reported as news
+an email the inbox agent had sorted more than two hours earlier.
 
 ## Things worth knowing before you act
 
