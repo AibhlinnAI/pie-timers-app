@@ -262,6 +262,16 @@ button,select{ font:inherit; }
   font-size:.85rem; font-weight:600;
 }
 
+/* Live is not a warning. The amber above is a caution about a simulated
+   clock; when the clock is real there is nothing to caution about, and an
+   amber bar on a correct foyer screen reads as a fault light. The
+   "unofficial" caveat stays in the words. */
+.live .note{
+  background:var(--wash-a);
+  border-color:var(--line);
+  color:var(--ink-muted);
+}
+
 .bar{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:11px 14px;

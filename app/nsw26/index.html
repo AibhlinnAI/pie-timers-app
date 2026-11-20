@@ -8,6 +8,21 @@
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
+<script>
+/* Pre-paint, so a forced theme or the foyer layout never flashes the other
+   one first. Both are read-only reads of the query string and both fail
+   silently — a page that refuses to open because a parameter was mistyped
+   is worse than a page that opens in its default clothes. The same values
+   are read again by the main script below; this one only sets classes. */
+(function () {
+  try {
+    var q = new URLSearchParams(location.search);
+    var t = q.get('theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    if (q.get('display') === '1' || q.get('view') === 'venue') document.documentElement.classList.add('venue');
+  } catch (e) { /* no query string support, no harm — carry on */ }
+}());
+</script>
 </head>
 <body>
 <style>
@@ -28,6 +43,14 @@
 }
 *,*::before,*::after{ box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
+
+/* The browser's own [hidden] rule is a bare attribute selector, so ANY
+   class rule setting display beats it — and this file has .timeline
+   {display:flex}. Nothing here hides anything with el.hidden today, so
+   this is prophylactic rather than load-bearing; it is here because
+   ndexpo26 shipped that exact bug in public and the three files should
+   not differ on it. Ask for the pixels, never for the property you set. */
+[hidden]{ display:none !important; }
 
 /* ============================================================
    NSW ADHD Conference 2026 in Pie Timers — self-contained.
@@ -217,6 +240,16 @@ button,select{ font:inherit; }
   font-size:.85rem; font-weight:600;
 }
 
+/* Live is not a warning. The amber above is a caution about a simulated
+   clock; when the clock is real there is nothing to caution about, and an
+   amber bar on a correct foyer screen reads as a fault light. The
+   "unofficial" caveat stays in the words. */
+.live .note{
+  background:var(--wash-a);
+  border-color:var(--line);
+  color:var(--ink-muted);
+}
+
 .bar{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:11px 14px;
@@ -244,7 +277,14 @@ button,select{ font:inherit; }
 }
 .bar input[type=range]{ flex:1; min-width:140px; accent-color:var(--orange); }
 .bar output{ font-variant-numeric:tabular-nums; font-weight:700; min-width:8ch; text-align:right; }
-:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; }
+/* --orange on a white card is 2.36:1, under the 3:1 a focus indicator has
+   to clear. --orange-text is the same hue, dark enough to see. */
+:focus-visible{ outline:2px solid var(--orange-text); outline-offset:2px; }
+
+/* A real clock cannot be scrubbed, paused or sped up, so in live mode the
+   controls that pretend otherwise are not rendered. The view toggle stays,
+   because which view you want is still a choice. */
+.live .clocking{ display:none; }
 
 /* ───────────────────────── Panels ───────────────────────── */
 
@@ -310,22 +350,22 @@ button,select{ font:inherit; }
 
 /* ───────────────────── Venue display mode ───────────────────── */
 
-body.venue .main{ grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); }
-body.venue .now{ flex-direction:column; text-align:center; justify-content:center; }
-body.venue .now::before{ align-self:center; width:min(200px,45%); height:5px; }
-body.venue .dialwrap{ width:min(240px,42vw); }
+.venue .main{ grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); }
+.venue .now{ flex-direction:column; text-align:center; justify-content:center; }
+.venue .now::before{ align-self:center; width:min(200px,45%); height:5px; }
+.venue .dialwrap{ width:min(240px,42vw); }
 /* Smaller than NWC26's hero type, and deliberately. That programme's
    longest title was 43 characters; this one's is 118, and a foyer screen
    that clips the back half of a session title is worse than one that sets
    it a size down. Sized so the longest fits without clipping at 1920×1080
    — which is checked, not hoped. */
-body.venue .title{ font-size:clamp(1.3rem,2.2vw,1.9rem); }
-body.venue .left{ font-size:clamp(1.3rem,2.4vw,2rem); }
-body.venue .window, body.venue .then{ font-size:clamp(.9rem,1.3vw,1.1rem); }
-body.venue .kicker{ font-size:clamp(.8rem,1.1vw,1rem); }
-body.venue .item{ padding:13px 18px; }
-body.venue .item .name{ font-size:clamp(.95rem,1.25vw,1.1rem); }
-body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
+.venue .title{ font-size:clamp(1.3rem,2.2vw,1.9rem); }
+.venue .left{ font-size:clamp(1.3rem,2.4vw,2rem); }
+.venue .window, .venue .then{ font-size:clamp(.9rem,1.3vw,1.1rem); }
+.venue .kicker{ font-size:clamp(.8rem,1.1vw,1rem); }
+.venue .item{ padding:13px 18px; }
+.venue .item .name{ font-size:clamp(.95rem,1.25vw,1.1rem); }
+.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 
 /* ───────────────────────── Footnotes ───────────────────────── */
 
@@ -353,7 +393,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 }
 
 @media (max-width:820px){
-  body.venue .main{ grid-template-columns:1fr; }
+  .venue .main{ grid-template-columns:1fr; }
 }
 @media (max-width:600px){
   .now{ flex-direction:column; align-items:stretch; text-align:center; }
@@ -397,16 +437,16 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
       <button type="button" id="viewDelegate" aria-pressed="true">A delegate's phone</button>
       <button type="button" id="viewVenue" aria-pressed="false">The foyer screen</button>
     </div>
-    <button class="btn" type="button" id="play" aria-pressed="true">Pause</button>
-    <label class="bar-label" for="speed">Speed</label>
-    <select id="speed">
+    <button class="btn clocking" type="button" id="play" aria-pressed="true">Pause</button>
+    <label class="bar-label clocking" for="speed">Speed</label>
+    <select id="speed" class="clocking">
       <option value="1">real time</option>
       <option value="60">1 min / sec</option>
       <option value="120" selected>2 min / sec</option>
       <option value="600">10 min / sec</option>
     </select>
-    <input type="range" id="scrub" min="0" max="1439" step="1" value="500" aria-label="Move through the day">
-    <output id="scrubOut">--:--</output>
+    <input type="range" class="clocking" id="scrub" min="0" max="1439" step="1" value="500" aria-label="Move through the day">
+    <output id="scrubOut" class="clocking">--:--</output>
   </div>
 
   <!-- NWC26 carried a day strip because it ran three days. This is one
@@ -444,10 +484,12 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     <h2>What this is</h2>
     <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at a
       glance without anyone reading a number. This page is the New South Wales
-      ADHD Conference programme, Sunday 18 October 2026, running through it. The
-      clock is simulated so the day can be watched now rather than on the day
-      itself — press <strong>Pause</strong> and drag the slider to land anywhere
-      between the doors opening and the close.</p>
+      ADHD Conference programme, Sunday 18 October 2026, running through it.
+      <!-- This sentence describes the clock, so it has to move when the clock
+           does. announce() rewrites it for live and frozen modes. -->
+      <span id="footClock">The clock is simulated so the day can be watched now
+      rather than on the day itself — press <strong>Pause</strong> and drag the
+      slider to land anywhere between the doors opening and the close.</span></p>
     <p>The two views are the same data. <strong>A delegate's phone</strong> is what
       someone in the room follows. <strong>The foyer screen</strong> is what a
       display in the venue shows, reading from across a room, with nobody touching
@@ -535,6 +577,10 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
   var CX = 80, CY = 80, R = 70, MIN = 60000;
   var $ = function (id) { return document.getElementById(id); };
 
+  /* Writing the same string back to a text node every 200ms churns layout
+     for nothing. Only touch it when it actually changed. */
+  function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
+
   /* Resolve each finish from the next item, the way a printed programme
      reads. Only what cannot be inferred is carried in the data. A kind
      that is not in the map falls back rather than throwing — a blank page
@@ -551,19 +597,104 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     });
   });
 
-  /* Brisbane wall clock. Queensland has no daylight saving, so one fixed
-     offset is honest here — read the returned Date with getUTC*. */
-  /* 10:20am on the day — twenty-five minutes into the first talk. The page
-     opens on a named speaker with a pie actually running, rather than on
-     an empty morning, because the first two seconds are what decides
-     whether anyone presses anything. */
-  var demo = { anchor: Date.parse('2026-10-18T00:00:00Z') + 620 * MIN, scale: 120, running: true, last: Date.now() };
+  /* Four ways the page can be driven, and every one of them says which on
+     screen. `at` beats `live` beats `demo`, most specific first — and the
+     code below has to enforce that rather than just claim it. ndexpo26's
+     first draft applied `at` and then let `live` overwrite the anchor on
+     every tick, so the documented order was exactly backwards. Both the
+     !frozen guards here AND the if/else chain below are load-bearing. */
+  var mode = (function () {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { q = null; }
+    var get = function (k) { return q ? q.get(k) : null; };
+
+    var at = null, raw = get('at');
+    if (raw) {
+      var m = /^(\d{1,2}):([0-5]\d)$/.exec(raw.trim());
+      if (m) {
+        var h = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+        if (h >= 0 && h <= 23) at = h * 60 + mm;
+      }
+    }
+    var frozen = at !== null;
+    var live = !frozen && get('live') === '1';
+    return {
+      at: at,
+      live: live,
+      fast: !frozen && !live && get('demo') === '1',
+      venue: get('display') === '1' || get('view') === 'venue'
+    };
+  }());
+
+  /* The anchor is a UTC instant whose getUTC* fields read as the venue's
+     wall clock. Everything downstream reads it with getUTC*, so there is
+     exactly one place where a time zone is applied and this is it. */
+  var DAY0 = Date.parse(PRESET.days[0].date + 'T00:00:00Z');
+
+  /* 10:20am on the day — fifteen minutes into Connor M Greene's talk,
+     which starts at 605. The page opens on a named speaker with a pie
+     actually running, rather than on an empty morning, because the first
+     two seconds are what decides whether anyone presses anything. */
+  var demo = { anchor: DAY0 + 620 * MIN, scale: 120, running: true, last: Date.now() };
+
+  if (mode.at !== null) {
+    demo.anchor = DAY0 + mode.at * MIN;
+    demo.running = false;
+  } else if (mode.fast) {
+    /* Fifteen minutes before the doors, so the countdown is seen first,
+       then the whole day in about forty-seven seconds. */
+    demo.anchor = DAY0 + 495 * MIN;
+    demo.scale = 600;
+  }
+  if (mode.live) demo.running = false;   // nothing to run; the world runs it
+
+  /* ── The live clock needs a real time zone, not the event's constant ──
+     PRESET.utcOffsetMinutes is 660 because THIS event is on 18 October,
+     which is inside daylight saving. Using it for ?live=1 would make the
+     page claim to show "the real Sydney clock" while being an hour out
+     for every date BEFORE Sunday 4 October — which is every rehearsal
+     between now and the changeover, i.e. the whole period in which anyone
+     is being shown this page.
+
+     New South Wales is +11 from 02:00 on the first Sunday in October to
+     03:00 on the first Sunday in April, and +10 the rest of the year.
+     Both changeovers land on the same UTC instant, 16:00 the day before,
+     which is why the two lines below look alike. This is ndexpo26's SHAPE
+     with New South Wales' own numbers — not a copy of its rule, which is
+     South Australia's +09:30/+10:30. Queensland, on /nwc26, has no
+     daylight saving at all and correctly uses a constant. Three demos,
+     three different answers: copy the reasoning, never the numbers. */
+  function firstSunday(year, monthIndex) {
+    var first = Date.UTC(year, monthIndex, 1);
+    return first + ((7 - new Date(first).getUTCDay()) % 7) * 1440 * MIN;
+  }
+  function nswOffsetAt(utcMs) {
+    var y = new Date(utcMs).getUTCFullYear();
+    var dstStarts = firstSunday(y, 9) + 2 * 60 * MIN - 600 * MIN;   // 02:00 AEST
+    var dstEnds   = firstSunday(y, 3) + 3 * 60 * MIN - 660 * MIN;   // 03:00 AEDT
+    return (utcMs >= dstStarts || utcMs < dstEnds) ? 660 : 600;
+  }
+  /* The offset actually in force right now, which is the event's own on
+     the day and is NOT on any date before 4 October. */
+  function liveOffset() { return nswOffsetAt(Date.now()); }
+  function liveAnchor() { return Date.now() + liveOffset() * MIN; }
+  if (mode.live) demo.anchor = liveAnchor();
 
   function now() { return new Date(demo.anchor); }
   function dateOf(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
   function minutesOf(d) { return d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60; }
   function instant(date, m) { return Date.parse(date + 'T00:00:00Z') + m * MIN; }
   function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+  /* Printed from the offset, never typed. This file used to carry the
+     string "UTC+11" in paint() and the number 660 in PRESET, and nothing
+     would have complained if they had drifted apart. The minutes are
+     omitted when they are zero, so the page Kyla already has still reads
+     "Sydney · UTC+11" — a half-hour zone would print them. */
+  function zoneLabel(m) {
+    var sign = m < 0 ? '-' : '+', a = Math.abs(m);
+    return 'UTC' + sign + Math.floor(a / 60) + (a % 60 ? ':' + pad(a % 60) : '');
+  }
 
   function clock(m) {
     var t = Math.floor(m), h = Math.floor(t / 60) % 24, mm = t % 60;
@@ -675,21 +806,36 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 
   function paint(force) {
     var real = Date.now();
-    if (demo.running) demo.anchor += (real - demo.last) * demo.scale;
+    if (mode.live) demo.anchor = liveAnchor();
+    else if (demo.running) demo.anchor += (real - demo.last) * demo.scale;
     demo.last = real;
+
+    /* Left running, the preview clock slides past the close, then past
+       midnight, onto a date the programme knows nothing about — a demo
+       somebody left open on a desk would sit on "That is the day" inside
+       four minutes. Loop it back to the run-up instead. */
+    if (demo.running && !mode.live) {
+      var d0 = PRESET.days[0];
+      if (demo.anchor > instant(d0.date, d0.end + 20)) {
+        demo.anchor = instant(d0.date, d0.start - 30);
+      }
+    }
 
     var n = now(), today = dateOf(n), mins = minutesOf(n);
     var day = pickDay(today), state = locate(day, today, mins);
 
-    $('clockTime').textContent = clock(mins);
-    $('clockDate').textContent = n.toLocaleDateString('en-AU',
-      { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-    $('clockZone').textContent = PRESET.timeZone + ' · UTC+11';
-    $('scrubOut').textContent = clock(mins);
+    setText($('clockTime'), clock(mins));
+    setText($('clockDate'), n.toLocaleDateString('en-AU',
+      { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }));
+    setText($('clockZone'), PRESET.timeZone + ' · ' +
+      zoneLabel(mode.live ? liveOffset() : PRESET.utcOffsetMinutes));
+    setText($('scrubOut'), clock(mins));
 
-    if (demo.running) {
+    if (!mode.live) {
       var s = $('scrub'), v = Math.round(mins);
-      if (v >= +s.min && v <= +s.max) s.value = String(v);
+      /* Spoken as a time, not as "620". */
+      s.setAttribute('aria-valuetext', clock(mins));
+      if (demo.running && v >= +s.min && v <= +s.max) s.value = String(v);
     }
 
     paintNow(day, today, mins, state);
@@ -707,11 +853,11 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
     }
     function set(cls, kicker, title, window_, left, then) {
       card.className = 'now' + (cls ? ' ' + cls : '');
-      $('kicker').textContent = kicker;
-      $('title').textContent = title;
-      $('window').textContent = window_;
-      $('left').textContent = left;
-      $('then').textContent = then;
+      setText($('kicker'), kicker);
+      setText($('title'), title);
+      setText($('window'), window_);
+      setText($('left'), left);
+      setText($('then'), then);
     }
 
     if (state.phase === 'other') {
@@ -822,7 +968,7 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
   /* ─────────────────────────── Controls ─────────────────────────── */
 
   function scrubRange() {
-    var day = pickDay(dateOf(now()));
+    var day = PRESET.days[0];
     var s = $('scrub');
     s.min = String(Math.max(0, day.items[0].time - 15));
     s.max = String(Math.min(1439, day.end + 15));
@@ -830,6 +976,12 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
 
   /* NWC26 built a day tab here per day of its programme. One Sunday needs
      none, and the slider already covers every minute of it. */
+
+  function pause() {
+    demo.running = false;
+    $('play').textContent = 'Play';
+    $('play').setAttribute('aria-pressed', 'false');
+  }
 
   $('play').addEventListener('click', function () {
     demo.running = !demo.running;
@@ -841,15 +993,13 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
   $('speed').addEventListener('change', function () { demo.scale = parseFloat(this.value) || 1; });
 
   $('scrub').addEventListener('input', function () {
-    demo.running = false;
-    $('play').textContent = 'Play';
-    $('play').setAttribute('aria-pressed', 'false');
-    demo.anchor = instant(dateOf(now()), parseInt(this.value, 10) || 0);
+    pause();
+    demo.anchor = instant(PRESET.days[0].date, parseInt(this.value, 10) || 0);
     paint(true);
   });
 
   function setView(venue) {
-    document.body.classList.toggle('venue', venue);
+    document.documentElement.classList.toggle('venue', venue);
     $('viewVenue').setAttribute('aria-pressed', String(venue));
     $('viewDelegate').setAttribute('aria-pressed', String(!venue));
     paint(true);
@@ -857,7 +1007,54 @@ body.venue .item .speaker{ font-size:clamp(.72rem,.95vw,.85rem); }
   $('viewVenue').addEventListener('click', function () { setView(true); });
   $('viewDelegate').addEventListener('click', function () { setView(false); });
 
+  /* ── Say which clock this is, in words, above the fold. A page whose
+     time is not the real time has to announce that every single way it
+     can be opened, or somebody screenshots it and believes it. ── */
+  function announce() {
+    var unofficial = ' Nothing here is the official programme.';
+    var n = $('note'), f = $('footClock');
+    if (mode.live) {
+      n.textContent = 'Live — this page is reading the real ' + PRESET.timeZone +
+        ' clock, ' + zoneLabel(liveOffset()) + '.' + unofficial;
+      f.textContent = 'This page is running on the real ' + PRESET.timeZone +
+        ' clock, so it shows the conference as it actually stands. The preview ' +
+        'controls are not shown while it is live, because a real clock cannot ' +
+        'be paused or dragged.';
+      return;
+    }
+    if (mode.at !== null) {
+      n.textContent = 'Preview clock — frozen at ' + clock(mode.at) + ' on ' +
+        new Date(DAY0).toLocaleDateString('en-AU',
+          { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) +
+        '. This is not the real time.' + unofficial;
+      f.textContent = 'The clock is frozen at ' + clock(mode.at) + ' so this ' +
+        'moment of the day can be looked at. Press Play, or drag the slider, ' +
+        'to move anywhere between the doors opening and the close.';
+      return;
+    }
+    if (mode.fast) {
+      n.textContent = 'Preview clock — the whole day is playing at 10 minutes a second. ' +
+        'This is not the real time.' + unofficial;
+      return;
+    }
+    n.textContent = 'Preview — the clock on this page is simulated, not the real time.' + unofficial;
+  }
+
   scrubRange();
+
+  if (mode.live) {
+    document.documentElement.classList.add('live');
+  } else {
+    var s0 = $('scrub');
+    if (mode.at !== null) {
+      pause();
+      if (mode.at >= +s0.min && mode.at <= +s0.max) s0.value = String(mode.at);
+    }
+    if (mode.fast) $('speed').value = '600';
+  }
+  if (mode.venue) setView(true);
+
+  announce();
   paint(true);
   setInterval(paint, 200);
 }());
