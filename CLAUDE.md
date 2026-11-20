@@ -80,6 +80,20 @@ arrived.
   places, closing at the start of 1 November 2026 (Adelaide) or when full.
   Separate from trial length. Never describe it by contrast with paying
   nothing.
+- **Before reusing an event page for a new event, port the live-mode fixes.**
+  The branch `live-clock-port-draft` holds an early draft of the live-clock
+  work (23 Sep 2026, built on `ee3e91d`). Most of it reached `main` another
+  way, but these did not, as read against `main` on 20 Nov 2026 (not run in a
+  browser): on `/ndexpo26`, `/nsw26` and `/nwc26` the notice strip stays amber
+  when live, where the draft makes it neutral; on `/nwc26` under `?live=1`
+  the footer still says the clock is simulated and to press Pause, a button
+  that is hidden; on `/nwc26` a preview left running never loops back and
+  ends on "Already over."; and `/nwc26` lacks some small accessibility items
+  (focus-ring contrast, the slider spoken as a clock time). The draft also
+  keeps the day tabs when live and pins a day, where `main` hides them on
+  purpose: that is a design choice to make, not a fault. `/nls26` was not
+  checked. Port by hand against `main`; never merge that branch. Its commit
+  message lists every item.
 
 ## Working with Mal
 
