@@ -88,7 +88,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>16 November 2026</strong> &middot;
+    Last updated: <strong>22 November 2026</strong> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <span data-hide-in-play><a href="terms.html#refunds">Refund Policy</a> &middot;</span>
     <a href="index.html">Back to the app</a>
@@ -140,6 +140,13 @@
     issued to, so it can't be used again. Ask and we will remove the email.</li>
     <li>An email left on the Android tester form is kept apart from your account.
     Ask and we will remove it, and it is deleted when testing ends.</li>
+    <li>If you subscribed while Foundation was open, the record of your place:
+    its number if you held one, your plan, Paddle's subscription number and the
+    dates, so the place is not given to anyone else. It no longer points to
+    your account.<!-- public.foundation_claims (supabase/schema-foundation.sql):
+    user_id is set to null when the account is deleted and the row stays. A
+    row is kept for a subscriber who got no place as well, which is why this
+    does not say only "if you held a Foundation place". --></li>
     <li>The sign-in log our database provider keeps, with the email address and
     IP address of each sign-in, for 1<!-- Supabase Free plan: its auth log, as auth.audit_log_entries is empty (checked 10 Oct 2026). Change with sections 8 and 9 if the plan changes --> day.</li>
     <li>No backups. Our database plan includes none, so there is no backup copy
@@ -243,7 +250,7 @@
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser. Its network provider, Cloudflare, carries every request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, the one-off first-open count in section 9, and the number of Foundation places left, which the Pricing and Foundation pages ask for without sending anything about you. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser. Its network provider, Cloudflare, carries every request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
       <tr><td>Resend</td><td>Your email address, and any email we send you from an @aibhlinn.ai address, such as our replies</td><td>Sending your sign-in code and our email to you</td></tr>
       <tr><td>Paddle</td><td>Your account email and account ID, which we pass to checkout so your payment reaches your account, and the billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>What Google sign-in or Google Calendar needs, only if you use them. Any email you send us, and email we send you, because our mailbox is with Google</td><td>Authentication, reading your calendar, and holding our email</td></tr>

@@ -157,6 +157,12 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
       (`relaunch-2026-11.sql` is not part of a fresh setup. It was a one-off
       for the accounts that existed when the launch offer was reset on
       22 Nov 2026, and matches no rows on a project made after that.)
+- [ ] `schema-foundation.sql`: the 100 Foundation places. One table that
+      cannot hold a 101st place, the one function `paddle-webhook` claims
+      through, and the one function the Pricing and Foundation pages read.
+      Run it **before** deploying `paddle-webhook` (5.3): until it has run,
+      that function answers 500 to every new subscription and Paddle keeps
+      retrying. See 5.6.
 - [ ] `schema-ratelimit.sql`
 - [ ] `schema-calendar.sql`
 - [ ] `schema-breaks.sql` — always, and before the functions (5.3) or `cron.sql`:
@@ -405,6 +411,117 @@ that release is on every track, `play | none` is people again.
    all" above.
 5. Mal's own devices, and any stall device that wipes its profile: open
    `/#count=off` once, or launch with it on the URL.
+
+### 5.6 Foundation places
+
+Foundation has 100 places and the database holds it to 100
+(`supabase/schema-foundation.sql`). The order matters. For the release that
+adds it (the Black Friday Launch Offer, 22 Nov 2026) the order is: the SQL,
+then the `paddle-webhook` function, then Test A in 8.4, then the pages, then
+the aibhlinn.ai advert. The SQL and the function are run by hand; the pages
+go out when the branch is merged to `main`. Merge last, and only once Test A
+has shown 1 Jan 2027 on a real throwaway purchase: that date is the offer.
+Publish the aibhlinn.ai site branch only after that merge is live and
+`foundation.html` shows the Black Friday Launch Offer. Its advert links to
+that page, and until then the live page still describes the October offer.
+
+- [ ] The trial rules the pages describe are running. Both are read-only:
+      `select public.trial_length();` returns `14 days` (so
+      `schema-access-codes.sql` has been re-run with the 22 Nov dates), and
+      step 3 of `supabase/relaunch-2026-11.sql` returns `rows_to_move = 0`
+      (so the accounts made before 22 Nov have been moved to the end of
+      5 Dec). The pages tell an account made before 22 Nov that its trial
+      runs to the end of 5 December "even if an earlier trial had run out".
+      Until that file has been run, a lapsed account that believes it and
+      subscribes is charged on the day.
+- [ ] Before anything else, confirm Paddle's field names against events
+      already stored (read-only):
+      `select payload->'data'->>'created_at' as created_at,
+              payload->'data'->>'started_at' as started_at,
+              payload->>'occurred_at' as occurred_at
+         from public.billing_events
+        where event_type = 'subscription.created' limit 3;`
+      `created_at` must be a timestamp, not null.
+- [ ] The privacy policy change must be live with or before the pages (the
+      Pricing and Foundation pages start asking Supabase for the count). It
+      is in the same push as the pages, so never publish `pricing.html` or
+      `foundation.html` without `privacy.html`.
+- [ ] Mal has read and agreed the two new sentences in `privacy.html` before
+      that push: the Foundation places count in the Supabase row of
+      section 6, and the Foundation line under "What we keep". They were
+      written as a draft on 22 Nov 2026. The same goes for the "Who can
+      join" wording on `foundation.html`.
+- [ ] Run `schema-foundation.sql`.
+- [ ] Run the privilege check in that file. Expect
+      `false | false | false | false | false | true | true | true`.
+- [ ] `select public.foundation_status();` Expect
+      `{"open": true, "places_left": 100}`.
+- [ ] Run `supabase/test-foundation.sql`. It always ends in an error: that is
+      what undoes it. Every line of the message must start with PASS.
+- [ ] `select public.foundation_status();` again. Still 100.
+- [ ] Confirm the SQL is in place one more time, straight before the
+      function goes out: `select public.foundation_status();` answers. Do
+      not deploy the function until it does (see "wrong order" below).
+- [ ] Deploy the function: `supabase functions deploy paddle-webhook`.
+- [ ] Run the catch-up statement at the end of `schema-foundation.sql`. On
+      22 Nov 2026 it gives no new place, because nobody had subscribed.
+- [ ] Keep the paid testing service's accounts out. They do not qualify for
+      Foundation (Mal's decision) and nothing in the database marks them, so
+      run the withhold statement in `schema-foundation.sql` ("Keeping an
+      account out") once for each tester sign-in address, with a note such
+      as 'withheld: testing account'. Each run must return one row; no row
+      means the address matched no account. Do this before the pages go
+      out, because their trials run to 5 December and any of them can
+      subscribe from the moment the offer is published. Keep the addresses
+      out of this repo.
+- [ ] Run Test A in 8.4 on a throwaway account. Do not publish the pages
+      until it has shown `next_billed_at` on 1 Jan 2027.
+- [ ] Publish the pages. Open `pricing.html` and `foundation.html` signed out:
+      both say 100 of 100 places.
+- [ ] Block the Supabase host in the browser's developer tools and reload:
+      Pricing says it could not check, Foundation shows no number.
+- [ ] Last, publish the aibhlinn.ai site branch, once the live
+      `foundation.html` shows the Black Friday Launch Offer.
+
+The lock, by hand, if you want to see it (two SQL editor tabs, saves
+nothing). Tab 1: `begin; lock table public.foundation_claims in share row
+exclusive mode; select pg_sleep(8); rollback;` Tab 2, inside those 8 seconds:
+run `test-foundation.sql`. It waits (or stops after 5 seconds with a lock
+timeout), and `select public.foundation_status();` answers at once.
+
+While Foundation is open, run the "no decision" query in the SQL file every
+day or two. It should return no rows. A row is a subscriber whose claim
+never happened: run the catch-up.
+
+While the offer is open, also open each new subscription in Paddle and check
+`next_billed_at` reads 1 Jan 2027. If the Paddle key is missing, or Paddle
+refuses the date change, `paddle-webhook` only logs it ("Could not defer
+first charge") and still answers 200, so Paddle does not retry and the
+customer is billed on the trial price's own schedule, 14 days after
+subscribing. That would be a charge in December 2026 for someone promised
+none until 2027. Move the date by hand in Paddle if you find one. Making the
+function answer 500 there instead, so Paddle retries, is a change to billing
+code that needs Mal's yes.
+
+If things are deployed in the wrong order: pages before the SQL show "could
+not check" and buying works as before. The function before the SQL is not
+harmless, so do not do it. It answers 500 to every new subscription, after
+Premium and the billing date are already written, and Paddle sends each one
+again until the SQL exists. Each of those retries writes the event's original
+period end back into `public.subscriptions` before the function writes the
+moved one again (`extendFreePeriod` in `paddle-webhook`). The function is
+built so the retry ends on the moved date, but that has only been checked
+against stubs, never against Paddle. So after any 500 followed by a retry,
+whatever caused it, check that account: `current_period_end` in
+`public.subscriptions` must read 1 Jan 2027 (`2027-01-01 10:00:00+00`) and
+match `next_billed_at` in Paddle. If it reads the trial price's own end
+instead, the account would lose Premium in December: set it to the Paddle
+date by hand.
+
+`node --experimental-strip-types tools/foundation-test.mjs` checks the
+function's wiring, the SQL file's shape and both pages against stubs. It
+runs no SQL. Only `test-foundation.sql` and the purchase in 8.4 Test A check
+the deployed database.
 
 ## 6. Email (Resend)
 
@@ -671,7 +788,29 @@ Test A — still in trial, takes no money, exercises the most code:
       account made today and bought today expects 1 Jan. This is the only check
       that exercises `deferFirstCharge`, and therefore the only proof
       `PADDLE_API_KEY` is set — without that key the function logs a warning and
-      silently leaves Paddle's own date.
+      silently leaves Paddle's own date. The exact instant is
+      `2027-01-01T10:00:00Z`: 8:30 pm on 1 Jan in Adelaide, and 1 January
+      from Hawaii to New Zealand, so "Pay nothing until 2027" holds on the
+      customer's own calendar. It is not Adelaide midnight, which is still
+      31 December 2026 everywhere to the west.
+- [ ] Confirm `current_period_end` on the `public.subscriptions` row reads
+      the same instant (`2027-01-01 10:00:00+00`), not the trial price's own
+      end 14 days out. `has_active_plan()` reads this column, so it is what
+      keeps Premium on until the first payment.
+- [ ] Read the function log for this purchase. If any delivery answered 500
+      and was then retried, check `current_period_end` again after the
+      retry: it must still read 1 Jan 2027. Note here what Paddle sent after
+      the repeated date move (a second `subscription.updated`, or nothing);
+      that has not been observed yet.
+- [ ] Confirm a row in `public.foundation_claims` for the test account with a
+      place number, and that `select public.foundation_status();` shows one
+      place fewer (so do `pricing.html` and `foundation.html`, once the new
+      pages are published).
+- [ ] Take the place back with the withdraw statement in
+      `schema-foundation.sql` (the note can be 'withdrawn: owner test
+      purchase'). Confirm `select public.foundation_status();` is back where
+      it started. The row stays, so Test B's purchase on the same account
+      takes no place.
 
 Test B — the money path. Expire the same account's trial first:
 
@@ -701,6 +840,8 @@ Reading a failure:
 - **401** — the secret in Supabase does not match the destination's. Recopy the secret.
 - **500** — the signature passed and a write failed. Read the Supabase function
   logs, not the Paddle delivery log.
+  A message starting `claim_foundation_place failed: 404` means
+  `schema-foundation.sql` has not been run (5.6).
 - **200 but no row** — the event carried no `custom_data.user_id`. That means
   the checkout was opened outside `billing.js`, which always attaches the id.
 

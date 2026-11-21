@@ -192,8 +192,9 @@ privacy policy alone.
 Every file the app is made of comes from our own origin, and that is a
 consequence of section 3 rather than a separate rule. The only requests to
 anyone else are the services the app needs to do its job, each named in
-`privacy.html` section 6: Supabase for accounts, sync, the tester form and
-the first-open count; Cloudflare Turnstile, loaded when someone opens the
+`privacy.html` section 6: Supabase for accounts, sync, the tester form, the
+first-open count and the Foundation places count (`pricing.html` and
+`foundation.html` only, never in the Play app); Cloudflare Turnstile, loaded when someone opens the
 sign-in form and refreshing until the app is closed; Paddle's checkout,
 loaded only when someone goes to subscribe; Google, reached through
 Supabase, only when someone chooses Google sign-in or connects Google

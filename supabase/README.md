@@ -19,9 +19,10 @@ contents in this order:
 | 7 | `schema-google-calendar.sql` | Google one-click columns | Only for Google |
 | 8 | `schema-tester-signups.sql` | the Android tester form's write-only `tester_signups` | Always |
 | 9 | `schema-visit-counts.sql` | first-open totals, the tag list, and their nightly job | Always |
-| 10 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
+| 10 | `schema-foundation.sql` | the 100 Foundation places and the public count | Always, before deploying paddle-webhook |
+| 11 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
 
-Steps 1–9 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
+Steps 1–10 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
 editing**, and only after the edge functions are deployed, because the file points at
 their URLs.
 
@@ -43,7 +44,8 @@ select table_name from information_schema.tables
 ```
 
 Expect: `access_codes`, `billing_events`, `calendar_events`, `calendar_feeds`,
-`code_attempts`, `code_redemptions`, `notification_log`, `push_subscriptions`,
+`code_attempts`, `code_redemptions`, `foundation_claims`, `notification_log`,
+`push_subscriptions`,
 `signin_attempts`, `subscriptions`, `tester_signups`, `timer_profiles`,
 `visit_counts`, `visit_sources`.
 

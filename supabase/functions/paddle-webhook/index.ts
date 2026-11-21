@@ -12,6 +12,10 @@
       a mid-processing failure see the id already logged and report
       "already processed" without redoing the part that failed. See
       wasAlreadyProcessed()/recordEvent() below.
+   3. A Foundation place is claimed only after the signature has passed
+      and the public.subscriptions row is written, through one database
+      function that decides each account once. A failed claim is thrown
+      before the event is recorded, so Paddle retries. Never swallow it.
    ============================================================ */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -86,8 +90,9 @@ async function rest(path: string, init: RequestInit = {}) {
    to buy.
 
    That number is 30 normally. The launch offer replaces the rule rather
-   than lengthening it: subscribe by 5 December 2026 and the first charge
-   falls on 1 January 2027, whoever you are and whenever you signed up.
+   than lengthening it: subscribe by 5 December 2026 (Adelaide time) and
+   the first charge falls on 1 January 2027, whoever you are and whenever
+   you signed up.
    (The offer first ran in October 2026, with 1 November and 1 December.
    It was reset on 22 Nov 2026, the day the app went public on Google
    Play.)
@@ -142,14 +147,22 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
   : "https://api.paddle.com";
 
 const FREE_DAYS_FROM_SIGNUP = 30;
-/* Adelaide time. Subscribe before LAUNCH_OFFER_END -- the instant
-   Foundation closes, the end of 5 December 2026 -- and the first charge
-   falls on LAUNCH_FIRST_CHARGE. */
-const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
-const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T00:00:00+10:30");
+/* Subscribe before LAUNCH_OFFER_END -- the instant Foundation closes,
+   the end of 5 December 2026 in Adelaide -- and the first charge falls
+   on LAUNCH_FIRST_CHARGE.
 
-function firstChargeAt(createdAt: string, now: number): Date {
-  if (now < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);
+   LAUNCH_FIRST_CHARGE is deliberately NOT Adelaide midnight. The promise
+   is "Pay nothing until 2027", and the app is public, so it has to be
+   2027 on the customer's own calendar. Midnight on 1 January in Adelaide
+   is still 31 December 2026 everywhere to the west: 9:30 pm in Perth,
+   1:30 pm in London, 8:30 am in New York. 10:00 UTC on 1 January 2027 is
+   1 January from Hawaii (midnight) to New Zealand (11 pm), and 8:30 pm
+   in Adelaide. It can only ever make a charge later, never earlier. */
+const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
+const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T10:00:00Z");
+
+function firstChargeAt(createdAt: string, purchasedAt: number): Date {
+  if (purchasedAt < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);
   return new Date(Date.parse(createdAt) + FREE_DAYS_FROM_SIGNUP * 86400000);
 }
 
@@ -163,25 +176,36 @@ async function accountCreatedAt(userId: string): Promise<string | null> {
   return rows?.[0]?.created_at ?? null;
 }
 
-async function deferFirstCharge(userId: string, subscriptionId: string, currentNextBilledAt: string | null, status: string) {
+/* Answers with the instant the first charge now sits on when Paddle
+   accepted a move, and null in every other case (nothing to move, no
+   key, or Paddle refused). */
+async function deferFirstCharge(
+  userId: string, subscriptionId: string, currentNextBilledAt: string | null,
+  status: string, purchasedAtMs: number,
+): Promise<string | null> {
   if (!PADDLE_API_KEY) {
     console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set one.");
-    return;
+    return null;
   }
 
   /* Only a subscription that arrived on a trial price. Anyone else has
      paid today and their anniversary is Paddle's business, not ours.
      See the note above: this used to be inferred from the date and the
      inference stops holding once the free window outlasts the trial. */
-  if (status !== "trialing") return;
+  if (status !== "trialing") return null;
 
   const createdAt = await accountCreatedAt(userId);
-  if (!createdAt) return;
+  if (!createdAt) return null;
 
+  /* Inside the offer or not is decided by when the person subscribed,
+     the same instant Foundation is judged on. A delivery retried after
+     midnight on 5 December therefore gets the same date as the first
+     attempt would have. The real clock is only asked whether that date
+     is still ahead. */
   const now = Date.now();
-  const target = firstChargeAt(createdAt, now);
+  const target = firstChargeAt(createdAt, purchasedAtMs);
   /* Already past the free window -- nothing to defer to. */
-  if (target.getTime() <= now) return;
+  if (target.getTime() <= now) return null;
 
   /* Otherwise pin to the end of the free window exactly, in whichever
      direction. The trial price gives everyone the same fixed run from
@@ -189,7 +213,7 @@ async function deferFirstCharge(userId: string, subscriptionId: string, currentN
      late one overshoots; Paddle's own date never knows where the window
      actually ends. Pulling a date earlier can only ever bring one back
      to that boundary, never to today, because of the check above. */
-  if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return;
+  if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return null;
 
   const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
     method: "PATCH",
@@ -205,7 +229,9 @@ async function deferFirstCharge(userId: string, subscriptionId: string, currentN
 
   if (!response.ok) {
     console.error(`Could not defer first charge for ${subscriptionId}: ${response.status} ${await response.text()}`);
+    return null;
   }
+  return target.toISOString();
 }
 
 /* Read-only duplicate check. Does NOT record anything -- recording
@@ -251,6 +277,50 @@ function planFromInterval(interval: string | undefined) {
   if (interval === "year") return "annual";
   if (interval === "month") return "monthly";
   return null;
+}
+
+/* ─────────────────────────── Foundation ───────────────────────────
+   Foundation is a price lock with 100 places, for the first 100 people
+   to subscribe from 22 Nov 2026 to the end of 5 Dec 2026 (Adelaide).
+   The database decides who gets one (supabase/schema-foundation.sql):
+   the table cannot hold a 101st place, and an account is decided once,
+   so a replay or a retry gets the same answer and never a second place.
+
+   This file holds no Foundation date and no count. It passes on the
+   instant Paddle says the subscription was made, and the database
+   judges the closing date against that, never against the time the
+   webhook happened to arrive. */
+
+/* The instant the subscription was made, from Paddle's signed payload.
+   Only called for subscription.created, where occurred_at is a fair
+   last resort. Null when nothing usable was sent. */
+// deno-lint-ignore no-explicit-any
+function purchasedAt(data: any, event: Record<string, unknown>): string | null {
+  for (const value of [data?.created_at, data?.started_at, event.occurred_at]) {
+    if (typeof value === "string" && Number.isFinite(Date.parse(value))) return value;
+  }
+  return null;
+}
+
+/* Throws on any failure, including the 404 PostgREST gives when the SQL
+   has not been run. A claim that silently did not happen is a
+   subscriber who silently lost a place. */
+async function claimFoundationPlace(
+  userId: string, subscriptionId: string, subscribedAt: string, plan: string | null,
+) {
+  const response = await rest("/rpc/claim_foundation_place", {
+    method: "POST",
+    body: JSON.stringify({
+      p_user_id: userId,
+      p_subscription_id: subscriptionId,
+      p_subscribed_at: subscribedAt,
+      p_plan: plan,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`claim_foundation_place failed: ${response.status} ${await response.text()}`);
+  }
+  return await response.json();
 }
 
 /* Grants (or refreshes) one identity-schema capability for an account.
@@ -341,6 +411,38 @@ async function mirrorToIdentitySchema(
   }
 }
 
+/* Once Paddle has accepted the new first-charge date, the free period
+   runs to that date, so the row and the identity grants are written to
+   match, here and now. Paddle says the same in the subscription.updated
+   its own date change produces, but this function cannot lean on when
+   that arrives. If this delivery fails after the move (a Foundation
+   claim that could not be made, say) Paddle sends it again, and the
+   upsert at the top of the handler takes whatever the event says: the
+   retry would put the payload's original period end back over the newer
+   one, and the account would lose Premium at the trial price's own end,
+   before the date it was promised. Writing the moved date after every
+   accepted move makes the end state the same whichever order the events
+   are handled in.
+
+   Only the row for this subscription. Throws on failure, like every
+   other entitlement write, so Paddle retries. */
+async function extendFreePeriod(
+  userId: string, subscriptionId: string, status: string, periodEnd: string,
+) {
+  const response = await rest(
+    `/subscriptions?user_id=eq.${userId}&paddle_subscription_id=eq.${encodeURIComponent(subscriptionId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ current_period_end: periodEnd, updated_at: new Date().toISOString() }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`period end update failed: ${response.status} ${await response.text()}`);
+  }
+  await mirrorToIdentitySchema(userId, status, periodEnd);
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -420,6 +522,30 @@ Deno.serve(async (request) => {
       throw new Error(`upsert failed: ${upsert.status} ${await upsert.text()}`);
     }
 
+    /* Foundation, on creation only. Tried here, straight after the
+       authoritative write, so a slow or failing step further down cannot
+       push someone back in the queue for the last places. A failure is
+       held, not thrown yet: entitlement and the billing date below must
+       never wait on Foundation. It is thrown before the event is
+       recorded, so Paddle retries and the claim is made then. Not on
+       subscription.updated or .canceled: renewals and this function's
+       own date change produce those, and a cancellation writes nothing
+       to Foundation. */
+    const isCreation = eventType === "subscription.created" && Boolean(data?.id);
+    const subscribedAt = isCreation ? purchasedAt(data, event) : null;
+    let foundation: unknown = null;
+    let foundationError: unknown = null;
+    if (isCreation) {
+      try {
+        if (!subscribedAt) throw new Error("subscription.created carries no usable created_at");
+        foundation = await claimFoundationPlace(userId, String(data.id), subscribedAt, row.plan);
+        // A place number or a reason. Never an account id.
+        console.log(`foundation: ${JSON.stringify(foundation)}`);
+      } catch (error) {
+        foundationError = error;
+      }
+    }
+
     // public.subscriptions (above) is the authoritative write; this
     // mirrors the same outcome into the identity schema for the screen
     // saver and any future suite app. Also throws on failure now -- see
@@ -428,13 +554,24 @@ Deno.serve(async (request) => {
 
     /* Only on creation, and only after the writes above have stuck:
        this is a courtesy, and a courtesy must not be what decides
-       whether someone is entitled. Any failure inside is logged, not
-       thrown, so a retry is never triggered from here -- Paddle would
+       whether someone is entitled. A refusal from Paddle is logged, not
+       thrown, so a retry is never triggered by one -- Paddle would
        replay the whole event and the guard against moving the date
        earlier is what makes that harmless anyway. */
-    if (eventType === "subscription.created" && data?.id) {
-      await deferFirstCharge(userId, String(data.id), data?.next_billed_at ?? null, status);
+    if (isCreation) {
+      const movedTo = await deferFirstCharge(
+        userId, String(data.id), data?.next_billed_at ?? null, status,
+        subscribedAt ? Date.parse(subscribedAt) : Date.now(),
+      );
+      /* Paddle accepted the move, so the free period ends on that date.
+         Written before a held Foundation error is thrown, so a retry of
+         this event always ends with the moved date, not the payload's
+         original one. See extendFreePeriod(). */
+      if (movedTo) await extendFreePeriod(userId, String(data.id), status, movedTo);
     }
+
+    // Held until entitlement and the billing date were written. See above.
+    if (foundationError) throw foundationError;
 
     // Recorded only now that every write above has actually succeeded.
     // See the file header and recordEvent()'s own comment: this used to
@@ -442,7 +579,7 @@ Deno.serve(async (request) => {
     // between here and there.
     await recordEvent(eventId, eventType, userId, event);
 
-    return Response.json({ ok: true, status, plan: row.plan }, { headers: corsHeaders });
+    return Response.json({ ok: true, status, plan: row.plan, foundation }, { headers: corsHeaders });
   } catch (error) {
     console.error(error);
     // A 500 makes Paddle retry. Nothing on this path was recorded, so
