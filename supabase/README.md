@@ -73,8 +73,8 @@ select u.email, s.status, s.plan, s.current_period_end
 ```
 
 Expect `trialing` / `trial` and a date 14 days out — or, for an account
-made during launch month before 18 Oct 2026, `2026-11-01 00:00+10:30`
-exactly. `select public.trial_length();` says which rule is live.
+made before 22 Nov 2026 and moved by `relaunch-2026-11.sql`,
+`2026-12-06 00:00+10:30` exactly. `select public.trial_length();` says which rule is live.
 
 ## Scheduled jobs
 

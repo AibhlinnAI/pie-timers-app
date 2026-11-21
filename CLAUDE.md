@@ -49,18 +49,23 @@ arrived.
 
 ## Things worth knowing before you act
 
-- **October 2026 is Launch Month.** Not 19 September — that was the ADHD
-  conference, attended for tester recruitment and research.
-  `app/foundation.html` is the product-facing source of truth for the dates.
-  The offer: accounts made before **18 Oct 2026 00:00 +10:30** get Premium
-  free to **1 Nov** (a fixed finish line, not a rolling window); from 18 Oct
-  the standard 14 days from signup applies, which for an 18 Oct signup is also
-  1 Nov. Subscribe before **1 Nov** and the first charge falls **1 Dec**;
-  after that, 30 days from signup. Foundation closes 1 Nov or when 100 places
-  go.
-- **Pie Timers has not publicly launched.** It is in Google Play closed
-  testing. Do not assume a date on the calendar is a launch date — check the
-  board and the docs.
+- **The launch offer was reset on 22 Nov 2026 and runs to the end of
+  5 Dec 2026.** It first ran in October 2026 ("Launch Month": 18 Oct, 1 Nov,
+  1 Dec), before the app was public; Mal reset it the day Pie Timers went
+  public on Google Play. `app/foundation.html` is the product-facing source
+  of truth for the dates. The offer: accounts made before **22 Nov 2026
+  00:00 +10:30** get Premium free to the end of **5 Dec** (the instant is
+  6 Dec 00:00 +10:30; a fixed finish line, not a rolling window); from
+  22 Nov the standard 14 days from signup applies, which for a 22 Nov signup
+  is the same instant. Subscribe by **5 Dec** and the first charge falls
+  **1 Jan 2027**; after that, 30 days from signup. Foundation closes at the
+  end of 5 Dec or when 100 places go, and its 100 places count from 22 Nov
+  (nobody had subscribed before then). Accounts that already existed were
+  moved to the new finish line by `supabase/relaunch-2026-11.sql`, which is
+  only true once Mal has run it: check before saying so.
+- **Pie Timers is public on Google Play, since 22 Nov 2026** (release 7,
+  1.0.6). Closed testing came before it. Older notes that say it has not
+  launched, or that its Play page is a 404, are out of date.
 - **Nothing under `supabase/` is the deployed state.** Those files describe
   what *should* be running. SQL only changes when it is executed in the
   Supabase SQL editor (project `tgapmpbcqqnpsldehuqa`); an edge function only
@@ -77,7 +82,7 @@ arrived.
   `CACHE` in `app/sw.js`. `DEPLOY.md` was missing from this list until
   20 Sep 2026, which is exactly why it went stale.
 - **Foundation is a price lock, not a trial.** A$2.90/month or A$19/year, 100
-  places, closing at the start of 1 November 2026 (Adelaide) or when full.
+  places, closing at the end of 5 December 2026 (Adelaide) or when full.
   Separate from trial length. Never describe it by contrast with paying
   nothing.
 - **Before reusing an event page for a new event, port the live-mode fixes.**

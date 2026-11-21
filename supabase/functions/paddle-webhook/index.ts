@@ -85,18 +85,21 @@ async function rest(path: string, init: RequestInit = {}) {
    number of days after the account was created, whenever they happen
    to buy.
 
-   That number is 30 normally. Launch month replaces the rule rather
-   than lengthening it: subscribe before 1 November and the first charge
-   falls on 1 December, whoever you are and whenever you signed up.
+   That number is 30 normally. The launch offer replaces the rule rather
+   than lengthening it: subscribe by 5 December 2026 and the first charge
+   falls on 1 January 2027, whoever you are and whenever you signed up.
+   (The offer first ran in October 2026, with 1 November and 1 December.
+   It was reset on 22 Nov 2026, the day the app went public on Google
+   Play.)
 
    A fixed date, not a count of days, and keyed on the moment of
    purchase rather than the account's creation date. Both departures
    from the old rule are deliberate. The offer as promised is a date --
-   "free Premium until 30 November" -- and the honest implementation of
+   "free Premium until 31 December" -- and the honest implementation of
    a promise phrased as a date is a date. Keying on purchase is safe
    here in a way it was not before, because the answer is the same for
    everyone inside the window: there is no click to time and no days to
-   gain. It also means a tester whose account predates launch month is
+   gain. It also means a tester whose account predates the launch offer is
    treated like anyone else who buys during it, which is the promise.
 
    LAUNCH_OFFER_END and LAUNCH_FIRST_CHARGE must match the dates inside
@@ -123,9 +126,9 @@ async function rest(path: string, init: RequestInit = {}) {
    spent -- paying for a month and receiving less. Ask the payload;
    never infer.
 
-   That exclusion is also the one place launch month does not reach. A
-   lapsed trial that is revived by a purchase in October is charged on
-   the day, not on 1 December, because the money has already moved and
+   That exclusion is also the one place the launch offer does not reach. A
+   lapsed trial that is revived by a purchase during the offer is charged
+   on the day, not on 1 January, because the money has already moved and
    Paddle cannot unmove it from here. Refunding into the offer is a
    support decision, not one this function should make silently.
 
@@ -140,10 +143,10 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
 
 const FREE_DAYS_FROM_SIGNUP = 30;
 /* Adelaide time. Subscribe before LAUNCH_OFFER_END -- the instant
-   Foundation closes and public.trial_length() stops being generous --
-   and the first charge falls on LAUNCH_FIRST_CHARGE. */
-const LAUNCH_OFFER_END = Date.parse("2026-11-01T00:00:00+10:30");
-const LAUNCH_FIRST_CHARGE = Date.parse("2026-12-01T00:00:00+10:30");
+   Foundation closes, the end of 5 December 2026 -- and the first charge
+   falls on LAUNCH_FIRST_CHARGE. */
+const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
+const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T00:00:00+10:30");
 
 function firstChargeAt(createdAt: string, now: number): Date {
   if (now < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);

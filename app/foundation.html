@@ -24,7 +24,7 @@
   }());
 </script>
 <title>Foundation Members · Pie Timers</title>
-<meta name="description" content="Foundation members lock the AibhlínnAI Premium price for as long as their subscription stays active and AibhlínnAI offers a Premium subscription. 100 places. Closes when all 100 are taken or at the start of 1 November 2026, Adelaide time.">
+<meta name="description" content="Foundation members lock the AibhlínnAI Premium price for as long as their subscription stays active and AibhlínnAI offers a Premium subscription. 100 places. Closes when all 100 are taken or at the end of 5 December 2026, Adelaide time.">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -58,7 +58,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>26 October 2026</strong> &middot;
+    Last updated: <strong>22 November 2026</strong> &middot;
     <a href="pricing.html">Pricing</a> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <a href="privacy.html">Privacy Policy</a> &middot;
@@ -66,15 +66,15 @@
   </p>
 
   <div class="launch timer-card timer-card--amber">
-    <svg class="oct-mark" viewBox="-40 -76 392 80" role="img" focusable="false" aria-label="October">
+    <svg class="oct-mark" viewBox="-40 -76 392 80" role="img" focusable="false" aria-label="Launch">
       <g transform="translate(0 -36)">
         <circle class="dial-base" r="37"/>
         <path class="dial-pie" id="octPie" d="M 0 -37 A 37 37 0 1 1 0 37 A 37 37 0 1 1 0 -37 Z"/>
         <circle class="dial-rim" r="37"/>
       </g>
-      <text x="40" y="0" font-size="100">ctober</text>
+      <text x="52" y="0" font-size="100">Launch</text>
     </svg>
-    <p class="launch-caption" id="launchCaption">October is launch month.</p>
+    <p class="launch-caption" id="launchCaption">The launch offer runs to the end of 5 December.</p>
   </div>
 
   <h2>Your price is locked</h2>
@@ -83,7 +83,7 @@
   long as their subscription stays active and AibhlínnAI offers a Premium
   subscription.</p>
   <p>There are <strong>100 places</strong>. Foundation closes when all 100 are
-  taken or at the start of <strong>1 November 2026</strong> (Adelaide time),
+  taken or at the end of <strong>5 December 2026</strong> (Adelaide time),
   whichever comes first.</p>
   <p>Prices are in Australian dollars and include GST, VAT or sales tax where
   it applies. Checkout shows the final price in your currency. Whichever plan
@@ -108,19 +108,19 @@
   </ul>
 
   <h2>Who can join</h2>
-  <p>The first 100 people to subscribe before 1 November.</p>
+  <p>The first 100 people to subscribe by 5 December.</p>
 
   <h2>When your first payment is taken</h2>
-  <p>Make an account before <strong>18 October 2026</strong> (Adelaide time)
-  and you get Premium with everything on, free until <strong>1 November</strong>.
-  It is the same finish line whether you join on the first of the month or the
-  seventeenth. No card is needed. From 18 October the trial is the standard
-  14 days from the day you sign up, which for an account made on the 18th is
-  also 1 November. The app shows how long your own trial has left.</p>
-  <p><strong>If you subscribe before 1 November while your trial is still
-  running</strong>, Premium stays free until <strong>30 November</strong> and
-  your first payment is taken on <strong>1 December</strong>. Subscribing early
-  never costs you free time. If you subscribe after 1 November, your first
+  <p>If you made your account before <strong>22 November 2026</strong>
+  (Adelaide time), you get Premium with everything on, free until the end of
+  <strong>5 December</strong>, even if an earlier trial had already run out.
+  No card is needed. An account made from 22 November gets the standard
+  14 days from the day you sign up. The app shows how long your own trial has
+  left.</p>
+  <p><strong>If you subscribe by 5 December while your trial is still
+  running</strong>, Premium stays free until <strong>31 December</strong> and
+  your first payment is taken on <strong>1 January 2027</strong>. Subscribing early
+  never costs you free time. If you subscribe after 5 December, your first
   payment falls 30 days after the day you made your account. If you subscribe
   once your trial has already ended, your first payment is taken on the day you
   subscribe.</p>
@@ -160,18 +160,18 @@
   })();
 </script>
 <script>
-  /* The October pie empties clockwise across launch month, the same way
-     app.js's wedgePath() draws the time left. The instants are fixed in
-     UTC, so the result does not depend on the phone's own time zone.
-     Adelaide moves from +09:30 to +10:30 at 02:00 on 4 October, which
-     makes launch month 743 hours long. Without this script the page
-     keeps the full pie and the caption written in the markup. The
-     captions say nothing about whether Foundation is open, which this
-     page cannot know. */
+  /* The launch pie empties clockwise across the launch offer, the same
+     way app.js's wedgePath() draws the time left. The offer was reset on
+     22 Nov 2026, the day Pie Timers went public on Google Play: it runs
+     from the start of 22 November to the end of 5 December, 14 days.
+     The instants are fixed in UTC, so the result does not depend on the
+     phone's own time zone. Adelaide is on +10:30 for the whole window.
+     Without this script the page keeps the full pie and the caption
+     written in the markup. The captions say nothing about whether
+     Foundation is open, which this page cannot know. */
   (function () {
-    var START = Date.UTC(2026, 8, 30, 14, 30);  // 1 Oct 2026 00:00 +09:30
-    var SHIFT = Date.UTC(2026, 9, 3, 16, 30);   // 4 Oct 2026 02:00 +09:30
-    var END = Date.UTC(2026, 9, 31, 13, 30);    // 1 Nov 2026 00:00 +10:30
+    var START = Date.UTC(2026, 10, 21, 13, 30); // 22 Nov 2026 00:00 +10:30
+    var END = Date.UTC(2026, 11, 5, 13, 30);    // 6 Dec 2026 00:00 +10:30
     var R = 37;
 
     var pie = document.getElementById('octPie');
@@ -196,25 +196,21 @@
              ' A ' + R + ' ' + R + ' 0 ' + (left > 0.5 ? 1 : 0) + ' 1 0 ' + -R + ' Z';
     }
 
-    // The date in Adelaide, read from a shifted UTC date.
-    function adelaideDate(t) {
-      var offsetMinutes = t < SHIFT ? 570 : 630;
-      return new Date(t + offsetMinutes * 60000).getUTCDate();
-    }
-
     function render() {
       var now = Date.now();
       var left, text;
       if (now < START) {
         left = 1;
-        text = 'Launch month starts 1 October.';
+        text = 'The launch offer starts 22 November.';
       } else if (now < END) {
         left = (END - now) / (END - START);
-        var days = 32 - adelaideDate(now);
-        text = days === 1 ? 'Last day of launch month.' : days + ' days left in launch month.';
+        // START and END are both Adelaide midnights, so this counts
+        // Adelaide calendar days, today included.
+        var days = Math.ceil((END - now) / 86400000);
+        text = days === 1 ? 'Last day of the launch offer.' : days + ' days left in the launch offer.';
       } else {
         left = 0;
-        text = 'Launch month is over.';
+        text = 'The launch offer is over.';
       }
       pie.setAttribute('d', wedge(left));
       caption.textContent = text;
