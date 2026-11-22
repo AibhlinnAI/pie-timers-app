@@ -72,7 +72,7 @@ arrived.
   other way round: `LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`, not
   Adelaide midnight. That is Mal's rule: the moment the last time zone on
   Earth (UTC-12) reaches midnight on New Year's Eve, so it is already 2027
-  on every customer's calendar. In Adelaide it is 10:30 pm on 1 January. Because that moment is early on 2 January in New Zealand and a few Pacific islands, customer-facing wording says the first payment is taken **"from 1 January 2027"**, never "on" (Mal, 22 Nov 2026). The 100 places are enforced by
+  on every customer's calendar. In Adelaide it is 10:30 pm on 1 January. Because that moment is early on 2 January in New Zealand and a few Pacific islands, customer-facing wording says the first payment is taken **"from 1 January 2027"**, never "on" (Mal, 22 Nov 2026). Inside the offer the charge is that date or 30 days after the account was made, whichever is later, so an account made in the offer's last three days is never charged sooner than the standard rule would (also Mal, 22 Nov 2026). The 100 places are enforced by
   `supabase/schema-foundation.sql` and `paddle-webhook`, which is only true
   once Mal has run the SQL and deployed the function: check before saying so
   (`select public.foundation_status();`). Until then nothing stops

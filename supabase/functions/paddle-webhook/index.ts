@@ -164,9 +164,21 @@ const FREE_DAYS_FROM_SIGNUP = 30;
 const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
 const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T12:00:00Z");
 
+/* Inside the offer the first charge is LAUNCH_FIRST_CHARGE or the
+   standard 30 days after the account was made, WHICHEVER IS LATER.
+   The offer is two weeks long and its charge date is under four weeks
+   after it closes, so an account made in the offer's last three days
+   (from 12:00 UTC on 2 December) would reach 1 January with fewer than
+   30 days behind it. The terms promise that subscribing early never
+   costs free time someone would otherwise have had, so the offer must
+   never give less than the rule it replaces. October's offer never met
+   this: its charge date was a full month after its close. Decided by
+   Mal, 22 Nov 2026. The pages say "from 1 January 2027", which stays
+   true either way. */
 function firstChargeAt(createdAt: string, purchasedAt: number): Date {
-  if (purchasedAt < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);
-  return new Date(Date.parse(createdAt) + FREE_DAYS_FROM_SIGNUP * 86400000);
+  const standard = Date.parse(createdAt) + FREE_DAYS_FROM_SIGNUP * 86400000;
+  if (purchasedAt < LAUNCH_OFFER_END) return new Date(Math.max(LAUNCH_FIRST_CHARGE, standard));
+  return new Date(standard);
 }
 
 async function accountCreatedAt(userId: string): Promise<string | null> {

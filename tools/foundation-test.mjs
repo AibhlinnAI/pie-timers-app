@@ -381,6 +381,50 @@ for (const type of ['subscription.updated', 'subscription.canceled']) {
 }
 
 {
+  /* The offer never gives less than the standard 30 days. An account
+     made in the offer's last three days would reach 1 January with fewer
+     than 30 days behind it, so inside the window the first charge is the
+     later of the two dates. */
+  const buy = (accountCreatedAt, purchasedAt, id) => {
+    webhookRoute({ accountCreatedAt });
+    return deliver(createdEvent({
+      event_id: id, occurred_at: purchasedAt,
+      data: { created_at: purchasedAt, next_billed_at: new Date(at(purchasedAt) + 14 * 86400000).toISOString() },
+    }), { now: at(purchasedAt) + 5000 });
+  };
+  const thirty = (iso) => new Date(at(iso) + 30 * 86400000).toISOString();
+
+  await buy('2026-12-04T09:00:00+10:30', '2026-12-05T10:00:00+10:30', 'evt_test_w17_late_account');
+  const lateAccount = patches()[0] ? JSON.parse(patches()[0].body) : {};
+  check('W17 an account made on 4 Dec that buys on 5 Dec is charged 30 days after it was made, not on 1 January',
+    lateAccount.next_billed_at === thirty('2026-12-04T09:00:00+10:30') && at(lateAccount.next_billed_at) > at(FIRST_CHARGE), lateAccount);
+
+  await buy('2026-12-02T22:00:00+10:30', '2026-12-03T10:00:00+10:30', 'evt_test_w17_just_before');
+  const justBefore = patches()[0] ? JSON.parse(patches()[0].body) : {};
+  check('W17 an account made just before the two dates cross still gets 1 January 2027',
+    justBefore.next_billed_at === FIRST_CHARGE, justBefore);
+
+  await buy('2026-12-02T23:00:00+10:30', '2026-12-03T10:00:00+10:30', 'evt_test_w17_just_after');
+  const justAfter = patches()[0] ? JSON.parse(patches()[0].body) : {};
+  check('W17 ...and one made just after gets its full 30 days',
+    justAfter.next_billed_at === thirty('2026-12-02T23:00:00+10:30'), justAfter);
+
+  await buy('2026-11-22T08:00:00+10:30', '2026-11-22T09:00:00+10:30', 'evt_test_w17_first_day');
+  const firstDay = patches()[0] ? JSON.parse(patches()[0].body) : {};
+  check('W17 an account made on the first day still gets 1 January 2027', firstDay.next_billed_at === FIRST_CHARGE, firstDay);
+
+  const cases = ['2026-09-07T10:00:00+10:30', '2026-11-22T00:00:00+10:30', '2026-12-01T12:00:00+10:30', '2026-12-05T23:00:00+10:30'];
+  let neverEarlier = true;
+  for (let i = 0; i < cases.length; i++) {
+    const bought = at(cases[i]) > at('2026-11-22T00:00:00+10:30') ? new Date(at(cases[i]) + 60000).toISOString() : '2026-11-23T10:00:00+10:30';
+    await buy(cases[i], bought, 'evt_test_w17_sweep_' + i);
+    const p = patches()[0] ? JSON.parse(patches()[0].body) : {};
+    if (!(at(p.next_billed_at) >= at(FIRST_CHARGE) && at(p.next_billed_at) >= at(cases[i]) + 30 * 86400000)) neverEarlier = false;
+  }
+  check('W17 inside the window nobody is charged before 1 January 2027 or before their 30 days', neverEarlier);
+}
+
+{
   /* "Pay nothing until 2027" has to be true on the customer's own
      calendar, not only in Adelaide. Mal's rule: the first charge falls
      when the last time zone on Earth, UTC-12, reaches midnight on New
