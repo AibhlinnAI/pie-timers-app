@@ -23,7 +23,7 @@ These must **never** be committed:
 | Supabase service-role key | Supabase → Edge Functions → Secrets |
 | VAPID **private** key | Supabase → Edge Functions → Secrets |
 | Paddle webhook secret | Supabase → Edge Functions → Secrets |
-| Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from two functions, and that one only opens a checkout in the browser. `manage-subscription` uses it to open the customer portal. `paddle-webhook` uses it to move a new subscriber's first payment date (5.6), so the key must be allowed to change subscriptions [check label: the permission names on a Paddle API key were not read from Paddle]. With the key missing, or not allowed to do that, `paddle-webhook` still switches Premium on but answers 500 to every subscription made on a trial price. |
+| Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from three functions, and that one only opens a checkout in the browser. `manage-subscription` uses it to open the customer portal. `create-checkout` uses it to read a price, read discounts and make the transaction for someone who subscribes while their free trial is running (5.6), so the key must be allowed to read prices, read discounts and write transactions. `paddle-webhook` uses it only as the net, to move a first payment that still lands short of the rule's date, so the key must be allowed to change subscriptions as well [check label: the permission names on a Paddle API key were not read from Paddle]. With the key missing, or not allowed to make a transaction, checkout does not open for an account in its free trial: the page says to try again, nobody is charged, and `create-checkout` logs "Could not make checkout". |
 | Turnstile secret key | Supabase → Edge Functions → Secrets |
 | Google client secret | Supabase → Edge Functions → Secrets |
 | Store review address and code (`REVIEW_EMAIL`, `REVIEW_CODE`) | Supabase → Edge Functions → Secrets, and Play Console → Sign-in details. Nowhere else. See `app/README.md` step 4c. |
@@ -227,10 +227,13 @@ locked down.
 
 ### 5.3 Edge functions and URL configuration
 
-- [ ] Deploy the eight edge functions, each with `--no-verify-jwt` except
-      `manage-subscription`: signin, delete-account, paddle-webhook,
-      manage-subscription, notify-milestones, calendar-sync, google-connect,
-      review-signin.
+- [ ] Deploy the nine edge functions, each with `--no-verify-jwt` except
+      `manage-subscription` and `create-checkout`: signin, delete-account,
+      paddle-webhook, manage-subscription, create-checkout,
+      notify-milestones, calendar-sync, google-connect, review-signin.
+      (Those two are called with the signed-in user's own session token,
+      so they are deployed bare. There is no `supabase/config.toml` to
+      remember the setting, so the flag has to be right on every deploy.)
 - [ ] **Authentication → URL Configuration → Site URL**:
       `https://pietimers.aibhlinn.ai` — no trailing slash.
 - [ ] **Redirect URLs**: `https://pietimers.aibhlinn.ai/**` — both asterisks.
@@ -416,15 +419,68 @@ that release is on every track, `play | none` is people again.
 
 Foundation has 100 places and the database holds it to 100
 (`supabase/schema-foundation.sql`). The order matters. For the release that
-adds it (the Black Friday Launch Offer, 22 Nov 2026) the order is: the SQL,
-then the 7-day trial on the monthly trial price in Paddle (the tick below
-says why), then the `paddle-webhook` function, then Test A in 8.4, then the
-pages, then the aibhlinn.ai advert. The SQL and the function are run by hand; the pages
-go out when the branch is merged to `main`. Merge last, and only once Test A
-has shown 1 Jan 2027 on a real throwaway purchase: that date is the offer.
-Publish the aibhlinn.ai site branch only after that merge is live and
-`foundation.html` shows the Black Friday Launch Offer. Its advert links to
-that page, and until then the live page still describes the October offer.
+adds it (the Black Friday Launch Offer, 22 Nov 2026) the order is:
+
+1. the SQL;
+2. a look at what the Paddle API key may do (the tick below);
+3. `supabase functions deploy paddle-webhook --no-verify-jwt`;
+4. `supabase functions deploy create-checkout` (no flag on this one);
+5. `supabase functions list` shows both;
+6. Test A in 8.4, run from the browser console on the live site;
+7. Test B in 8.4;
+8. Test C in 8.4: the old Buy button, which is the one time the net's date
+   move meets Paddle before a customer needs it;
+9. the merge to `main`, which is what sends out the pages and `billing.js`;
+10. a look at the real Buy button (8.4, "After the merge");
+11. the aibhlinn.ai advert, last.
+
+The SQL and the two functions are run by hand; the pages and `billing.js`
+go out when the branch is merged. That order is safe because the new
+`paddle-webhook` works with the pages that are live now, and nothing calls
+`create-checkout` until the new `billing.js` is live: deploying it changes
+nothing for anyone until the merge. The one order that is not safe is the
+merge going out while the `paddle-webhook` that is live is still an older
+one ("If things are deployed in the wrong order", below). Merge only once Test A has shown, on a
+real throwaway purchase, a first payment on the first whole day at or after
+`2027-01-01T12:00Z` (1 or 2 Jan 2027 on your calendar; 8.4 says which): that
+date is the offer. Publish the aibhlinn.ai site branch only after that merge
+is live and `foundation.html` shows the Black Friday Launch Offer. Its advert
+links to that page, and until then the live page still describes the October
+offer.
+
+**Checkout is given the right first-payment day, so nothing is moved
+afterwards (the owner, 22 Nov 2026: "just make sure we get the date
+right").** What Paddle's overlay then puts in front of the customer (a
+date, a count of free days, or neither) has not been seen yet: Test A is
+the first look, and it says what to do if the overlay shows neither. Until this release a checkout
+opened on a catalogue trial price showed the purchase plus that price's
+trial, and `paddle-webhook` moved the date afterwards, so the pages had to
+say "Checkout may show an earlier first-payment date". That paragraph is off
+all three pages. Now, while an account's own free trial is running,
+`billing.js` asks the `create-checkout` function for a Paddle transaction.
+The function works out, from the account's own row and the server's clock,
+how many whole days of free time put the first payment at or after the
+rule's date, makes a transaction whose price is a copy of the plain
+catalogue price with that many days as its trial, checks Paddle's answer,
+and hands back the transaction's id. Paddle's checkout counts the days from
+the purchase itself, so the date it shows is the date it bills on, and
+nothing is moved afterwards. `paddle-webhook` keeps the same rule as a net
+that should have nothing to do. An account whose trial has ended opens the
+plain catalogue price from `billing.js`, as before, and pays on the day.
+
+**What "21 days" and "30 days" become.** A Paddle trial is a whole number of
+days counted from the moment of purchase, and the rule's date is an exact
+instant, so the day count is rounded up. The first payment is taken at the
+time of day the customer subscribed, on the first such moment at or after
+day 21 (monthly) or day 30 (yearly) from the account being made. That is
+between 21 and 22 days after the account was made (30 and 31 yearly), and
+never before it. During the offer it is between `2027-01-01T12:00Z` and
+`2027-01-02T12:00Z`. Two people who made their accounts at the same moment
+can differ by under 24 hours, set by the time of day each subscribed, never
+by which day of the trial they subscribed on. `2027-01-01T12:00Z` is 10:30 pm
+on 1 January in Adelaide, so most Australian offer subscribers will be shown
+2 January 2027. "From 1 January 2027" stays true. All of this was read from
+Paddle's documentation and run against stubs; Test A is the first real look.
 
 **The terms were revised on 22 Nov 2026, and two things here changed with
 them.** Foundation first closed at the end of 5 Dec 2026. It now closes at
@@ -449,7 +505,7 @@ and the function still uses the old rule, whatever the pages say. The end of
       step 3 of `supabase/relaunch-2026-11.sql` returns `rows_to_move = 0`
       (so the accounts made before 22 Nov have been moved to the end of
       5 Dec). The pages tell an account made before 22 Nov that its trial
-      runs to the end of 5 December "even if an earlier trial had run out".
+      runs to the end of 5 December "even if an earlier trial had already ended".
       Until that file has been run, a lapsed account that believes it and
       subscribes is charged on the day.
 - [ ] Before anything else, confirm Paddle's field names against events
@@ -479,44 +535,43 @@ and the function still uses the old rule, whatever the pages say. The end of
       on line 5 means the database still closes Foundation on 5 December:
       run `schema-foundation.sql` again.
 - [ ] `select public.foundation_status();` again. Still 100.
-- [ ] In Paddle, set the monthly trial price's trial period to **7 days**.
-      Catalogue, then Products, then the Pie Timers product, then the
-      monthly price that carries a trial (its id is `monthlyTrialPriceId`
-      in `app/config.js`), then edit its trial period [check label]. That
-      menu path was not read from Paddle, so check each label as you go,
-      and whether Paddle lets you change the trial on an existing price was
-      not checked either. If it does not, make a new monthly price with a
-      7-day trial and tell Claude its id: `monthlyTrialPriceId` in
-      `config.js` then has to change, which is a code change with its own
-      release. Leave the yearly trial price at 14 days and leave the two
-      plain prices alone.
-      Why (Mal, 22 Nov 2026: "consistency is critical when offering value
-      for early loyalty"): Paddle counts a trial from the purchase, so
-      checkout shows the purchase plus the trial, and `paddle-webhook`
-      never moves a date earlier than checkout showed. With 14 days on the
-      monthly price, someone who subscribes on day 10 of their trial is
-      shown day 24 and keeps it, while someone who subscribes on day 1 gets
-      day 21. Subscribing early is punished. With 7 days, checkout always
-      shows a date on or before day 21, so the function always moves the
-      date later, and every monthly subscriber ends on the same date:
-      21 days after they made their account, or 1 Jan 2027 if that is
-      later. Yearly needs no change: the purchase plus 14 days is at most
-      day 28, under 30.
-      If it is left at 14 days, nobody is charged early: the function still
-      never moves a date earlier than checkout showed. But a monthly
-      subscriber who subscribes after day 7 of their trial keeps a later
-      date than one who subscribes early, and the pages' "Checkout may show
-      an earlier first-payment date" is not what they see.
-      Do this in the same sitting as the function deploy below, not days
-      before it. With 7 days on the price, a move that does not happen
-      means a charge 7 days after subscribing, so the function has to be
-      the version that answers 500 and retries when a move fails (below).
-      Afterwards, open the monthly checkout on a throwaway account that is
-      still in its trial and confirm it shows a first payment 7 days out.
+- [ ] Nothing in Paddle's catalogue has to be changed for this release. An
+      earlier plan had a tick here: set the monthly trial price's trial to
+      7 days, so the date could be moved the same way for everyone. That
+      step is retired, because `create-checkout` now gives each checkout
+      its own number of free days and no catalogue trial price is opened.
+      If it has already been done, leave it: nobody is charged early
+      either way, as long as the net's move succeeds (Test C in 8.4 is
+      where that is seen). It does change one number. That price is now
+      opened only by an old cached page, and where this section says such
+      a purchase is billed "14 days after subscribing" when its move is
+      stuck, read 7 for the monthly plan. Your separate steps page may
+      still carry the 7-day tick: it is outside this repo and was not
+      changed here. Leave the two plain prices alone, and do not archive
+      the two trial prices yet (8.1 says when).
+- [ ] Check what the key behind `PADDLE_API_KEY` may do. `create-checkout`
+      needs it to read prices, read discounts and write transactions.
+      `paddle-webhook` needs it to change subscriptions, and
+      `manage-subscription` to make customer portal sessions [check label:
+      Paddle's key permissions screen was not read, so the names there may
+      differ]. A key that cannot write a transaction charges nobody: it
+      stops checkout opening for accounts in their free trial, and Test A
+      shows it at once.
 - [ ] Confirm the SQL is in place one more time, straight before the
-      function goes out: `select public.foundation_status();` answers. Do
-      not deploy the function until it does (see "wrong order" below).
-- [ ] Deploy the function: `supabase functions deploy paddle-webhook`.
+      functions go out: `select public.foundation_status();` answers. Do
+      not deploy `paddle-webhook` until it does (see "wrong order" below).
+- [ ] Deploy the webhook: `supabase functions deploy paddle-webhook --no-verify-jwt`.
+      The flag matters. Paddle calls this function with a signature, not a
+      Supabase token, and without the flag Supabase's gateway would ask
+      Paddle for a token it never sends and turn every delivery away
+      before the function runs. (Read from 5.3 and `app/README.md`, not
+      run. Until 23 Nov 2026 this tick left the flag off.)
+- [ ] Deploy the checkout function: `supabase functions deploy create-checkout`.
+      No flag on this one: it is called with the signed-in user's own
+      session token, like `manage-subscription`. It needs no new secret.
+      Nothing calls it until the new `billing.js` is live, so deploying it
+      changes nothing for anyone yet.
+- [ ] `supabase functions list` shows both, each updated just now.
 - [ ] Run the catch-up statement at the end of `schema-foundation.sql`. On
       22 Nov 2026 it gives no new place, because nobody had subscribed.
 - [ ] Keep the paid testing service's accounts out. They do not qualify for
@@ -528,16 +583,35 @@ and the function still uses the old rule, whatever the pages say. The end of
       out, because their trials run to 5 December and any of them can
       subscribe from the moment the offer is published. Keep the addresses
       out of this repo.
-- [ ] Run Test A in 8.4 on a throwaway account. Do not publish the pages
-      until it has shown `next_billed_at` on 1 Jan 2027. (That is the date
-      for an account made and subscribed on the same day until early
-      December. 8.4 gives the dates after that.)
-- [ ] Publish the pages. Open `pricing.html` and `foundation.html` signed out:
-      both say 100 of 100 places.
+- [ ] Run Test A in 8.4 on a throwaway account, from the browser console
+      on the live site. Do not merge until checkout itself has shown the
+      right first-payment day and `next_billed_at` in Paddle is that same
+      day: the first whole day, counted from the purchase, at or after
+      `2027-01-01T12:00Z`. (That is the date for an account made and
+      subscribed on the same day until early December. 8.4 gives the
+      dates after that, and what to do if the price or the date is not
+      what it should be.)
+- [ ] Run Test B in 8.4.
+- [ ] Run Test C in 8.4, on another throwaway account still in its free
+      trial: the live Buy button, which is still the old one and opens a
+      catalogue trial price. It takes no money. It is the only time the
+      net's date move, and the key's permission to make it, are seen
+      against Paddle. It can only be run this way before the merge.
+- [ ] Straight before the merge: `supabase functions list` shows
+      `paddle-webhook` and `create-checkout` both updated in this sitting,
+      and "first charge: checkout's date stands" was seen in the
+      `paddle-webhook` log in Test A. Only the new `paddle-webhook` writes
+      that line. Without it, do not merge: an older `paddle-webhook` under
+      the new pages is the one order that can charge someone early (see
+      "If things are deployed in the wrong order").
+- [ ] Merge, which publishes the pages and `billing.js`. Open `pricing.html`
+      and `foundation.html` signed out: both say 100 of 100 places.
+- [ ] On a throwaway account still in its free trial, press the real Buy
+      button on `pricing.html` (8.4, "After the merge").
 - [ ] Block the Supabase host in the browser's developer tools and reload:
       Pricing says it could not check, Foundation shows no number.
 - [ ] With the pages live, sign in to the app as an account that has
-      subscribed on a trial price and has not been charged yet (the Test A
+      subscribed during its free trial and has not been charged yet (the Test A
       account, if its subscription is still there). Settings shows the plan
       as "Monthly, first payment from" and a date, not "Free trial". No
       plans are offered there. On `pricing.html`, the status line says
@@ -564,20 +638,78 @@ The first-payment rule has no cut-off.
 **One thing still needs eyes, on that day and every other: a 500 from
 `paddle-webhook`.** No page and no script can put right a first-payment move
 that keeps failing ("What a retry cannot do", below). Everyone who subscribes
-during the offer has their first payment from 12:00 UTC on 1 January 2027. A
-monthly subscriber of 25 to 31 December whose move is stuck would be charged
-7 days after subscribing, on 1 to 7 January, earlier than the day 21 the
-pages promise. Before going away for any stretch that covers late December
-or the first week of January:
+during the offer has their first payment from 12:00 UTC on 1 January 2027.
+A purchase made through `create-checkout` needs no move, so a stuck move is
+now only possible for a subscription that did not come through it: an older
+cached page that opened one of the two retired catalogue trial prices, or
+one of them opened by hand. Such a subscriber whose move is stuck would be
+charged 14 days after subscribing (7 on the monthly plan, if the retired
+7-day change was made in Paddle before it was retired), which can be
+earlier than the pages promise. Test C in 8.4 is run once, before the
+merge, to see that move succeed against Paddle.
+
+**A fault in `create-checkout` charges nobody.** It stops checkout opening
+for accounts in their free trial: the page says "Could not open checkout.
+Please try again.", and the function writes a log line starting "Could not
+make checkout". Nobody is told unless a customer writes in, so it is a sale
+that waits, found only by reading the log. It is never a wrong charge: the
+page does not fall back to another price.
+
+Before going away for any stretch that covers late December or the first
+week of January:
 
 - [ ] Search the `paddle-webhook` function log for "Could not defer first
       charge". Expect no line since it was last checked. If there is one,
       follow "What a retry cannot do" below before leaving.
+- [ ] Search it too for "first charge moved after checkout" and "trial
+      subscription on a catalogue price". Neither is a fault, and nobody
+      was charged early. Each one is a subscription that did not come
+      through `create-checkout` (or, for the first, a date a few seconds
+      short), so the customer was shown one date and is billed on a later
+      one. A run of them means old pages are still about.
+- [ ] Search it for "free period on an account whose own free trial was
+      not running". This one is to look at. A subscription arrived with a
+      free period, and when it was bought the account was not in its own
+      free trial: the trial had ended, or the account already had a
+      subscription. The terms give that person no free period: they pay
+      on the day. Nobody was charged wrongly, and the function changed
+      nothing, because it never moves a date earlier than checkout
+      showed. It is one of three things: a transaction `create-checkout`
+      made during the trial and that was paid later (whether Paddle
+      allows that is what Test B's spare transaction finds out); a retired
+      catalogue trial price opened by hand; or, once in a while, someone
+      whose trial ended in the minutes their checkout was open. Match the
+      line to a subscription in Paddle by its time. What to do with that
+      subscription (leave it, or cancel it in Paddle and write to the
+      customer) is your call.
+- [ ] Search it for "First payment later than the rule: by N hours". A day
+      or two is a checkout left open, and there is nothing to do. So is a
+      trial you extended by hand. Many days, on an account whose trial
+      you did not extend, is a transaction made on one day and paid on a
+      later one: its free days are counted from the day it was paid, so
+      that subscriber's first payment is later than someone else's with
+      the same account day. Same as the line above: nobody was charged
+      wrongly, and what to do is your call.
+- [ ] Search the `create-checkout` function log for "Could not make
+      checkout". A line now and then is a customer whose trial had just
+      ended or who mistyped a discount code. The same line many times
+      over, or any line naming Paddle or `PADDLE_API_KEY`, is checkout not
+      opening for people in their trial: fix the cause before leaving
+      (8.4, "Reading a failure"). Many lines saying "answered 429" are
+      Paddle turning the function away for calling too often (its
+      documentation allows 240 requests a minute from one address, then
+      refuses for 60 seconds; read 23 Nov 2026). `create-checkout` has no
+      limit on how often one signed-in account may call it, so one
+      account calling in a loop could cause that for everyone. Nobody is
+      charged by it. Many "checkout made" lines within minutes of each
+      other, far more than there are new subscriptions, are the same
+      thing seen earlier.
 - [ ] In Paddle, list the subscriptions whose status is `trialing` [check
       label: the Subscriptions list and its status filter were not read
-      from Paddle]. None may show a next payment before 1 Jan 2027. A
-      monthly one whose next payment is 7 days after it was made (14 days
-      on yearly) is a move that did not happen.
+      from Paddle]. None may show a next payment before 1 Jan 2027, and
+      none a next payment earlier than the rule's date for its own
+      account and plan (8.4). One that does is a move that did not
+      happen.
 - [ ] Decide who watches for a failed delivery while you are away, and
       check it reaches them [check label: where Paddle sends its
       failed-notification emails, and to which address, was not read from
@@ -594,16 +726,20 @@ While Foundation is open, run the "no decision" query in the SQL file every
 day or two. It should return no rows. A row is a subscriber whose claim
 never happened: run the catch-up.
 
-Also open each new subscription made on a trial price in Paddle and check
-`next_billed_at` against the rule in 8.4. Until the new year that is 1 Jan
-2027 (`2027-01-01T12:00:00Z`) for most accounts, and later for an account
-whose own 30 days (yearly) or 21 days (monthly) run past it. It is never
-before 1 Jan 2027, and never earlier than the date checkout showed. On a
-monthly plan, with the 7-day trial on the price, checkout shows a date
-7 days out and the function moves it every time.
+Also open each new subscription made during a free trial in Paddle (status
+`trialing`) and check `next_billed_at` against the rule in 8.4. It is the
+first whole day, counted from the moment of purchase, at or after the
+rule's date: the same time of day as the purchase, and under 24 hours past
+the rule's instant. Until the new year that is between
+`2027-01-01T12:00:00Z` and `2027-01-02T12:00:00Z` for most accounts, and
+later for an account whose own 30 days (yearly) or 21 days (monthly) run
+past 1 January. It is never before `2027-01-01T12:00:00Z`, and never
+earlier than the date checkout showed.
 
-A move that was needed and did not happen now retries (Mal's instruction,
-22 Nov 2026; until then it was logged and answered 200). There are four ways
+`paddle-webhook` is the net, and a move it needs and cannot make retries
+(Mal's instruction, 22 Nov 2026; until then it was logged and answered
+200). A purchase made through `create-checkout` needs no move, so what
+follows is about a subscription that arrived another way. There are four ways
 a move can fail: the Paddle key is missing ("PADDLE_API_KEY not set"); the
 account's creation date could not be read (the lookup failed, there was no
 row, or the date did not parse); the payload gave neither Paddle's own date
@@ -620,9 +756,13 @@ nothing.
 What a retry cannot do is fix a cause that does not go away by itself. A
 missing key stays missing until it is set, and an account with no creation
 date on record fails every time. Paddle stops retrying after its own limit
-(not read from Paddle: check its notification log), and from then on the
-customer is billed on the trial price's own schedule: 7 days after
-subscribing on a monthly plan, 14 days on a yearly one. So treat a 500 from
+(Paddle's documentation says up to 60 tries over about two days for a live
+destination; not observed: check its notification log), and from then on
+the customer is billed on the date Paddle already holds. The only schedule
+an unmoved date can fall back to now is the old catalogue trial prices'
+own, 14 days after subscribing (7 on the monthly plan, if the retired
+7-day change was made), for a purchase made from an old cached page. So
+treat a 500 from
 this function as something to act on the same day. Search the function log
 for "Could not defer first charge" and fix the cause first. Only a refusal
 from Paddle names the subscription in its log line. Match the others to a
@@ -658,11 +798,11 @@ update public.subscriptions
  where user_id = '<account uuid>';
 ```
 
-For anyone who subscribes monthly
-before about 25 Dec 2026, or yearly before about 18 Dec 2026, an unmoved
-date would be a charge in December 2026 for someone promised none until
-2027. This check does not end with the offer: the 30-day and 21-day rule is
-permanent.
+For anyone who subscribes on one of the old catalogue trial prices before
+about 18 Dec 2026 (before about 25 Dec on the monthly plan, if that price
+carries the retired 7-day change), an unmoved date would be a charge in
+December 2026 for someone promised none until 2027. This check does not
+end with the offer: the 30-day and 21-day rule is permanent.
 
 If things are deployed in the wrong order: pages before the SQL show "could
 not check" and buying works as before. The function before the SQL is not
@@ -670,14 +810,39 @@ harmless, so do not do it. It answers 500 to every new subscription, after
 Premium and the billing date are already written, and Paddle sends each one
 again until the SQL exists. Each of those retries writes the event's original
 period end back into `public.subscriptions` before the function writes the
-moved one again (`extendFreePeriod` in `paddle-webhook`). The function is
-built so the retry ends on the moved date, but that has only been checked
-against stubs, never against Paddle. So after any 500 followed by a retry,
-whatever caused it, check that account: `current_period_end` in
-`public.subscriptions` must match `next_billed_at` in Paddle (1 Jan 2027,
-`2027-01-01 12:00:00+00`, for most accounts until the new year). If it reads
-the trial price's own end instead, the account would lose Premium before its
-first payment: set it to the Paddle date by hand.
+first-payment date again (`extendFreePeriod` in `paddle-webhook`). The
+function is built so the retry ends on the first-payment date, but that has
+only been checked against stubs, never against Paddle. So after any 500
+followed by a retry, whatever caused it, check that account:
+`current_period_end` in `public.subscriptions` must match `next_billed_at`
+in Paddle. If it reads an earlier date instead, the account would lose
+Premium before its first payment: set it to the Paddle date by hand.
+
+**The merge before the new `paddle-webhook` is the dangerous order.** The
+new `billing.js` opens checkouts whose first payment is weeks out, on the
+date `create-checkout` worked out. An older `paddle-webhook` does not know
+that. The one on `main` before this release moves every first payment to
+the account's creation plus 30 days, "in whichever direction", earlier
+included, and knows nothing of 1 January 2027 (read in `main`'s copy of
+the file on 23 Nov 2026; which version is deployed was not checked).
+Under the new pages it would move a first payment that checkout showed as
+2 January 2027 back to 25 December 2026 for an account made on
+25 November: a charge earlier than the customer was shown, which is the
+one thing this release exists to prevent. So the merge waits for two things: `supabase functions list`
+shows `paddle-webhook` updated in this sitting, and Test A's
+`paddle-webhook` log has "first charge: checkout's date stands", a line
+only the new function writes. If the merge has already gone out over an
+older `paddle-webhook`: deploy the new one at once, then open every
+subscription made since the merge in Paddle and check `next_billed_at`
+against the rule (8.4); move any that is early by hand, and set
+`current_period_end` to match (the statement above).
+
+`create-checkout` deployed before the SQL, or before `paddle-webhook`,
+harms nothing while the old pages are live: nothing calls it until the new
+`billing.js` is out. The merge before `create-checkout` is deployed only
+stops sales: the new `billing.js` would ask for a function that is not
+there, and nobody in their free trial could open checkout until it is.
+Nobody would be charged wrongly.
 
 `node --experimental-strip-types tools/foundation-test.mjs` checks the
 function's wiring, the SQL file's shape and both pages against stubs. It
@@ -856,12 +1021,39 @@ for.
 
 ### 8.1 Catalogue
 
-- [ ] Create the product and its four prices in **Catalogue → Products**:
-      a yearly and a monthly price that are paid on the day, and a yearly
-      and a monthly price with a trial set on the price (14 days on the
-      yearly one, 7 days on the monthly one; 5.6 says why).
-- [ ] Copy the four price ids into `app/config.js` → `paddle.annualPriceId`,
-      `monthlyPriceId`, `annualTrialPriceId` and `monthlyTrialPriceId`.
+- [ ] Create the product and its two prices in **Catalogue → Products**: a
+      yearly and a monthly price that are paid on the day, with no trial
+      set on either. Those two are the only prices in use. `billing.js`
+      opens them for an account whose trial has ended, and
+      `create-checkout` copies them, with the right free days added, for
+      an account whose trial is running (5.6).
+- [ ] Copy the two price ids into `app/config.js` → `paddle.annualPriceId`
+      and `monthlyPriceId`, and into `PLAIN_PRICE` in
+      `supabase/functions/create-checkout/index.ts`. A test pins the two
+      files equal.
+- [ ] Discount codes: keep each one to the **product**, or to nothing.
+      Never keep one to a price. For someone in their free trial,
+      `create-checkout` buys a copy of the plain price, which is a
+      different price in Paddle, so a discount kept to a price id cannot
+      apply there. The function turns such a code away ("That discount
+      code was not recognised") and makes no transaction, and it does the
+      same for a code that has reached its end date or its limit of uses.
+      Paddle still lists all of those as "active": that word only means
+      not archived (read on Paddle's list-discounts page, 23 Nov 2026).
+      A lapsed account opens the plain price itself, where Paddle's own
+      overlay judges the code as it always did.
+- [ ] The product also has two older prices with a trial set on the price,
+      `annualTrialPriceId` and `monthlyTrialPriceId` in `config.js`. They
+      are retired: nothing in `billing.js` opens them. Their ids stay in
+      `config.js` for now, because a browser can pair an older cached
+      `billing.js` with the new `config.js`, and that older file charges
+      today if the ids are missing. Do not archive them in Paddle in the
+      same release either: an old cached page can still open one, and
+      what Paddle does with an archived price in checkout, or with a
+      subscription already on it, was not read. Once
+      "trial subscription on a catalogue price" has stopped appearing in
+      the `paddle-webhook` log for a few weeks, archive both, then take
+      the two ids out of `config.js` in a release of their own.
 - [ ] Check the base currency. `annualPrice`, `monthlyPrice`, `annualSaving`
       and `annualNote` in `config.js` are display labels only — Paddle charges
       the real localised amount. Prices are set in **AUD**, so the labels read
@@ -924,70 +1116,130 @@ Simulations) run in Sandbox only, so a Production destination can never be
 given a synthetic event. The only way to exercise the live path is a real
 purchase, refunded afterwards.
 
-**Which price you get decides what this test proves.** `billing.js` hands
-anyone still inside their account trial (runs to the end of 5 Dec 2026 for an
-account made before 22 Nov 2026, 14 days from signup after) the *trial* price, so that
-purchase authorises the card and takes **nothing** today — there is no charge
-to refund, and the status stays `trialing`. Only a lapsed account takes the
-plain price and pays on the spot. Run both, in this order, on a throwaway
-account rather than your own.
+**Which path you take decides what this test proves.** While an account's
+own free trial is running (to the end of 5 Dec 2026 for an account made
+before 22 Nov 2026, 14 days from signup after), `billing.js` asks the
+`create-checkout` function for a transaction that already carries the right
+number of free days, so that purchase authorises the card and takes
+**nothing** today — there is no charge to refund, and the status stays
+`trialing`. Only a lapsed account opens the plain price and pays on the
+spot. Run both, in this order, on a throwaway account rather than your own.
+Then run Test C, on another throwaway account: it is the old Buy button,
+and the one time the net under all this is seen working against Paddle.
 
-Test A — still in trial, takes no money, exercises the most code:
+Test A — still in trial, takes no money, and is the first real purchase
+through `create-checkout`. Everything about that function was read from
+Paddle's documentation and run against stubs. This test is where it meets
+Paddle, and the list at the end of it says what only this test can show.
 
-- [ ] Buy the monthly plan through your own live checkout.
+Before the merge the live `billing.js` is still the old one, so Test A is
+run from the browser console. Sign in on the live site as a throwaway
+account that is still in its free trial, reload the page so nothing of
+Paddle's is loaded yet, and open the console.
+
+First, a spare. This makes one more transaction for the same account and
+opens nothing:
+
+```js
+(async () => {
+  const t = await CT.auth.validToken();
+  const r = await fetch(CT.config.supabaseUrl + '/functions/v1/create-checkout', { method: 'POST', headers: { apikey: CT.config.supabaseAnonKey, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ cadence: 'monthly' }) });
+  console.log('spare', r.status, await r.json());
+})();
+```
+
+- [ ] Write down the spare's `transactionId` and the time. Do not open it
+      yet. It is looked at again at the end of Test B, after this
+      account's trial has been ended, to find out one thing nobody knows:
+      whether a transaction made earlier can still be opened later, and
+      from which day Paddle then counts its free days.
+
+Then the test itself. Paste this. It sends exactly what the new
+`billing.js` sends.
+
+```js
+(async () => {
+  const t = await CT.auth.validToken();
+  const r = await fetch(CT.config.supabaseUrl + '/functions/v1/create-checkout', { method: 'POST', headers: { apikey: CT.config.supabaseAnonKey, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ cadence: 'monthly' }) });
+  const d = await r.json(); console.log(r.status, d);
+  if (!d.transactionId) return;
+  if (!window.Paddle) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  Paddle.Initialize({ token: CT.config.paddle.clientToken, checkout: { settings: { displayMode: 'overlay', theme: 'light' } } });
+  Paddle.Checkout.open({ transactionId: d.transactionId, customer: { email: CT.auth.getUser().email } });
+})();
+```
+
+- [ ] The console prints `200` and an answer with `ok: true`, a
+      `transactionId`, `trialDays` and `firstPaymentFrom`. Write down
+      `trialDays` and `firstPaymentFrom`. `firstPaymentFrom` is the rule's
+      date for this account. Any other status: "Reading a failure" below,
+      and stop.
+- [ ] **Before paying**, write down what the overlay shows: the
+      first-payment day or the count of free days, the price, the
+      currency, whether tax is included, and whether your email is filled
+      in. Write down which of the three it is: a first-payment day, a
+      count of free days, or neither. The day checkout shows must be the
+      purchase day plus `trialDays`
+      days. This is the point of the release, and it is the first time it
+      is seen: Paddle's documentation does not say what the overlay shows
+      for a trial. If it shows neither a day nor a count, do not pay and
+      do not merge yet ("If Test A fails", below).
+- [ ] Change the country in the overlay to one outside Australia and note
+      whether the price changes to that country's currency. The pages say
+      "Checkout shows the final price in your currency". If it does not
+      change, **stop and do not merge** ("If Test A fails", below).
+- [ ] Pay. Nothing is taken. In Paddle the subscription is `trialing`, and
+      `next_billed_at` must be that day: the purchase time plus
+      `trialDays` days, the same day the overlay showed, at or after the
+      rule's date and under 24 hours after it.
+      The rule's date (`firstChargeAt` in `paddle-webhook`, `freePeriod`
+      in `create-checkout`) is the later of the day the account was made
+      plus 30 days on a yearly plan or 21 days on a monthly plan
+      (`FREE_DAYS_YEARLY`, `FREE_DAYS_MONTHLY`) and `LAUNCH_FIRST_CHARGE`.
+      There is no subscribe-by date: it is keyed on **the account's
+      creation date and the plan**, not on when the purchase is made. So
+      a throwaway account made today and bought today on the monthly plan
+      expects the rule's date to be **`2027-01-01T12:00:00Z`** if the
+      account is made before 10:30 pm on 11 Dec 2026, Adelaide time
+      (before 10:30 pm on 2 Dec on the yearly plan), and day 21 (monthly)
+      or day 30 (yearly) from account creation after that.
+      `next_billed_at` is then the first moment at or after it that falls
+      at the time of day you paid. `2027-01-01T12:00:00Z` is 10:30 pm on
+      1 Jan in Adelaide, so a purchase made before 10:30 pm in Adelaide
+      shows **2 January 2027** there, and one made after 10:30 pm shows
+      1 January. It is never before `2027-01-01T12:00:00Z`: the moment
+      the last time zone on Earth (UTC-12) reaches midnight on New Year's
+      Eve, so "Pay nothing until 2027" holds on every customer's calendar.
+      It is not Adelaide midnight, which is still 31 December 2026
+      everywhere to the west.
 - [ ] Confirm the `public.subscriptions` row's **`plan` changes from `trial` to
       `monthly`**. The status stays `trialing` and does *not* become `active`
       on this path, and looking for `active` here reads a working webhook as a
-      broken one.
-- [ ] Confirm a row in `public.billing_events`.
+      broken one. `current_period_end` reads the same instant as
+      `next_billed_at`. `has_active_plan()` reads this column, so it is
+      what keeps Premium on until the first payment.
+- [ ] Confirm a row in `public.billing_events`, and that its payload
+      carries `custom_data.user_id` (the test account's id) and
+      `custom_data.trial_days`. Paddle's documentation says custom data on
+      a transaction is copied to the subscription it makes; this is where
+      that is seen. Without `user_id` there the webhook cannot tell whose
+      purchase it is ("If Test A fails", below).
 - [ ] Confirm **three** rows in `identity.product_entitlements`: `can_sync`,
       `can_use_calendar`, `can_use_screensaver`. Note that `grant_trial` may
       already have written here, so check `source` and the timestamps rather
       than just counting rows.
-- [ ] Confirm `next_billed_at` in Paddle follows the first-payment rule
-      (`firstChargeAt` in `paddle-webhook`). The first payment is taken at
-      the latest of three instants: the day the account was made plus
-      30 days on a yearly plan or 21 days on a monthly plan
-      (`FREE_DAYS_YEARLY`, `FREE_DAYS_MONTHLY`; 30 if the plan cannot be
-      read); `LAUNCH_FIRST_CHARGE`; and Paddle's own `next_billed_at`, the
-      date its checkout showed: the purchase plus the trial on the price,
-      7 days on the monthly trial price once 5.6 is done, 14 on the yearly
-      one. There is no
-      subscribe-by date: the rule is keyed on **the account's creation
-      date and the plan**, not on when the purchase is made. So a throwaway
-      account made today and bought today on the monthly plan expects
-      **1 Jan 2027** if it is made before 10:30 pm on 11 Dec 2026, Adelaide
-      time (before 10:30 pm on 2 Dec on the yearly plan), and day 21
-      (monthly) or day 30 (yearly) from account creation after that.
-      Before you look at the result, note the first-payment date the
-      checkout itself shows: on the monthly plan it should be 7 days out.
-      If it shows 14, the trial on the monthly trial price has not been
-      changed (5.6). With 7 days there, every monthly purchase made during
-      a trial is moved, whichever day it is made on. (Left at 14, a monthly
-      purchase made after day 7 of the trial from 18 Dec 2026 keeps
-      Paddle's own date, nothing is sent to Paddle, and the test proves
-      nothing about the key: buy on the day the account is made.) This is
-      the only check that exercises `deferFirstCharge`, and therefore the
-      only proof `PADDLE_API_KEY` is set. Without that key the function
-      still switches Premium on, but it answers 500 to Paddle, logs "Could
-      not defer first charge: PADDLE_API_KEY not set", and Paddle sends the
-      event again, up to its own retry limit (5.6). The exact instant of
-      `LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`: the moment the last
-      time zone on Earth (UTC-12) reaches midnight on New Year's Eve, so
-      "Pay nothing until 2027" holds on every customer's calendar. It is
-      10:30 pm on 1 Jan in Adelaide. It is not Adelaide midnight, which is
-      still 31 December 2026 everywhere to the west.
-- [ ] Confirm `current_period_end` on the `public.subscriptions` row reads
-      the same instant as `next_billed_at` (`2027-01-01 12:00:00+00` in the
-      1 January case), not the trial price's own end (7 days out on
-      monthly, 14 on yearly).
-      `has_active_plan()` reads this column, so it is what keeps Premium on
-      until the first payment.
-- [ ] Read the function log for this purchase. If any delivery answered 500
-      and was then retried, check `current_period_end` again after the
-      retry: it must still read the moved date. Note here what Paddle sent after
-      the repeated date move (a second `subscription.updated`, or nothing);
-      that has not been observed yet.
+- [ ] Read the `create-checkout` function log. One line for this purchase:
+      "checkout made: monthly, N days, first payment from ...", with the
+      `trialDays` and `firstPaymentFrom` you wrote down, and no line
+      starting "Could not make checkout".
+- [ ] Read the `paddle-webhook` function log. It has "first charge:
+      checkout's date stands". It has none of "first charge moved after
+      checkout", "Could not defer first charge" and "trial subscription on
+      a catalogue price". Nor does it have "free period on an account
+      whose own free trial was not running": this account's trial is
+      running. If any delivery answered 500 and was then
+      retried, check `current_period_end` again after the retry: it must
+      still read the same instant as `next_billed_at`.
 - [ ] Confirm a row in `public.foundation_claims` for the test account with a
       place number, and that `select public.foundation_status();` shows one
       place fewer (so do `pricing.html` and `foundation.html`, once the new
@@ -997,6 +1249,87 @@ Test A — still in trial, takes no money, exercises the most code:
       purchase'). Confirm `select public.foundation_status();` is back where
       it started. The row stays, so Test B's purchase on the same account
       takes no place.
+- [ ] Open the customer portal for the test account from the app's
+      Settings. It opens, and it names the plan properly (the price was
+      made for this one transaction, and how the portal names such a
+      price was not read).
+- [ ] Repeat once on the yearly plan, on a second throwaway account still
+      in its trial: change `cadence: 'monthly'` to `cadence: 'annual'` in
+      the snippet. And once with a discount code, if any exist: add
+      `discountCode: '<the code>'` beside `cadence`. Try a good code
+      that is kept to the product or to nothing: the overlay must show
+      the discounted price. Then, if you have one, try a code that has
+      reached its end date, or one kept to a price: the console must
+      print `422` and `discount_not_found`, and nothing opens. If a good
+      code prints `502`, read the `create-checkout` log: Paddle refused
+      the discount on this kind of transaction, and codes cannot be used
+      by someone in their trial until that is understood.
+
+What Test A does not show. With `create-checkout`, Paddle's own date is
+already right, so `paddle-webhook` moves nothing in Test A, and the move
+itself (`deferFirstCharge`) is not exercised by it. And `create-checkout`
+answering 200 proves `PADDLE_API_KEY` is set and may read a price and
+write a transaction, but not that it may change a subscription, which is
+what the move needs. Test C, below, is where the move meets Paddle: run
+it before the merge. When a move is needed and cannot be made,
+`paddle-webhook` still switches Premium on, answers 500 to Paddle, logs
+"Could not defer first charge", and Paddle sends the event again, up to
+its own retry limit (5.6).
+
+What only this test can show (none of it is in Paddle's documentation, or
+it was read there and never run):
+
+- what the overlay shows for a trial: a date, a count of days, or neither;
+- that the trial is counted from the moment checkout completes;
+- that a transaction made with no customer, address or currency is priced
+  in the buyer's own currency and with tax shown, as a checkout opened on
+  a catalogue price is;
+- that the per-country prices copied from the catalogue price are used;
+- that `custom_data` reaches `subscription.created`;
+- that the overlay opens with `customer` beside `transactionId`, and fills
+  in the email;
+- that a discount set on the transaction shows in the overlay;
+- that `current_billing_period.ends_at` in the payload is the same instant
+  as `next_billed_at` (if not, the webhook writes the row to
+  `next_billed_at` itself, and its log still says the date stands);
+- how the customer portal and Paddle's receipts name a price made for one
+  transaction;
+- that the API key may do what the function asks of it;
+- whether a transaction made earlier can still be opened later, and from
+  which day its free days are then counted (the spare, at the end of
+  Test B);
+- what Paddle does with a discount that is set on a transaction like this
+  one.
+
+If Test A fails:
+
+- **The overlay shows neither a first-payment day nor a count of free
+  days.** Do not merge until you have decided what to do. The bill is
+  right: every tick about `next_billed_at` can still pass. But the
+  paragraph that warned about the date is off all three pages, so the
+  customer would be shown no first-payment day anywhere before paying,
+  which is not what "just make sure we get the date right" asked for. The
+  choices are yours, and none is built. (One of them: the page says the
+  number of free days before checkout opens. `create-checkout` already
+  answers with it, as `trialDays`.)
+
+- **The price does not change to the buyer's currency, or tax is not shown
+  as included.** Do not merge. There are two ways on, and both are the
+  owner's call: accept Australian dollars on this path and reword
+  "Checkout shows the final price in your currency" on `pricing.html`; or
+  change `create-checkout` to choose from a ladder of ordinary catalogue
+  prices, one for each trial length, in place of the price it makes. The
+  browser side, the webhook, the pages and the tests stay as built.
+- **`custom_data` is missing from `subscription.created`.** Do not merge.
+  The webhook would answer "unattributed" and the subscriber would have no
+  Premium. Cancel the test subscription in Paddle.
+- **The overlay will not open with `customer` beside `transactionId`.**
+  Take `customer` out of that one call in `billing.js` (and the snippet).
+  The customer then types their email; the purchase is still tied to the
+  account by `user_id`.
+- **The first-payment day is not the purchase day plus `trialDays`.** Do
+  not merge, and write down both dates: the day arithmetic rests on Paddle
+  counting whole days from the purchase.
 
 Test B — the money path. Expire the same account's trial first:
 
@@ -1006,11 +1339,117 @@ update public.subscriptions
  where user_id = '<test account uuid>';
 ```
 
-- [ ] Buy the monthly plan again. This time the charge is real.
+- [ ] Buy the monthly plan again, through the live checkout (the Buy
+      button, or `CT.billing.openCheckout('monthly')` from the console).
+      This time the charge is real.
 - [ ] Confirm the row flips to `active`/`monthly`.
+- [ ] The `create-checkout` log shows no line for this purchase: a lapsed
+      account never calls it. (Pasting the Test A snippet as this account
+      prints `409` and `not_in_trial`, opens nothing, and does write one
+      "Could not make checkout" line.)
 - [ ] Refund and cancel in Paddle. Cancel Test A's subscription as well:
       it is a separate subscription, and left alone it takes its own first
       payment on its own date.
+- [ ] Last, the spare from Test A. This account's trial has now ended,
+      so the terms give it no free period. Reload the page, open the
+      console, and paste this with the spare's id in it:
+
+      ```js
+      (async () => {
+        if (!window.Paddle) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+        Paddle.Initialize({ token: CT.config.paddle.clientToken, checkout: { settings: { displayMode: 'overlay', theme: 'light' } } });
+        Paddle.Checkout.open({ transactionId: '<the spare transactionId>' });
+      })();
+      ```
+
+      **Do not pay.** Write down three things: whether the overlay opens
+      at all; whether it still offers the free days; and what
+      first-payment day it shows (counted from today, or from the day the
+      spare was made). Close it. If you can, do the same again the next
+      day.
+
+What the spare tells you. `create-checkout` fixes the free days on a
+transaction when it makes it, and Paddle counts them from when it is paid.
+Nothing ties the two together, and Paddle's documentation does not say
+whether a transaction can be opened long after it was made (read
+23 Nov 2026).
+
+- **The overlay does not open, or opens with no free days.** A transaction
+  cannot be kept for later. Nothing more to do.
+- **It opens and still offers the free days.** Then a signed-in person who
+  saves transaction ids during their trial (the function gives one each
+  time it is asked, with no limit) can start a free period after the
+  trial has ended, where the terms say they pay on the day; can do it
+  again after cancelling; and inside the trial can push their first
+  payment out by up to the length of the trial. Nobody is charged
+  wrongly by any of that, and `paddle-webhook` cannot undo it, because it
+  never moves a date earlier than checkout showed. It writes "free period
+  on an account whose own free trial was not running" and "First payment
+  later than the rule" in its log (5.6), which is how it is found. The
+  same person can do the same today with one of the two retired
+  catalogue trial prices from the console, so this is not new in kind;
+  it is the route that would be left once those are archived. Whether
+  that matters at A$2.90 a month, and what to do about it, is your
+  decision to make before the merge. Nothing has been built for it. The
+  choices include: accept it and act on the log lines by hand; a limit
+  on how many transactions one account may be given (needs a small
+  table to count in, which is a new stored record about an account, so
+  `privacy.html` would need reading against it); or having `paddle-webhook`
+  end such a free period, which changes a date checkout showed.
+
+Test C — the net. Takes no money, and can only be run this way before the
+merge. Until the merge the live Buy button is still the old one: it opens
+a catalogue trial price, so Paddle's own date lands short of the rule and
+`paddle-webhook` has to move it later. Nothing else in this release runs
+that move against Paddle, and after the merge it is the only thing
+between a returning visitor on an old cached page and a first payment in
+December. A returning visitor's browser can go on running the old page and
+the old `billing.js` from its cache for a while after the merge: the
+`pricing.html` that is live now asks for `billing.js` by its plain name
+(read in `main`'s copy on 23 Nov 2026, not tried in a browser).
+
+- [ ] Sign in on the live site as another throwaway account that is still
+      in its free trial and has no subscription (not the Test A account).
+      Reload `pricing.html` and press the live Buy button for the monthly
+      plan, or run `CT.billing.openCheckout('monthly')` from the console.
+      The overlay shows a first payment about two weeks away (one week,
+      if the retired 7-day change was made in Paddle). That short date is
+      expected here. Pay. Nothing is taken.
+- [ ] Read the `paddle-webhook` function log. It has "trial subscription
+      on a catalogue price" and "first charge moved after checkout:
+      checkout showed ..., rule gives ...". It has no "Could not defer
+      first charge".
+- [ ] In Paddle the subscription is `trialing` and `next_billed_at` is
+      exactly the rule's instant, to the second, not rounded to a whole
+      day: `2027-01-01T12:00:00Z` for an account made before
+      `2026-12-11T12:00:00Z`.
+- [ ] `current_period_end` on the account's `public.subscriptions` row is
+      the same instant.
+- [ ] If the log has "Could not defer first charge" instead: **stop and do
+      not merge.** The line says why. "PADDLE_API_KEY not set", or a
+      refusal from Paddle about permissions, means the key cannot change
+      a subscription (5.6). Fix it; Paddle sends the event again by
+      itself and the next attempt makes the move. Check the two dates
+      above again afterwards.
+- [ ] Take the Foundation place back (the withdraw statement, as in
+      Test A), and cancel this subscription in Paddle.
+
+If the merge has already happened, the live button is the new one and this
+test cannot be run from it. The same purchase can still be made from the
+console of a throwaway account in its trial, by opening the retired
+monthly trial price directly:
+`Paddle.Checkout.open({ items: [{ priceId: CT.config.paddle.monthlyTrialPriceId, quantity: 1 }], customer: { email: CT.auth.getUser().email }, customData: { user_id: CT.auth.getUser().id } })`,
+after the two lines of the Test A snippet that load Paddle and call
+`Paddle.Initialize`.
+
+After the merge — the real button. Tests A and B ran before the new
+`billing.js` was live, so one look is left:
+
+- [ ] On a throwaway account still in its free trial, open `pricing.html`
+      (reload it once first) and press the real Buy button. The overlay
+      opens and shows the same kind of first-payment date Test A did.
+      Close it without paying. The `create-checkout` log has one more
+      "checkout made" line.
 
 Diagnostics cannot check any of 8.2 or 8.4 for you — the exchange is server to server, so
 this is the one you must watch happen.
@@ -1035,7 +1474,46 @@ Reading a failure:
   line starting "Could not defer first charge" says why, and Paddle sends
   the event again (5.6).
 - **200 but no row** — the event carried no `custom_data.user_id`. That means
-  the checkout was opened outside `billing.js`, which always attaches the id.
+  the checkout was opened outside both `billing.js`, which attaches the id
+  when it opens a plain price, and `create-checkout`, which writes it on
+  the transaction it makes.
+
+Reading a failure from `create-checkout` (the status the Test A snippet
+prints, or the browser's Network tab; the page itself only ever says to try
+again). Every one writes a log line starting "Could not make checkout", with
+the reason and no account id. None of them charges anybody or opens a
+checkout.
+
+- **401 `not_signed_in`** — no session token, or Supabase did not accept
+  it. Sign in again.
+- **409 `already_subscribed`** — the account has a subscription that is
+  running. Nothing is made, so there is never a second one from here.
+- **409 `not_in_trial`** — the account's own free trial is not running
+  (ended, cancelled, or complimentary). That is the plain-price path:
+  `billing.js` takes it on the next click.
+- **422 `discount_not_found`** — a discount code was typed and Paddle has no
+  active discount with that code that is open to checkout, or it has one
+  that cannot be used here: it has reached its end date, it has been used
+  as often as it allows, or it is kept to other products or to a price
+  (8.1). The log line says which.
+- **502 `paddle`** — Paddle refused, could not be reached, or answered with
+  something other than what was asked for. The log line says which: the
+  catalogue price could not be read or is not as expected (archived, a
+  trial set on it, the wrong billing cycle); the discount lookup failed;
+  Paddle refused the transaction (its own words follow, cut short); or
+  "Paddle's answer did not match what was asked for", which means the
+  transaction came back without the trial, the amount or the account that
+  was sent, and was not opened. A refusal that mentions permissions is the
+  API key (5.6). "answered 429" is Paddle turning the function away for
+  calling too often (5.6, the going-away ticks).
+- **503 `not_configured`** — `PADDLE_API_KEY` is not set.
+- **503 `account_unreadable`** — the account's row could not be read, has
+  no creation date, or gives a free period of more than a year. The last
+  is a wrong date on the row: look at `created_at` and
+  `current_period_end` for that account.
+- **A 404, or a 401 that is not JSON with `not_signed_in` in it** — the
+  function is not deployed, or Supabase's gateway turned the token away
+  before the function ran. `supabase functions list`.
 
 ### 8.5 Before switching `environment` to `'production'`
 
@@ -1108,6 +1586,9 @@ the bump your fix reaches new visitors and nobody else.
 **As well as `CACHE`, bump the `?v=` of every changed js or css file, in
 `app/index.html` and in `SHELL` in `app/sw.js` together**, or a browser can pair
 the old file with the new page (see the comments beside `SHELL`).
+`billing.js` is loaded by `app/pricing.html` too: when its `?v=` is bumped,
+bump it there as well, or the pricing page can open checkout with an old
+`billing.js` (a test pins the two equal).
 
 ## If you ever need to take the service down
 

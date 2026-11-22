@@ -16,12 +16,14 @@
       and the public.subscriptions row is written, through one database
       function that decides each account once. A failed claim is thrown
       before the event is recorded, so Paddle retries. Never swallow it.
-   4. The same goes for the first-payment date. When the rule asks for
-      a later date than Paddle holds and the move does not happen, the
-      failure is held until every other write is done and then thrown
-      before the event is recorded, so Paddle retries. Never swallow it:
-      a move that silently did not happen is a customer charged on a
-      date earlier than the pages promised.
+   4. The same goes for the first-payment date. Checkout is given the
+      right date to begin with (the create-checkout function), so this
+      function is the net under it and should have nothing to move. When
+      the rule does ask for a later date than Paddle holds and the move
+      does not happen, the failure is held until every other write is
+      done and then thrown before the event is recorded, so Paddle
+      retries. Never swallow it: a move that silently did not happen is
+      a customer charged on a date earlier than the pages promised.
    ============================================================ */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -111,21 +113,35 @@ async function rest(path: string, init: RequestInit = {}) {
       moved: a move with nothing to check it against could be a move
       earlier.
 
+   Checkout shows the right date itself, and this function is the net
+   (the owner, 22 Nov 2026: "just make sure we get the date right").
+   The create-checkout function makes the transaction for anyone who
+   subscribes while their free trial is running, and puts on it the
+   number of whole free days that lands the first payment at or after
+   instants 1 and 2. A Paddle trial is whole days counted from the
+   purchase, so that count is rounded UP: Paddle's own date is the time
+   of day the customer subscribed, on the first such moment at or after
+   the rule's date, and less than 24 hours past it. It arrives here as
+   next_billed_at, already at or after the other two instants, so the
+   latest of the three IS Paddle's date and nothing is sent to Paddle.
+
    Consistency (Mal, 22 Nov 2026: "consistency is critical when offering
-   value for early loyalty"). Paddle counts a trial price's trial from
-   the PURCHASE, so checkout shows the purchase plus that trial. With a
-   14-day trial on the monthly price, someone who subscribed on day 10
-   was shown day 24 and, by instant 3, kept it, while someone who
-   subscribed on day 1 got day 21: subscribing early was punished. The
-   fix is in Paddle, not here: the monthly trial price carries a 7-day
-   trial (DEPLOY.md 5.6; only true once the owner has set it). Checkout
-   then shows the purchase plus 7 days, which is never later than the
-   account plus 21 for anyone subscribing during a 14-day trial, so the
-   date is always moved LATER, to exactly the account plus 21 days (or
-   LAUNCH_FIRST_CHARGE). The yearly trial price keeps 14 days: the
-   purchase plus 14 is at most day 28, under 30. If the monthly price is
-   left at 14 days nobody is charged early; instant 3 simply holds a
-   late subscriber on the later date checkout showed.
+   value for early loyalty"). Two people who made their accounts at the
+   same moment get first payments within 24 hours of each other, set by
+   the time of day each subscribed and never by which day of the trial
+   they subscribed on. (The plan before this was a 7-day trial on
+   Paddle's monthly trial price, with the date moved here for every
+   monthly subscriber. That is retired: nothing in Paddle has to be set
+   to a particular trial length any more.)
+
+   What the net still catches is a subscription that did not come
+   through create-checkout: an older cached page that opens one of the
+   two retired catalogue trial prices, or one of those prices opened by
+   hand. Paddle counts that price's own trial from the purchase, which
+   can land short of the rule, and the date is then moved LATER here,
+   to exactly the rule's instant. It also catches a date a few seconds
+   short. next_billed_at is moved with proration_billing_mode
+   do_not_bill, so moving the date does not itself raise an invoice.
 
    This is the standing rule and it has no cut-off date. Once
    LAUNCH_FIRST_CHARGE is behind us it is simply 30 days yearly, 21 days
@@ -133,38 +149,38 @@ async function rest(path: string, init: RequestInit = {}) {
    (History: until 22 Nov 2026 it was 30 days for every plan, and
    1 January 2027 only for a purchase made by the end of 5 December.)
 
-   Paddle has no way to say this at checkout: a trial length lives on
-   the price and is the same for everyone. So the date is corrected
-   here, once, when the subscription first appears. next_billed_at is
-   moved with proration_billing_mode do_not_bill, so moving the date
-   does not itself raise an invoice.
-
-   Applies ONLY to a subscription that arrived on a trial price, which
-   the payload states outright as status trialing. Someone whose trial
-   had already ended pays the full price on the day, and moving their
-   next payment would hand them less than the period they paid for. Ask
-   the payload; never infer it from a date. Refunding a lapsed trial
-   into the offer is a support decision, not one this function makes.
+   Applies ONLY to a subscription that arrived with a free period,
+   which the payload states outright as status trialing. Someone whose
+   trial had already ended pays the full price on the day, and moving
+   their next payment would hand them less than the period they paid
+   for. Ask the payload; never infer it from a date. Refunding a lapsed
+   trial into the offer is a support decision, not one this function
+   makes.
 
    The pages (pricing.html, foundation.html, terms.html) state the same
-   rule and the same 1 January 2027. If one moves, move all of them.
-   This function holds no Foundation date: the Foundation window is
-   judged in SQL (supabase/schema-foundation.sql).
+   rule and the same 1 January 2027, and create-checkout repeats the
+   three constants below (tools/foundation-test.mjs pins them equal).
+   If one moves, move all of them. This function holds no Foundation
+   date: the Foundation window is judged in SQL
+   (supabase/schema-foundation.sql).
 
-   Requires PADDLE_API_KEY. With the monthly trial price on a 7-day
-   trial the date is moved for every monthly subscriber, so a move that
-   does not happen is no longer a missed courtesy: it is a first payment
-   taken on checkout's date, earlier than the pages say. So when a move
-   is needed and does not succeed (the key is missing, Paddle refuses or
-   cannot be reached, the account's creation date cannot be read), this
-   function answers 500 and Paddle sends the event again. Premium is
-   never held back by it: the subscriptions row, the identity grants
-   and the Foundation claim are all written first, and the failure is
-   thrown only afterwards, before the event is recorded. A retry is
-   safe: the target depends only on the account, the plan and the date
-   in the payload, so it is the same date every time, and moving a date
-   to where it already sits changes nothing. (Until 22 Nov 2026 these
-   failures were logged and answered 200.) */
+   PADDLE_API_KEY is needed only when a date has to be moved. A purchase
+   that came through create-checkout needs no move, so it is answered
+   200 with or without the key. When a move IS needed and does not
+   succeed (the key is missing, Paddle refuses or cannot be reached, the
+   account's creation date cannot be read), that is a first payment
+   left on a date earlier than the pages say, so this function answers
+   500 and Paddle sends the event again. Premium is never held back by
+   it: the subscriptions row, the identity grants and the Foundation
+   claim are all written first, and the failure is thrown only
+   afterwards, before the event is recorded. A retry is safe: the
+   target depends only on the account, the plan and the date in the
+   payload, so it is the same date every time, and moving a date to
+   where it already sits changes nothing. (Until 22 Nov 2026 these
+   failures were logged and answered 200.)
+
+   Nothing here is true of the live service until both functions have
+   been deployed. Run against stubs only (tools/foundation-test.mjs). */
 const PADDLE_API_KEY = Deno.env.get("PADDLE_API_KEY") ?? "";
 const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") === "sandbox"
   ? "https://sandbox-api.paddle.com"
@@ -177,15 +193,22 @@ const FREE_DAYS_MONTHLY = 21;
    when Paddle states next_billed_at, that date is used as it is and no
    trial length is assumed.
 
-   It is the LARGER of the two trial lengths in play on Paddle's trial
-   prices (app/config.js): 14 days on the yearly one and 7 on the
-   monthly one (14 there too until the owner changes it, DEPLOY.md 5.6).
+   It is the LAST stand-in, and the least any of them may be: the trial
+   on the two retired catalogue trial prices (app/config.js), 14 days.
+   A transaction made by create-checkout carries a longer one, up to 41
+   days for a standard account, and the payload says how long: the
+   trial's own end date on the item, or failing that the trial length
+   on the item's price. Those are read first (paddleFirstPaymentAt), so
+   14 days is used only when the payload states none of them, and never
+   in place of a longer trial it does state.
+
    Larger is the safe direction. The stand-in is the date no move may
    fall short of, so guessing too long can only leave a first payment
    LATER than it needed to be, which costs the customer nothing.
    Guessing too short could move a payment to a date EARLIER than
    checkout showed, which is the one thing that must never happen. If
-   a trial price is ever given a longer trial than this, raise it. */
+   a catalogue trial price is ever given a longer trial than this,
+   raise it. */
 const PADDLE_TRIAL_DAYS = 14;
 const DAY_MS = 86400000;
 
@@ -222,13 +245,31 @@ function firstChargeAt(
 /* Paddle's own first-payment date, the one its checkout showed the
    customer: the third instant, and the one no move may fall short of.
    `stated` is true only when the payload's next_billed_at says it
-   outright. When that is missing or does not parse, a stand-in is used:
-   the end of the current billing period (on a trialing subscription
-   that period is the trial), then the purchase instant plus
-   PADDLE_TRIAL_DAYS. A stand-in is the same date or a later one, and
-   later is always fine, but it is a floor and not a reading of what
-   Paddle holds (deferFirstCharge treats the two differently). Null
-   when none can be read. */
+   outright. When that is missing or does not parse, a stand-in is used,
+   the first of these the payload can give:
+
+   - the end of the current billing period (on a trialing subscription
+     that period is the trial);
+   - the latest trial end date written on any item (trial_dates);
+   - the purchase instant plus the trial length written on the item's
+     price, in days, or plus PADDLE_TRIAL_DAYS when that is longer or
+     when no price states a trial in days.
+
+   The last used to be the purchase plus 14 days and nothing else. A
+   transaction made by create-checkout can carry a 40-day trial, and 14
+   days would then be EARLIER than checkout showed, so the move that
+   follows a stand-in could have been a move earlier. Reading the trial
+   the payload itself states closes that.
+
+   Every one of these is Paddle's own field, inside the signed payload.
+   custom_data is deliberately not read here, though create-checkout
+   writes the day count there too: on a checkout opened by the browser,
+   custom_data is whatever the browser sent.
+
+   A stand-in is the same date or a later one, and later is always
+   fine, but it is a floor and not a reading of what Paddle holds
+   (deferFirstCharge treats the two differently). Null when none can be
+   read. */
 type ShownDate = { at: string; stated: boolean };
 // deno-lint-ignore no-explicit-any
 function paddleFirstPaymentAt(data: any, event: Record<string, unknown>): ShownDate | null {
@@ -237,9 +278,29 @@ function paddleFirstPaymentAt(data: any, event: Record<string, unknown>): ShownD
   if (readable(data?.next_billed_at)) return { at: data.next_billed_at, stated: true };
   const periodEnd = data?.current_billing_period?.ends_at;
   if (readable(periodEnd)) return { at: periodEnd, stated: false };
+
+  // deno-lint-ignore no-explicit-any
+  const items: any[] = Array.isArray(data?.items) ? data.items : [];
+  let trialEnds = NaN;
+  let trialDays = 0;
+  for (const item of items) {
+    const ends = item?.trial_dates?.ends_at;
+    if (readable(ends) && !(Date.parse(ends) <= trialEnds)) trialEnds = Date.parse(ends);
+    /* A trial length counts only when it is plainly a number of days:
+       a whole number from 1 to 999, which is what Paddle allows. Anything
+       else (a week, a zero, text) is not guessed at, and the 14-day
+       floor below stands. */
+    const trial = item?.price?.trial_period;
+    if (trial?.interval === "day" && Number.isInteger(trial.frequency) &&
+        trial.frequency >= 1 && trial.frequency <= 999 && trial.frequency > trialDays) {
+      trialDays = trial.frequency;
+    }
+  }
+  if (Number.isFinite(trialEnds)) return { at: new Date(trialEnds).toISOString(), stated: false };
+
   const bought = purchasedAt(data, event);
   return bought
-    ? { at: new Date(Date.parse(bought) + PADDLE_TRIAL_DAYS * DAY_MS).toISOString(), stated: false }
+    ? { at: new Date(Date.parse(bought) + Math.max(PADDLE_TRIAL_DAYS, trialDays) * DAY_MS).toISOString(), stated: false }
     : null;
 }
 
@@ -288,6 +349,85 @@ async function accountCreatedAt(userId: string): Promise<string> {
   return createdAt;
 }
 
+/* One log line, when the first payment Paddle states is more than 36
+   hours after the rule's own date (the later of LAUNCH_FIRST_CHARGE and
+   the account's 30 or 21 days). create-checkout rounds up to whole
+   days, so its dates sit under 24 hours past the rule; 36 hours leaves
+   room for a checkout that stayed open a while. Past that it is worth a
+   look: a checkout left open for a day or more, a free trial extended
+   by hand (the first payment never falls inside it), or a transaction
+   that create-checkout made on one day and that was paid on a later
+   one, which carries its free days from the day it was paid (see
+   ownTrialAtPurchase). The hours say which: a day or two is an open
+   checkout, and many days with no trial extended by hand is a
+   transaction paid late. It only says so. It never changes a date, the
+   customer is never worse off for a later one, and it cannot throw. No
+   account id and no subscription id. */
+function noteIfLaterThanRule(createdAt: string, plan: string | null, shownAt: string) {
+  const days = plan === "monthly" ? FREE_DAYS_MONTHLY : FREE_DAYS_YEARLY;
+  const rule = Math.max(LAUNCH_FIRST_CHARGE, Date.parse(createdAt) + days * DAY_MS);
+  const later = Date.parse(shownAt) - rule;
+  if (Number.isFinite(later) && later > 36 * 3600000) {
+    console.warn(`First payment later than the rule: by ${Math.round(later / 3600000)} hours.`);
+  }
+}
+
+/* Whether the account's own free trial was running at the moment this
+   subscription was bought, read from the account's row BEFORE this
+   event is written over it. It feeds one log line (noteFirstCharge)
+   and nothing else.
+
+   Why. A free period before the first payment is for someone who
+   subscribes while their own free trial is running. create-checkout
+   makes that test when it MAKES the transaction, but Paddle counts the
+   free days from when the transaction is PAID, and nothing ties the two
+   moments together. A transaction made during the trial and paid after
+   it has ended (if Paddle still opens one that old, which is not
+   known), or one of the retired catalogue trial prices opened by hand,
+   starts a free period the terms do not give. This function cannot
+   undo that: it never moves a date earlier than checkout showed. It
+   can say that it happened, so it is found by reading the log and not
+   by guessing.
+
+   true:  the row was plan 'trial' and entitled at the purchase instant,
+          the same test create-checkout and has_active_plan() make.
+   false: the row was read, and it was plainly something else.
+   null:  it cannot be told, and nothing is logged. No purchase time,
+          the lookup failed, no row, an answer with no plan column in
+          it, an end date that does not parse, or a row that already
+          carries THIS
+          subscription, which is a retried delivery reading what the
+          first attempt wrote.
+
+   Never throws and never writes. A fault in here must not be what
+   turns a good delivery into a 500. */
+async function ownTrialAtPurchase(
+  userId: string, subscriptionId: string, boughtAt: string | null,
+): Promise<boolean | null> {
+  try {
+    const bought = boughtAt ? Date.parse(boughtAt) : NaN;
+    if (!Number.isFinite(bought)) return null;
+    const response = await rest(
+      `/subscriptions?user_id=eq.${userId}&select=plan,status,current_period_end,complimentary,paddle_subscription_id`,
+    );
+    if (!response.ok) return null;
+    const rows = await response.json();
+    const before = Array.isArray(rows) ? rows[0] : null;
+    // A plan of null is a real answer (no plan). No plan column at all is not a row this can read.
+    if (!before || typeof before !== "object" || before.plan === undefined) return null;
+    if (before.paddle_subscription_id === subscriptionId) return null;
+    const ends = before.current_period_end === null || before.current_period_end === undefined
+      ? null
+      : Date.parse(String(before.current_period_end));
+    if (ends !== null && !Number.isFinite(ends)) return null;
+    const entitled = before.complimentary === true ||
+      (["active", "trialing", "past_due"].includes(before.status) && (ends === null || ends > bought));
+    return before.plan === "trial" && entitled;
+  } catch (_error) {
+    return null;
+  }
+}
+
 /* Answers with the instant the first charge now sits on when Paddle
    accepted a move, and null when there was nothing to move (not a
    trial-price subscription, a date already past, or Paddle's own stated
@@ -300,14 +440,18 @@ async function accountCreatedAt(userId: string): Promise<string> {
    charge". The handler holds the error until every other write is done
    and throws it before the event is recorded, so the delivery is
    answered 500 and Paddle retries. It must never be swallowed: left
-   alone, the customer is charged on checkout's date, which for a
-   monthly subscriber is always earlier than the pages say.
+   alone, the customer is charged on the date Paddle holds, which may
+   be earlier than the pages say.
+
+   A purchase that came through create-checkout leaves here at the
+   "stated and equal" line below, before the key is asked for: its date
+   is already the latest of the three.
    `shown` is Paddle's own first-payment date (paddleFirstPaymentAt). */
 async function deferFirstCharge(
   userId: string, subscriptionId: string, shown: ShownDate | null,
   status: string, plan: string | null,
 ): Promise<string | null> {
-  /* Only a subscription that arrived on a trial price. Anyone else has
+  /* Only a subscription that arrived with a free period. Anyone else has
      paid today and their anniversary is Paddle's business, not ours.
      See the note above: the payload says so, and it is never inferred
      from a date. No key is needed for them, so none is asked for. */
@@ -337,18 +481,24 @@ async function deferFirstCharge(
   /* Already past: nothing to defer to. */
   if (target.getTime() <= now) return null;
 
+  /* Said, never acted on: Paddle's stated date is well past the rule's.
+     See noteIfLaterThanRule(). */
+  if (shown.stated) noteIfLaterThanRule(createdAt, plan, shown.at);
+
   /* Paddle's own date is one of the three instants the target is the
      latest of, so the target is never earlier than it. When Paddle
      STATED its date and the target is that date, there is nothing to
      move, and nothing is sent. Exactly equal, not "within a minute": a
      date a few seconds short of LAUNCH_FIRST_CHARGE is still moved.
+     This is where every purchase made through create-checkout leaves.
 
      A stand-in is different. It is a floor worked out here, not what
-     Paddle holds, and Paddle's real date may be earlier (a 7-day trial
-     against the 14-day stand-in). Skipping the move because the target
-     equals the stand-in would leave that earlier date in place, which
-     can be earlier than the pages promise. So with a stand-in the date
-     is always sent. At worst that sets the date to where it already is. */
+     Paddle holds, and Paddle's real date may be earlier (a price with a
+     shorter trial than the stand-in assumed). Skipping the move because
+     the target equals the stand-in would leave that earlier date in
+     place, which can be earlier than the pages promise. So with a
+     stand-in the date is always sent. At worst that sets the date to
+     where it already is. */
   if (shown.stated && Date.parse(shown.at) === target.getTime()) return null;
 
   if (!PADDLE_API_KEY) {
@@ -428,7 +578,7 @@ function planFromInterval(interval: string | undefined) {
 
 /* ─────────────────────────── Foundation ───────────────────────────
    Foundation is a price lock with 100 places, for the first 100 people
-   to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (Adelaide).
+   to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (noon UTC on 1 Jan 2027).
    The database decides who gets one (supabase/schema-foundation.sql):
    the table cannot hold a 101st place, and an account is decided once,
    so a replay or a retry gets the same answer and never a second place.
@@ -590,6 +740,68 @@ async function extendFreePeriod(
   await mirrorToIdentitySchema(userId, status, periodEnd);
 }
 
+/* What happened to the first payment of a new subscription that has
+   not paid yet, in lines somebody can search the function log for.
+   None carries an account id or a subscription id, none changes
+   anything, and a fault in here is swallowed: a log line must never be
+   what turns a good delivery into a 500.
+
+   "first charge: checkout's date stands" is the normal line. Checkout
+   showed a date, it is the right one, and nothing was sent to Paddle.
+
+   "first charge moved after checkout" means the net was needed: Paddle
+   held a date short of the rule and it was moved later. The customer
+   was shown one date and is billed on a later one. Nobody is charged
+   early, but it should not happen to a purchase made through
+   create-checkout, so it is a warning.
+
+   "trial subscription on a catalogue price" says why that happens. A
+   transaction made by create-checkout carries a price made for it
+   alone, which Paddle marks as type "custom" in the signed payload. A
+   free period on anything else is a checkout that did not come through
+   create-checkout: an older cached page on one of the two retired
+   catalogue trial prices, or one of them opened by hand. Once those two
+   prices are archived in Paddle this line should never appear.
+
+   "free period on an account whose own free trial was not running" is
+   the one to act on. The subscription arrived with a free period, and
+   when it was bought the account was not in its own free trial: the
+   trial had ended, or the account already had a subscription. The
+   terms give such a person no free period (they pay on the day). It is
+   a transaction made earlier and paid later, or a catalogue trial
+   price opened by hand; once in a while it is someone whose trial
+   ended in the minutes their checkout was open. Nothing is changed
+   here, because a date is never moved earlier than checkout showed.
+   What to do about that subscription is the owner's call (DEPLOY.md
+   5.6). `ownTrial` comes from ownTrialAtPurchase(). */
+// deno-lint-ignore no-explicit-any
+function noteFirstCharge(data: any, status: string, shown: ShownDate | null, movedTo: string | null, failed: boolean, ownTrial: boolean | null) {
+  try {
+    if (status !== "trialing") return;
+    // deno-lint-ignore no-explicit-any
+    const items: any[] = Array.isArray(data?.items) ? data.items : [];
+    if (!items.some((item) => item?.price?.type === "custom")) {
+      console.warn("trial subscription on a catalogue price");
+    }
+    if (ownTrial === false) {
+      console.warn("free period on an account whose own free trial was not running");
+    }
+    if (movedTo) {
+      const rule = new Date(Date.parse(movedTo)).toISOString();
+      const from = shown ? new Date(Date.parse(shown.at)).toISOString() : "nothing";
+      console.warn(
+        shown && shown.stated
+          ? `first charge moved after checkout: checkout showed ${from}, rule gives ${rule}`
+          : `first charge moved after checkout: the payload did not state checkout's date (it is no later than ${from}), rule gives ${rule}`,
+      );
+    } else if (!failed && shown && shown.stated) {
+      console.log("first charge: checkout's date stands");
+    }
+  } catch (_error) {
+    // Only a log line was lost.
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -617,7 +829,9 @@ Deno.serve(async (request) => {
   // deno-lint-ignore no-explicit-any
   const data = (event.data ?? {}) as any;
 
-  // user_id is passed as custom_data when the checkout is opened.
+  // user_id travels as custom_data: written on the transaction by
+  // create-checkout for someone subscribing during their free trial, and
+  // passed by billing.js when it opens the plain price for anyone else.
   const userId: string | null = data?.custom_data?.user_id ?? null;
 
   if (!eventId) return new Response("Missing event id", { status: 400, headers: corsHeaders });
@@ -647,6 +861,14 @@ Deno.serve(async (request) => {
     const status = eventType === "subscription.canceled"
       ? "canceled"
       : String(data?.status ?? "active");
+
+    /* Read now, before the row below is written over: was the account in
+       its own free trial when this was bought? Only for a new
+       subscription that arrived with a free period, only for a log
+       line, and it cannot fail the delivery (ownTrialAtPurchase). */
+    const ownTrial = eventType === "subscription.created" && Boolean(data?.id) && status === "trialing"
+      ? await ownTrialAtPurchase(userId, String(data.id), purchasedAt(data, event))
+      : null;
 
     const row = {
       user_id: userId,
@@ -710,19 +932,42 @@ Deno.serve(async (request) => {
        never earlier than Paddle's own. */
     let deferError: unknown = null;
     if (isCreation) {
+      // Paddle's own first-payment date, read once and used three times below.
+      const shown = paddleFirstPaymentAt(data, event);
       let movedTo: string | null = null;
       try {
         movedTo = await deferFirstCharge(
-          userId, String(data.id), paddleFirstPaymentAt(data, event), status, row.plan,
+          userId, String(data.id), shown, status, row.plan,
         );
       } catch (error) {
         deferError = error;
       }
+      noteFirstCharge(data, status, shown, movedTo, deferError !== null, ownTrial);
       /* Paddle accepted the move, so the free period ends on that date.
          Written before a held Foundation error is thrown, so a retry of
          this event always ends with the moved date, not the payload's
          original one. See extendFreePeriod(). */
       if (movedTo) await extendFreePeriod(userId, String(data.id), status, movedTo);
+
+      /* Nothing was moved because checkout's date already stands, which
+         is every purchase made through create-checkout. Premium must
+         still run to the first payment. The row above took its period
+         end from the payload's billing period, and that being the same
+         instant as next_billed_at on a trialing subscription is
+         expected, not seen. (Before create-checkout nearly every
+         purchase was moved, and the line above wrote the date.) So when
+         the two differ, or the period is missing, the row and the
+         grants are written to the stated date here. When they are the
+         same instant nothing is written. Only for a date Paddle stated
+         outright and that is still ahead. A failure throws, like every
+         entitlement write, so the delivery is answered 500 and Paddle
+         retries. */
+      const standsAt = !movedTo && !deferError && status === "trialing" && shown !== null && shown.stated
+        ? Date.parse(shown.at)
+        : NaN;
+      if (standsAt > Date.now() && Date.parse(String(row.current_period_end ?? "")) !== standsAt) {
+        await extendFreePeriod(userId, String(data.id), status, shown!.at);
+      }
     }
 
     // Held until entitlement and the billing date were written. See above.

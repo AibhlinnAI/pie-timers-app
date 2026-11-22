@@ -338,12 +338,18 @@ twice or forged from the client.
 Fourteen days covers two real working weeks, which is what the timers need to
 timers to prove themselves. Subscribe inside that window and the first payment
 is not taken until day 30 from sign-up on a yearly plan, or day 21 on a
-monthly plan (`FREE_DAYS_YEARLY` and `FREE_DAYS_MONTHLY` in `paddle-webhook`),
-and never before 1 January 2027. Checkout may show an earlier date; it is
-moved to the right one shortly afterwards, and never to a date earlier than
-the one checkout showed. So subscribing never costs someone free time they
-would otherwise have had, whichever day of the trial they subscribe on.
-Subscribe after the trial has ended and the payment is taken on the day.
+monthly plan (`FREE_DAYS_YEARLY` and `FREE_DAYS_MONTHLY` in `create-checkout`
+and in `paddle-webhook`), and never before 1 January 2027. Checkout is given
+the right number of free days for the account (`create-checkout`), so it
+shows the first-payment day itself: the first whole day, counted from the
+moment of subscribing, at or after that date. (That is the date Paddle is
+given and bills on. What its overlay puts in front of the customer, a
+date, a count of free days or neither, is first seen in `DEPLOY.md` 8.4
+Test A.) So subscribing never costs
+someone free time they would otherwise have had, and whichever day of the
+trial they subscribe on, the first payment lands on the same date to within
+a day. Subscribe after the trial has ended and the payment is taken on the
+day.
 
 The app stays quiet during the trial and only starts mentioning payment in the last
 14 days. When the trial ends, automatic sync stops but nothing is deleted, no card is
@@ -382,9 +388,24 @@ the bottom of `supabase/schema-billing.sql`. Offer that freely.
 
 ### Discount codes
 
-The checkout accepts any discount code you create in Paddle → Discounts, entered in
-the field above the plan cards. Paddle validates the code and shows the result in its own
-overlay, so a mistyped or expired code fails gracefully.
+The checkout accepts a discount code you create in Paddle → Discounts, entered in
+the field above the plan cards. Who judges the code depends on the path:
+
+- **Someone whose free trial has ended** opens the plain price, and Paddle validates
+  the code and shows the result in its own overlay, so a mistyped or expired code
+  fails gracefully there.
+- **Someone subscribing while their free trial is running** goes through
+  `create-checkout`, which looks the code up in Paddle on the server before any
+  checkout opens. A code that is mistyped, archived, past its end date, used as
+  often as it allows, or kept to something other than this product is turned away
+  with "That discount code was not recognised. Check it, or leave it out, and try
+  again." and nothing opens. Paddle's overlay is not there to say so on this path:
+  Paddle lists a discount as "active" until it is archived, whatever its end date.
+
+**Keep a discount to the product, or to nothing. Never to a price.** On the trial
+path the price bought is a copy of the plain price, a different price in Paddle, so
+a discount kept to a price id cannot apply to it (`DEPLOY.md` 8.1). What Paddle does
+with a discount set on such a transaction is first seen in `DEPLOY.md` 8.4 Test A.
 
 If you run a public promotion, assume the code reaches a coupon site eventually —
 that is near-certain. Cap redemptions and set an expiry in Paddle rather than
@@ -515,10 +536,12 @@ Users, then set a new `REVIEW_CODE` with the command above, then update Play
 Console the same day. Deleting the account is what ends sessions already handed
 out; the next sign-in with the new code makes it again.
 
-> **`--no-verify-jwt` on every function here except `manage-subscription`.** The
-> browser calls them with the publishable key, which is not a JWT, and there is
-> no `supabase/config.toml` to remember the setting. A bare `deploy` turns the
-> check back on and the gateway then refuses every call, sign-in included.
+> **`--no-verify-jwt` on every function here except `manage-subscription` and
+> `create-checkout`.** The browser calls the others with the publishable key,
+> which is not a JWT, and there is no `supabase/config.toml` to remember the
+> setting. A bare `deploy` turns the check back on and the gateway then refuses
+> every call, sign-in included. Those two are called with the signed-in user's
+> own session token, so they are deployed bare.
 
 **5 — For background push**, generate a VAPID key pair:
 
@@ -558,17 +581,24 @@ fine for testing but should be pinned to your site before launch.
 
 1. Create a Paddle account and complete seller verification. Budget several days
    for this — they review new sellers, and review is not instant.
-2. Create one product with four prices: annual and monthly, each once paid on
-   the day and once with a trial set on the price (14 days on the annual one,
-   7 days on the monthly one). `DEPLOY.md` 5.6 and 8.1 say why.
+2. Create one product with two prices, annual and monthly, each paid on the
+   day. Those two are the only prices in use. (Two more, the same plans with
+   a trial set on the price, are retired: their ids stay in `config.js` for
+   now and nothing opens them. `DEPLOY.md` 8.1 says why.)
 3. Optionally create discount codes, each with a redemption limit and expiry.
-4. Put the client token and all four price IDs in `config.js`.
+4. Put the client token and the two price IDs in `config.js`, and the same
+   two IDs in `PLAIN_PRICE` in `supabase/functions/create-checkout/index.ts`.
 5. Add a webhook pointing at `.../functions/v1/paddle-webhook`, subscribed to the
-   `subscription.*` events, then set both secrets. `paddle-webhook` needs the
-   API key as well as the webhook secret: it uses the key to move a new
-   subscriber's first payment date, and answers 500 to every subscription made
-   on a trial price while the key is missing or cannot change a subscription
-   (`DEPLOY.md` 5.6 and 8.4).
+   `subscription.*` events, then set both secrets. The API key is used by
+   three functions. `create-checkout` uses it to read a price, read discounts
+   and make the transaction for someone who subscribes while their free trial
+   is running, with the right number of free days on it, so that checkout
+   can show the first-payment day itself (first seen in `DEPLOY.md` 8.4
+   Test A). `paddle-webhook` uses it only as the net: to
+   move a first payment that still lands short of the rule's date, and it
+   answers 500 when such a move is needed and the key is missing or cannot
+   change a subscription. `manage-subscription` uses it to open the customer
+   portal (`DEPLOY.md` 5.6 and 8.4).
 
 ```bash
 supabase secrets set PADDLE_WEBHOOK_SECRET=...
@@ -577,6 +607,10 @@ supabase secrets set PADDLE_API_KEY=...
 
 ```bash
 supabase functions deploy paddle-webhook --no-verify-jwt
+```
+
+```bash
+supabase functions deploy create-checkout
 ```
 
 Test with Paddle's sandbox first — set `paddle.environment` to `'sandbox'` in

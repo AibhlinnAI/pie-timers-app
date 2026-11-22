@@ -224,6 +224,14 @@
         }
         window.Paddle.Initialize({
           token: cfg.paddle.clientToken,
+          /* How checkout looks, set here as well as on the open call
+             below. A checkout opened on a transaction made by the server
+             (the free-trial path in openCheckout) is opened with the
+             transaction's id and no settings of its own, and Paddle's
+             page for Paddle.Checkout.open says of that case: "There's no
+             settings object, so checkout settings must be included in
+             Paddle.Initialize()". */
+          checkout: { settings: { displayMode: 'overlay', theme: 'light' } },
           eventCallback: function (event) {
             // Paddle confirms client-side, but the webhook is the source of
             // truth. Re-read entitlement shortly after, once the write has landed.
@@ -244,36 +252,25 @@
     return paddleReady;
   }
 
-  /* Which of the two prices for this cadence. Someone still inside
-     their account trial takes the price that carries a trial, so
-     checkout takes nothing today. paddle-webhook then moves that first
-     charge to 30 days after the account was made on a yearly plan, or
-     21 days on a monthly plan, and never before 1 January 2027; they
-     can cancel free right up to that date. Someone whose trial has
-     already lapsed takes the plain price and pays now, before 2027 or
-     after it: the later first payment is only for someone who
-     subscribes while their free trial is running (Mal, 22 Nov 2026).
-     Handing a lapsed account the trial price would give away free time
-     nobody offered. This file holds no date and must not gain one.
+  /* The plain catalogue price for this cadence: the one paid on the
+     day. It is the only kind of price this file ever opens.
 
-     "Inside their account trial" is plan 'trial', the row the
-     grant_trial trigger writes, and never status 'trialing' alone.
-     Paddle reports 'trialing' too for someone who has ALREADY subscribed
-     on a trial price and is waiting for their first payment (plan
-     'monthly' or 'annual'). Until 22 Nov 2026 either one counted, so a
-     subscriber could be handed the trial price a second time.
+     Someone whose free trial has ended takes it and pays now, before
+     the new year or after it: the later first payment is only for
+     someone who subscribes while their free trial is running (Mal,
+     22 Nov). Never give a lapsed account a free period: that would be
+     free time nobody offered.
 
-     Falls back to the plain price whenever the trial pair is unset, so
-     a half-configured catalogue charges honestly rather than failing. */
-  function priceFor(cadence) {
+     Someone whose own free trial IS running does not take a catalogue
+     price at all. The create-checkout function decides their free
+     period on the server, from the account's own row, and makes the
+     transaction (openCheckout below). The two catalogue prices that
+     carry a trial are retired: config.js still lists them, for an older
+     cached copy of this file, and nothing here reads them. This file
+     holds no date and must not gain one. */
+  function plainPriceFor(cadence) {
     var p = cfg.paddle;
-    var plain = cadence === 'monthly' ? p.monthlyPriceId : p.annualPriceId;
-    var trial = cadence === 'monthly' ? p.monthlyTrialPriceId : p.annualTrialPriceId;
-
-    var ent = entitlement;
-    var inTrial = ent.plan === 'trial' && ent.entitled;
-
-    return (inTrial && trial) ? trial : plain;
+    return cadence === 'monthly' ? p.monthlyPriceId : p.annualPriceId;
   }
 
   /* A Paddle subscription behind this account. See CT.billing.hasPaidPlan
@@ -294,22 +291,120 @@
     return hasPaidPlan() && entitlement.entitled && !entitlement.cancelAtPeriodEnd;
   }
 
+  /* What the customer is told when checkout does not open. None of
+     them is ever followed by a checkout on another price. */
+  var CHECKOUT_FAILED = 'Could not open checkout. Please try again.';
+  var ACCOUNT_UNCHECKED = 'We could not check your account just now. Please try again.';
+  var SIGN_IN_FIRST = 'Please sign in first.';
+  var DISCOUNT_NOT_FOUND = 'That discount code was not recognised. Check it, or leave it out, and try again.';
+
+  /* Asks the create-checkout function for a Paddle transaction for this
+     account, and answers with the transaction's id. Only for an account
+     whose own free trial is running.
+
+     The function decides the free period: how many whole days put the
+     first payment on the right day for THIS account. It reads the
+     account from the access token, so nothing sent here says who is
+     asking, which price, which date or how many days. The body carries
+     the plan and a discount code if one was typed, and that is all.
+
+     Every failure throws one of the sentences above. It never falls
+     back to a catalogue price: the old trial price would bring back a
+     checkout that shows one date and bills on another, and the plain
+     price would charge today someone who owes nothing yet. Stopping
+     with "try again" costs the customer one more click.
+
+     It gives up after 15 seconds, by the same means as pricing.html's
+     own lookup, so a request that never answers does not leave the
+     button waiting for ever. */
+  function requestTrialCheckout(cadence, code) {
+    return CT.auth.validToken().catch(function () {
+      return undefined;
+    }).then(function (token) {
+      /* undefined: the session could not be read at all (no network,
+         say). That is "try again", not "signed out". */
+      if (token === undefined) return null;
+      if (!token) throw new Error(SIGN_IN_FIRST);
+
+      var asked = { cadence: cadence === 'monthly' ? 'monthly' : 'annual' };
+      if (code) asked.discountCode = code;
+      var init = {
+        method: 'POST',
+        headers: {
+          apikey: cfg.supabaseAnonKey,
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(asked)
+      };
+
+      // A browser too old to stop a request simply waits for it.
+      var timer = null;
+      if (typeof AbortController === 'function') {
+        var stopper = new AbortController();
+        init.signal = stopper.signal;
+        timer = setTimeout(function () { stopper.abort(); }, 15000);
+      }
+      function done(answer) {
+        if (timer !== null) clearTimeout(timer);
+        return answer;
+      }
+
+      /* Null for anything that is not an answer: no network, a request
+         stopped by the timer, a body that is not JSON. */
+      return fetch(cfg.supabaseUrl + '/functions/v1/create-checkout', init)
+        .then(function (response) {
+          return response.json().then(function (data) {
+            return { status: response.status, data: data };
+          });
+        })
+        .then(done, function () { return done(null); });
+    }).then(function (answer) {
+      var data = answer && answer.data;
+      var said = data && data.error;
+      if (answer && answer.status === 200 && data && data.ok === true &&
+          typeof data.transactionId === 'string' && /^txn_[a-z0-9]+$/.test(data.transactionId)) {
+        return data.transactionId;
+      }
+      if (answer && answer.status === 409 && said === 'already_subscribed') throw new Error(ALREADY_SUBSCRIBED);
+      /* The server says the free trial is not running, where the read a
+         moment ago said it was: the trial ended in between, or the two
+         reads disagree. The next click reads the account again and, if
+         the trial has ended, takes the plain price. */
+      if (answer && answer.status === 409 && said === 'not_in_trial') throw new Error(ACCOUNT_UNCHECKED);
+      if (answer && answer.status === 401) throw new Error(SIGN_IN_FIRST);
+      /* A typed code the server could not find. Said here, because on
+         this path the code is checked before the overlay opens, and
+         carrying on without it would show a price they were not
+         expecting. */
+      if (answer && answer.status === 422 && said === 'discount_not_found') throw new Error(DISCOUNT_NOT_FOUND);
+      throw new Error(CHECKOUT_FAILED);
+    });
+  }
+
   function openCheckout(cadence, discountCode) {
     if (inPlayAppNow()) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
     var user = CT.auth.getUser();
-    if (!user) return Promise.reject(new Error('Please sign in first.'));
+    if (!user) return Promise.reject(new Error(SIGN_IN_FIRST));
 
-    /* Re-read entitlement before choosing a price, rather than trusting
+    /* Re-read entitlement before choosing a path, rather than trusting
        whatever happens to be cached.
 
-       priceFor() decides between the trial price and the plain one, and a
-       stale answer costs the customer money: a trialling account read as
-       not-entitled gets the plain price and is charged today instead of on
-       the later date paddle-webhook would have set (day 30 at the time of
-       the test below). That is not hypothetical -- a live test account on day 6 of
-       a 14-day trial was charged A$2.90 this way.
+       There are two paths. An account whose own free trial is running
+       asks the create-checkout function for a transaction that already
+       carries the right free period, so checkout shows the right
+       first-payment day itself. Any other account that may buy opens
+       the plain catalogue price and pays on the day.
+
+       The server makes its own check of the trial, so a stale read
+       cannot hand anyone a free period they are not due. A stale read
+       can still cost the customer money the other way: a trialling
+       account read as not-entitled takes the plain price and is charged
+       today instead of on the later date. That is not hypothetical -- a
+       live test account on day 6 of a 14-day trial was charged A$2.90
+       this way.
 
        Two routes produce a stale read, and only refreshing here closes
        both. refresh() is async and pricing.html's Buy handler never waited
@@ -322,22 +417,52 @@
 
        A lookup that fails stops here. CT.db.getEntitlement never rejects:
        on a failed lookup it answers status 'unknown' with no plan, which
-       priceFor() would read as "not in a trial" and so open the plain
-       price, charging someone whose trial IS running today rather than
-       on the later date. (The note here used to say a failed refresh
-       fell back to the cached value. It never did: the cache had already
-       been overwritten.) Nothing is lost by stopping, since checkout
-       needs the network anyway. */
+       reads as "not in a trial" and so would open the plain price,
+       charging someone whose trial IS running today rather than on the
+       later date. (The note here used to say a failed refresh fell back
+       to the cached value. It never did: the cache had already been
+       overwritten.) Nothing is lost by stopping, since checkout needs
+       the network anyway. */
     return refresh().catch(function () { return entitlement; }).then(function () {
-      if (entitlement.status === 'unknown') {
-        throw new Error('We could not check your account just now. Please try again.');
-      }
+      if (entitlement.status === 'unknown') throw new Error(ACCOUNT_UNCHECKED);
       if (alreadySubscribed()) throw new Error(ALREADY_SUBSCRIBED);
-      var priceId = priceFor(cadence);
+
+      /* The account's own free trial, still running: plan 'trial', the
+         row the grant_trial trigger writes, and never status 'trialing'
+         alone. Paddle reports 'trialing' too for someone who has ALREADY
+         subscribed and is waiting for their first payment (plan
+         'monthly' or 'annual'). Until 22 Nov either one counted, so a
+         subscriber could be offered a free period a second time.
+         create-checkout makes the same test on the server. */
+      var inTrial = entitlement.plan === 'trial' && entitlement.entitled;
+      var priceId = plainPriceFor(cadence);
       if (!priceId) throw new Error('That plan is not available yet.');
-      return initPaddle().then(function (ok) { return { ok: ok, priceId: priceId }; });
+
+      /* Paddle's script first, on both paths. On the free-trial path
+         that means a script that will not load never leaves a
+         transaction behind that nobody can open. */
+      return initPaddle().then(function (ok) {
+        return { ok: ok, inTrial: inTrial, priceId: priceId };
+      });
     }).then(function (state) {
-      if (!state.ok) throw new Error('Could not open checkout. Please try again.');
+      if (!state.ok) throw new Error(CHECKOUT_FAILED);
+
+      var code = (discountCode || '').trim();
+
+      if (state.inTrial) {
+        return requestTrialCheckout(cadence, code).then(function (transactionId) {
+          /* The transaction already holds the price, the free period,
+             the account it is for and any discount, all written by the
+             server. So nothing but its id and the email to fill in is
+             passed: no items, no customData and no discountCode. The
+             look of the overlay comes from Paddle.Initialize(). */
+          window.Paddle.Checkout.open({
+            transactionId: transactionId,
+            customer: { email: user.email }
+          });
+          return true;
+        });
+      }
 
       var options = {
         items: [{ priceId: state.priceId, quantity: 1 }],
@@ -349,7 +474,6 @@
 
       // Paddle validates the code itself and shows the error in the overlay,
       // so an expired or mistyped code fails gracefully rather than here.
-      var code = (discountCode || '').trim();
       if (code) options.discountCode = code;
 
       window.Paddle.Checkout.open(options);
