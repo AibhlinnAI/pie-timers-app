@@ -204,7 +204,10 @@
     if (!CT.billing || !CT.billing.enabled()) return;
 
     var ent = CT.billing.get();
-    var trialing = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    /* Plan 'trial' is the account's own free trial. Status 'trialing' is
+       not enough: Paddle reports it too for someone who has subscribed
+       and is waiting for their first payment, and they are Premium. */
+    var trialing = ent.plan === 'trial' && ent.entitled;
     var left = daysLeft(ent);
     var node;
 

@@ -14,7 +14,9 @@
       written, passes on the instant Paddle says the subscription was
       made, and answers 500 without recording the event when the claim
       fails, so Paddle retries. Premium and the billing date are
-      written either way.
+      written either way. A first-payment date that should have been
+      moved and was not is treated the same way: Premium is written,
+      the event is not recorded, and the answer is 500.
    2. The SQL file still has the constraints, the lock, the revokes
       and the two grants, and its dates match the function's and the
       pages'.
@@ -111,9 +113,19 @@ const reply = (status, body) => new Response(
 
 const WEBHOOK_FILE = path.join(ROOT, 'supabase', 'functions', 'paddle-webhook', 'index.ts');
 const WEBHOOK_SOURCE = read('supabase/functions/paddle-webhook/index.ts');
-vm.runInThisContext('(function (console) {\n' + stripTypeScriptTypes(WEBHOOK_SOURCE) + '\n})', { filename: WEBHOOK_FILE })(captured);
-if (typeof handler !== 'function') throw new Error('paddle-webhook did not register a handler');
-const webhook = handler;
+/* Starts the function afresh. It reads its secrets once, as it loads. */
+function startWebhook() {
+  handler = null;
+  vm.runInThisContext('(function (console) {\n' + stripTypeScriptTypes(WEBHOOK_SOURCE) + '\n})', { filename: WEBHOOK_FILE })(captured);
+  if (typeof handler !== 'function') throw new Error('paddle-webhook did not register a handler');
+  return handler;
+}
+const webhook = startWebhook();
+/* The same function, started with no PADDLE_API_KEY among its secrets. */
+const PADDLE_KEY = ENV.PADDLE_API_KEY;
+delete ENV.PADDLE_API_KEY;
+const webhookNoKey = startWebhook();
+ENV.PADDLE_API_KEY = PADDLE_KEY;
 
 /* Paddle-Signature: ts=<seconds>;h1=<hex hmac of "ts:body">. Signed with
    the test secret, so the function's own signatureValid() runs. */
@@ -177,7 +189,7 @@ async function deliver(event, opts = {}) {
   const realNow = Date.now;
   Date.now = () => now;
   try {
-    const response = await webhook(new Request('https://proj.supabase.co/functions/v1/paddle-webhook', {
+    const response = await (opts.handler || webhook)(new Request('https://proj.supabase.co/functions/v1/paddle-webhook', {
       method: 'POST',
       headers: header === null ? {} : { 'Paddle-Signature': header },
       body,
@@ -390,9 +402,11 @@ for (const type of ['subscription.updated', 'subscription.canceled']) {
 }
 
 /* One purchase on a trial price. Paddle's own first-payment date, the
-   one its checkout showed, is 14 days after the purchase unless a case
-   says otherwise. Answers what the customer ends up with: the date sent
-   to Paddle when one was sent, Paddle's own date when it was left.
+   one its checkout showed, is the purchase plus the trial that price
+   carries in Paddle: `trialDays`, 14 unless a case says otherwise (the
+   monthly trial price is to carry 7, DEPLOY.md 5.6). Answers what the
+   customer ends up with: the date sent to Paddle when one was sent,
+   Paddle's own date when it was left.
 
    `shown` is what the payload's next_billed_at says: null leaves it
    out, and a string that does not parse is sent as it is. `periodEnds`
@@ -404,11 +418,11 @@ for (const type of ['subscription.updated', 'subscription.canceled']) {
 const DAY = 86400000;
 const iso = (ms) => new Date(ms).toISOString();
 let purchaseCount = 0;
-async function purchase({ account, bought, interval, shown, periodEnds }) {
-  const real = typeof shown === 'string' && Number.isFinite(at(shown)) ? shown : iso(at(bought) + 14 * DAY);
+async function purchase({ account, bought, interval, shown, periodEnds, trialDays = 14, handler: use, over = {} }) {
+  const real = typeof shown === 'string' && Number.isFinite(at(shown)) ? shown : iso(at(bought) + trialDays * DAY);
   const paddleDate = shown === undefined ? real : shown;
   const period = periodEnds === undefined ? real : periodEnds;
-  webhookRoute({ accountCreatedAt: account });
+  webhookRoute({ accountCreatedAt: account, ...over });
   const r = await deliver(createdEvent({
     event_id: 'evt_test_rule_' + (++purchaseCount), occurred_at: bought,
     data: {
@@ -417,7 +431,7 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
       current_billing_period: period === null ? undefined : { ends_at: period },
       billing_cycle: interval === null ? undefined : { interval },
     },
-  }), { now: at(bought) + 5000 });
+  }), { now: at(bought) + 5000, handler: use });
   const sent = patches().map((p) => JSON.parse(p.body));
   return {
     r, sent,
@@ -488,10 +502,13 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
 }
 
 {
-  /* W18. The first payment is never moved EARLIER than the date
-     Paddle's checkout showed the customer. Paddle's trial price runs 14
-     days from the purchase, so a monthly customer who subscribes on day
-     10 was shown day 24, and day 21 would be earlier than that. */
+  /* W18. The safety net. The first payment is never moved EARLIER than
+     the date Paddle's checkout showed the customer, whatever trial the
+     price carries. These cases run with a 14-day trial on the monthly
+     price, which is what Paddle holds until the owner sets it to 7
+     (DEPLOY.md 5.6): a monthly customer who subscribes on day 10 was
+     shown day 24, and day 21 would be earlier than that. W22 has the
+     same purchases on the 7-day trial. */
   const account = '2027-02-01T09:00:00+10:30';
   const day10 = await purchase({ account, bought: '2027-02-11T09:00:00+10:30', interval: 'month' });
   check('W18 monthly bought on day 10 of the trial: checkout showed day 24, later than day 21',
@@ -523,25 +540,40 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
   check('W18 a date from Paddle 30 seconds short of 1 January 12:00 UTC is still moved to it', almost.movedTo === FIRST_CHARGE, almost.sent);
 
   /* No next_billed_at in the payload, or one that does not parse. The
-     date checkout showed is still there, 14 days after the purchase, and
-     the first payment must not land before it. The function falls back
-     on the end of the billing period, then on the purchase plus 14 days,
-     and with neither it moves nothing. */
+     date checkout showed is still there, and the first payment must not
+     land before it. The function falls back on the end of the billing
+     period, then on the purchase plus 14 days (PADDLE_TRIAL_DAYS, the
+     larger of the two trials in play), and with neither it moves
+     nothing.
+
+     A stand-in is a floor, not a reading of what Paddle holds, so the
+     date is always SENT, even when the target is the stand-in itself.
+     (It used to be skipped then. With a 7-day trial behind a 14-day
+     stand-in that would leave Paddle's real, earlier date in place:
+     W22.) Here Paddle really holds day 24, so the send sets the date to
+     where it already is. */
   const day10bought = '2027-02-11T09:00:00+10:30';
   const day24 = at(day10bought) + 14 * DAY;
   const noDate = await purchase({ account, bought: day10bought, interval: 'month', shown: null });
   check('W18 monthly on day 10 with no next_billed_at in the payload: not moved earlier than purchase + 14 days',
-    noDate.r.status === 200 && noDate.sent.length === 0 && noDate.firstPayment >= day24, noDate.sent);
+    noDate.r.status === 200 && noDate.movedTo === iso(day24) && noDate.firstPayment >= day24 && noDate.firstPayment >= noDate.shown, noDate.sent);
   const junkMonthly = await purchase({ account, bought: day10bought, interval: 'month', shown: 'soon' });
-  check('W18 ...and the same for one that does not parse', junkMonthly.sent.length === 0 && junkMonthly.firstPayment >= day24, junkMonthly.sent);
+  check('W18 ...and the same for one that does not parse', junkMonthly.movedTo === iso(day24) && junkMonthly.firstPayment >= junkMonthly.shown, junkMonthly.sent);
   const bare = await purchase({ account, bought: day10bought, interval: 'month', shown: null, periodEnds: null });
   check('W18 ...and with no billing period either, the purchase plus 14 days holds it',
-    bare.r.status === 200 && bare.sent.length === 0 && bare.firstPayment >= day24, bare.sent);
+    bare.r.status === 200 && bare.movedTo === iso(day24) && bare.firstPayment >= bare.shown, bare.sent);
   const bareJunk = await purchase({ account, bought: day10bought, interval: 'month', shown: 'soon', periodEnds: 'later' });
-  check('W18 ...and with both unreadable', bareJunk.sent.length === 0 && bareJunk.firstPayment >= day24, bareJunk.sent);
+  check('W18 ...and with both unreadable', bareJunk.movedTo === iso(day24) && bareJunk.firstPayment >= bareJunk.shown, bareJunk.sent);
   const inOfferBare = await purchase({ account: '2026-12-12T09:00:00+10:30', bought: '2026-12-26T08:59:00+10:30', interval: 'month', shown: null, periodEnds: null });
   check('W18 ...and during the offer: bought on day 14 with no date, never pulled back to day 21',
-    inOfferBare.sent.length === 0 && inOfferBare.firstPayment === at('2027-01-09T08:59:00+10:30'), inOfferBare.sent);
+    inOfferBare.sent.length === 1 && inOfferBare.firstPayment === at('2027-01-09T08:59:00+10:30') && inOfferBare.firstPayment >= inOfferBare.shown, inOfferBare.sent);
+  const source18 = WEBHOOK_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '');
+  check('W18 the stand-in is 14 days, the larger of the two trials in play, and the rule itself never reads it',
+    /const PADDLE_TRIAL_DAYS = 14;/.test(source18) && (source18.match(/PADDLE_TRIAL_DAYS/g) || []).length === 2 &&
+    /function firstChargeAt\(/.test(source18) &&
+    !/PADDLE_TRIAL_DAYS/.test((source18.match(/function firstChargeAt\([\s\S]*?\n\}/) || [''])[0]));
+  check('W18 a date Paddle stated is left alone only when it is exactly the target; a stand-in never is',
+    /if \(shown\.stated && Date\.parse\(shown\.at\) === target\.getTime\(\)\) return null;/.test(source18));
 
   /* The fallback is a floor, not a stop: a move LATER still goes ahead. */
   const junkDate = await purchase({ account, bought: day10bought, interval: 'year', shown: 'soon' });
@@ -570,11 +602,13 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
 }
 
 {
-  /* W21. The account's creation date could not be read. The first
-     payment stays on Paddle's own date, which may be earlier than the
-     rule gives, so it must never happen silently: the log says so, with
-     no account id and no subscription id. (Whether this should answer
-     500 instead, so Paddle retries, is Mal's call: DEPLOY.md 5.6.) */
+  /* W21. The account's creation date could not be read, so the function
+     cannot tell whether the first payment has to be moved. Left alone,
+     the customer would be charged on checkout's date, which may be
+     earlier than the pages say. So it is logged, with no account id and
+     no subscription id, and the delivery is answered 500 without being
+     recorded: Paddle sends it again. Premium is switched on all the
+     same, on this first attempt. (Until 22 Nov 2026 this answered 200.) */
   const cases = {
     'a lookup answering 500': { over: { account: () => reply(500, { message: 'no' }) }, says: 'answered 500' },
     'a lookup answering 404': { over: { account: () => reply(404, { message: 'no' }) }, says: 'answered 404' },
@@ -584,19 +618,251 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
   };
   let n = 0;
   for (const [name, c] of Object.entries(cases)) {
+    const event = createdEvent({ event_id: 'evt_test_nodate_' + (++n) });
     webhookRoute(c.over);
-    const r = await deliver(createdEvent({ event_id: 'evt_test_nodate_' + (++n) }));
+    const r = await deliver(event);
     const said = logs.join('\n');
     check('W21 ' + name + ': nothing is sent to Paddle and the row is not rewritten', patches().length === 0 && extensions().length === 0, keys());
     check('W21 ' + name + ': it is logged as "Could not defer first charge"', said.includes('Could not defer first charge') && said.includes(c.says), logs);
-    check('W21 ' + name + ': ...without the account id or the subscription id', !said.includes(USER_ID) && !said.includes(SUB_ID), logs);
-    check('W21 ' + name + ': Premium and the Foundation claim are untouched by it',
-      r.status === 200 && upserts().length === 1 && claims().length === 1 && grants().length === 3 && recorded().length === 1, { r, keys: keys() });
+    check('W21 ' + name + ': ...without the account id or the subscription id', !said.includes(USER_ID) && !said.includes(SUB_ID) && !r.text.includes(USER_ID) && !r.text.includes(SUB_ID), logs);
+    check('W21 ' + name + ': the answer is 500 and the event is NOT recorded, so Paddle retries',
+      r.status === 500 && r.json && r.json.ok === false && recorded().length === 0, { r, keys: keys() });
+    check('W21 ' + name + ': Premium is still switched on, and the Foundation claim still made, on this first attempt',
+      upserts().length === 1 && claims().length === 1 && grants().length === 3, keys());
+
+    webhookRoute();
+    const again = await deliver(event);
+    check('W21 ' + name + ': the retry, with the date readable, moves the first payment and is recorded',
+      again.status === 200 && patches().length === 1 && JSON.parse(patches()[0].body).next_billed_at === FIRST_CHARGE &&
+      extensions().length === 1 && recorded().length === 1, { again, keys: keys() });
   }
 
   webhookRoute();
   await deliver(createdEvent({ event_id: 'evt_test_nodate_ok' }));
   check('W21 a move that goes ahead logs no such line', patches().length === 1 && !logs.join('\n').includes('Could not defer first charge'), logs);
+}
+
+{
+  /* W22. Consistency (Mal, 22 Nov 2026: "consistency is critical when
+     offering value for early loyalty"). With a 7-day trial on Paddle's
+     monthly trial price, checkout shows the purchase plus 7 days, which
+     is never later than the account plus 21. So whichever day of the
+     trial a monthly customer subscribes on, the date is moved LATER, to
+     exactly 21 days after the account was made, or to 1 January 2027
+     when that is later. "Day n" here is the last hour of the nth day of
+     the trial. The expected instants are written out, not computed. */
+  const accounts = [
+    // account made               monthly: 21 days or 1 Jan    yearly: 30 days or 1 Jan
+    ['2027-02-01T09:00:00+10:30', '2027-02-21T22:30:00.000Z', '2027-03-02T22:30:00.000Z'],
+    ['2026-12-12T09:00:00+10:30', '2027-01-01T22:30:00.000Z', '2027-01-10T22:30:00.000Z'],
+    ['2026-11-25T09:00:00+10:30', FIRST_CHARGE,               FIRST_CHARGE],
+  ];
+  for (const [account, monthly, yearly] of accounts) {
+    const made = account.slice(0, 10);
+    const ended = { seven: new Set(), fourteen: new Set(), yearly: new Set() };
+    for (const n of [1, 5, 10, 14]) {
+      const bought = iso(at(account) + n * DAY - 3600000);
+      const T = 'W22 account made ' + made + ', monthly bought on day ' + n + ' of the trial';
+
+      const seven = await purchase({ account, bought, interval: 'month', trialDays: 7 });
+      ended.seven.add(seven.firstPayment);
+      check(T + ', 7-day Paddle trial: checkout showed the purchase plus 7 days, never later than day 21',
+        seven.shown === at(bought) + 7 * DAY && seven.shown <= at(account) + 21 * DAY);
+      check(T + ', 7-day Paddle trial: moved to exactly ' + monthly,
+        seven.r.status === 200 && seven.movedTo === monthly && seven.extendedTo === monthly && recorded().length === 1, seven.sent);
+      check(T + ', 7-day Paddle trial: that is a move LATER than checkout showed', at(seven.movedTo) > seven.shown);
+
+      /* The safety net: the same purchase while Paddle's monthly trial
+         price still carries 14 days. Nobody is charged before the rule's
+         date or before the date checkout showed. */
+      const fourteen = await purchase({ account, bought, interval: 'month', trialDays: 14 });
+      ended.fourteen.add(fourteen.firstPayment);
+      check(T + ', 14-day Paddle trial: never earlier than checkout showed, never earlier than the rule',
+        fourteen.r.status === 200 && fourteen.shown === at(bought) + 14 * DAY &&
+        fourteen.firstPayment >= fourteen.shown && fourteen.firstPayment >= at(monthly) &&
+        fourteen.firstPayment === Math.max(at(monthly), fourteen.shown), fourteen.sent);
+
+      /* Yearly is unchanged: its trial price keeps 14 days, and the
+         purchase plus 14 is at most day 28, under 30. */
+      const year = await purchase({ account, bought, interval: 'year', trialDays: 14 });
+      ended.yearly.add(year.firstPayment);
+      check('W22 account made ' + made + ', yearly bought on day ' + n + ': moved to exactly ' + yearly,
+        year.r.status === 200 && year.shown < at(account) + 30 * DAY && year.movedTo === yearly && year.extendedTo === yearly, year.sent);
+    }
+    check('W22 account made ' + made + ': with the 7-day trial every monthly subscriber ends on the same date, whichever day they subscribed',
+      ended.seven.size === 1 && [...ended.seven][0] === at(monthly), [...ended.seven].map(iso));
+    check('W22 account made ' + made + ': and so does every yearly subscriber', ended.yearly.size === 1 && [...ended.yearly][0] === at(yearly));
+  }
+  /* What leaving the monthly trial price at 14 days costs, written down
+     so nobody mistakes it for fixed: after the offer, someone who
+     subscribes on day 10 or 14 keeps a later date than someone who
+     subscribes on day 1. Nobody is charged early. */
+  {
+    const account = '2027-02-01T09:00:00+10:30';
+    const day1 = await purchase({ account, bought: iso(at(account) + 1 * DAY - 3600000), interval: 'month', trialDays: 14 });
+    const day14 = await purchase({ account, bought: iso(at(account) + 14 * DAY - 3600000), interval: 'month', trialDays: 14 });
+    check('W22 left at 14 days, a monthly subscriber on day 14 keeps day 28 where one on day 1 gets day 21',
+      day1.firstPayment === at(account) + 21 * DAY && day14.sent.length === 0 && day14.firstPayment === at(account) + 28 * DAY - 3600000);
+  }
+
+  /* The 7-day trial behind a payload that states no next_billed_at.
+     With the billing period's end to go on (the trial's end, the same
+     instant), the date still lands on exactly day 21. With nothing but
+     the purchase time, the 14-day stand-in holds it: the date is SENT,
+     to the purchase plus 14 days. Paddle really holds the purchase plus
+     7, which is day 17 here, earlier than the pages' day 21, so leaving
+     it would have broken the promise. */
+  const account = '2027-02-01T09:00:00+10:30';
+  const bought = iso(at(account) + 10 * DAY - 3600000);
+  const noDate = await purchase({ account, bought, interval: 'month', trialDays: 7, shown: null });
+  check('W22 7-day trial, day 10, no next_billed_at but a billing period: still exactly day 21',
+    noDate.r.status === 200 && noDate.movedTo === '2027-02-21T22:30:00.000Z', noDate.sent);
+  const bare = await purchase({ account, bought, interval: 'month', trialDays: 7, shown: null, periodEnds: null });
+  check('W22 7-day trial, day 10, no date of Paddle\'s at all: Paddle holds day 17, so the date is sent, to the purchase plus 14 days',
+    bare.r.status === 200 && bare.shown < at(account) + 21 * DAY && bare.movedTo === iso(at(bought) + 14 * DAY) &&
+    bare.firstPayment >= at(account) + 21 * DAY && bare.firstPayment >= bare.shown && bare.extendedTo === bare.movedTo, bare.sent);
+  const bareEarly = await purchase({ account, bought: iso(at(account) + 1 * DAY - 3600000), interval: 'month', trialDays: 7, shown: null, periodEnds: null });
+  check('W22 ...and on day 1 with no date at all: exactly day 21', bareEarly.movedTo === '2027-02-21T22:30:00.000Z', bareEarly.sent);
+}
+
+{
+  /* W23. A move that was needed and did not happen. With the 7-day
+     monthly trial the date is moved for every monthly subscriber, so a
+     failed move is a customer charged on checkout's date, earlier than
+     the pages say. It is never answered 200. Each case: the answer is
+     500, the subscriptions row and the identity grants are written
+     (Premium is on from the first attempt), the Foundation claim is
+     made, the event is NOT recorded, and the retry succeeds. The date
+     is the same on the retry, so moving it twice is harmless. */
+  const failures = {
+    'no PADDLE_API_KEY': { handler: webhookNoKey, over: {}, says: 'Could not defer first charge: PADDLE_API_KEY not set', sent: 0 },
+    'Paddle answering 400': { over: { paddle: () => reply(400, { error: 'no' }) }, says: 'Could not defer first charge for ' + SUB_ID + ': 400', sent: 1, namesSubscription: true },
+    'Paddle answering 429': { over: { paddle: () => reply(429, { error: 'slow down' }) }, says: 'Could not defer first charge for ' + SUB_ID + ': 429', sent: 1, namesSubscription: true },
+    'Paddle answering 500': { over: { paddle: () => reply(500, { error: 'no' }) }, says: 'Could not defer first charge for ' + SUB_ID + ': 500', sent: 1, namesSubscription: true },
+    'Paddle out of reach': { over: { paddle: () => { throw new Error('socket closed'); } }, says: 'Could not defer first charge: Paddle could not be reached', sent: 1 },
+    'the account lookup failing': { over: { account: () => reply(503, { message: 'no' }) }, says: 'Could not defer first charge: reading the account\'s creation date answered 503', sent: 0 },
+    /* These two used to reach the log only as a bare TypeError or
+       SyntaxError, with no line anyone could search for. */
+    'the account lookup out of reach': { over: { account: () => { throw new TypeError('fetch failed'); } }, says: 'Could not defer first charge: the account lookup could not be reached', sent: 0 },
+    'the account lookup answering something that is not JSON': { over: { account: () => reply(200, '<html>gateway</html>') }, says: 'Could not defer first charge: the account lookup\'s answer could not be read', sent: 0 },
+  };
+  let n = 0;
+  for (const [name, f] of Object.entries(failures)) {
+    for (const interval of ['month', 'year']) {
+      const T = 'W23 ' + name + ' (' + interval + 'ly): ';
+      const event = createdEvent({ event_id: 'evt_test_failed_move_' + (++n), data: { billing_cycle: { interval } } });
+      webhookRoute(f.over);
+      const r = await deliver(event, { handler: f.handler });
+      const said = logs.join('\n');
+      check(T + 'the answer is 500', r.status === 500 && r.json && r.json.ok === false && /first charge not deferred/.test(r.json.error), r);
+      check(T + 'the event is NOT recorded, so Paddle retries', recorded().length === 0, keys());
+      check(T + 'the subscriptions row was written', upserts().length === 1 && JSON.parse(upserts()[0].body).status === 'trialing', keys());
+      check(T + 'Premium is on from this first attempt: all three identity grants were made',
+        grants().length === 3 && grants().every((g) => JSON.parse(g.body).p_expires_at === '2027-03-01T00:00:00Z'), keys());
+      check(T + 'the Foundation claim was made', claims().length === 1, keys());
+      check(T + 'the row\'s period end is not rewritten to a date Paddle does not hold', extensions().length === 0, keys());
+      check(T + (f.sent ? 'the move was tried once' : 'nothing was sent to Paddle'), patches().length === f.sent, keys());
+      check(T + 'it is logged as "Could not defer first charge"', said.includes(f.says), logs);
+      check(T + 'the answer names neither the account nor the subscription, and the log never names the account',
+        !r.text.includes(USER_ID) && !r.text.includes(SUB_ID) && !said.includes(USER_ID) && (f.namesSubscription || !said.includes(SUB_ID)), { r, logs });
+      /* Every write the failed attempt made comes before the failure. */
+      const iFail = f.sent ? indexOfCall((c) => c.host === 'api.paddle.com') : calls.length;
+      check(T + 'the row, the claim and the grants all came first',
+        indexOfCall((c) => c.method === 'POST' && c.path === '/rest/v1/subscriptions') < iFail &&
+        indexOfCall((c) => c.path === '/rest/v1/rpc/claim_foundation_place') < iFail &&
+        calls.map((c, i) => (c.path === '/rest/v1/rpc/grant_capability' ? i : -1)).filter((i) => i >= 0).every((i) => i < iFail), keys());
+
+      webhookRoute();
+      const again = await deliver(event);
+      const moved = patches().map((p) => JSON.parse(p.body));
+      check(T + 'the retry succeeds: 200, the date moved to 1 January 2027, the event recorded',
+        again.status === 200 && moved.length === 1 && moved[0].next_billed_at === FIRST_CHARGE && moved[0].proration_billing_mode === 'do_not_bill' &&
+        extensions().length === 1 && JSON.parse(extensions()[0].body).current_period_end === FIRST_CHARGE && recorded().length === 1, { again, keys: keys() });
+    }
+  }
+
+  /* A retry after a move that DID succeed (the delivery failed on
+     something else) sends the same date again. Same date, twice. */
+  {
+    const event = createdEvent({ event_id: 'evt_test_move_twice' });
+    webhookRoute({ record: () => reply(500, { message: 'no' }) });
+    const first = await deliver(event);
+    const firstMove = patches().map((p) => JSON.parse(p.body).next_billed_at);
+    webhookRoute();
+    const second = await deliver(event);
+    const secondMove = patches().map((p) => JSON.parse(p.body).next_billed_at);
+    check('W23 a retry after a successful move sends exactly the same date again',
+      first.status === 500 && second.status === 200 && firstMove.length === 1 && secondMove.length === 1 && firstMove[0] === secondMove[0] && firstMove[0] === FIRST_CHARGE,
+      { firstMove, secondMove });
+  }
+
+  /* Both held failures at once: still one 500, both logged, and the
+     retry does both. */
+  {
+    const event = createdEvent({ event_id: 'evt_test_both_fail' });
+    webhookRoute({ claim: () => reply(500, { message: 'no' }), paddle: () => reply(400, { error: 'no' }) });
+    const r = await deliver(event);
+    const said = logs.join('\n');
+    check('W23 a failed claim and a failed move together: one 500, unrecorded, both logged, Premium written',
+      r.status === 500 && recorded().length === 0 && grants().length === 3 && upserts().length === 1 &&
+      said.includes('claim_foundation_place failed: 500') && said.includes('Could not defer first charge'), { r, logs });
+    webhookRoute();
+    const again = await deliver(event);
+    check('W23 ...and the retry makes the claim and the move', again.status === 200 && claims().length === 1 && patches().length === 1 && recorded().length === 1, keys());
+  }
+
+  /* No key is not a failure when there is nothing to move. */
+  {
+    webhookRoute();
+    const paid = await deliver(createdEvent({ event_id: 'evt_test_nokey_paid', data: { status: 'active' } }), { handler: webhookNoKey });
+    check('W23 no PADDLE_API_KEY and a subscription that paid on the day: 200, recorded, no complaint',
+      paid.status === 200 && recorded().length === 1 && patches().length === 0 && !logs.join('\n').includes('Could not defer first charge'), { paid, logs });
+    const already = await purchase({ account: '2027-02-01T09:00:00+10:30', bought: '2027-02-02T09:00:00+10:30', interval: 'year', shown: '2027-06-01T00:00:00Z', handler: webhookNoKey });
+    check('W23 no PADDLE_API_KEY and a date from Paddle that is already the right one: 200, recorded',
+      already.r.status === 200 && already.sent.length === 0 && recorded().length === 1 && !logs.join('\n').includes('Could not defer first charge'), { r: already.r, logs });
+  }
+
+  const code = WEBHOOK_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check('W23 the held failure is thrown after the Foundation one and before the event is recorded',
+    /if \(foundationError\) throw foundationError;\s*if \(deferError\) throw deferError;\s*await recordEvent\(eventId, eventType, userId, event\);/.test(code));
+  check('W23 no failed move is left as a warning: the old "leaving the billing date" lines are gone',
+    !/leaving the billing date|The billing date is left as Paddle set it/.test(WEBHOOK_SOURCE));
+}
+
+{
+  /* W24. The rule is for someone who subscribes while their free trial
+     is running, and for nobody else (Mal, 22 Nov 2026: "Initial payments
+     will not be charged before 1 January 2027 if you sign on while in
+     your free 14-day trial period"). An account whose trial has ended
+     takes the plain price, pays on the day, and arrives here as an
+     active subscription, not a trialing one. It is not moved, in
+     December 2026 or at any other time, and nothing is asked of Paddle. */
+  const lapsed = [
+    ['month', '2026-12-15T10:00:00+10:30', '2027-01-15T10:00:00+10:30'],
+    ['year', '2026-12-15T10:00:00+10:30', '2027-12-15T10:00:00+10:30'],
+    ['month', '2026-12-31T23:00:00+10:30', '2027-01-31T23:00:00+10:30'],
+    ['month', '2027-01-10T10:00:00+10:30', '2027-02-10T10:00:00+10:30'],
+  ];
+  let n = 0;
+  for (const [interval, bought, renews] of lapsed) {
+    for (const use of [webhook, webhookNoKey]) {
+      const T = 'W24 a lapsed account subscribing ' + bought.slice(0, 10) + ' (' + interval + 'ly' + (use === webhookNoKey ? ', no Paddle key' : '') + '): ';
+      // The account was made on 23 November; its 14 days ended on 7 December.
+      webhookRoute({ accountCreatedAt: '2026-11-23T09:00:00+10:30' });
+      const r = await deliver(createdEvent({
+        event_id: 'evt_test_lapsed_' + (++n), occurred_at: bought,
+        data: { status: 'active', created_at: bought, next_billed_at: renews, billing_cycle: { interval }, current_billing_period: { ends_at: renews } },
+      }), { now: at(bought) + 5000, handler: use });
+      const row = upserts()[0] ? JSON.parse(upserts()[0].body) : {};
+      check(T + 'arrives as a paid subscription, not a trialing one', r.status === 200 && row.status === 'active' && row.current_period_end === renews, row);
+      check(T + 'its payment date is NOT moved: nothing is sent to Paddle', patches().length === 0, keys());
+      check(T + 'the row is not rewritten and the account\'s creation date is not even looked up',
+        extensions().length === 0 && !calls.some((c) => c.method === 'GET' && c.path === '/rest/v1/subscriptions'), keys());
+      check(T + 'the event is recorded and Premium runs to the end of the period paid for',
+        recorded().length === 1 && grants().length === 3 && grants().every((g) => JSON.parse(g.body).p_expires_at === renews), keys());
+      check(T + 'no "Could not defer" line', !logs.join('\n').includes('Could not defer first charge'), logs);
+    }
+  }
 }
 
 {
@@ -626,21 +892,38 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
      in the payload at all. The date checkout showed is the same in all
      three, and so is the answer. */
   const PAYLOADS = [{}, { shown: null }, { shown: null, periodEnds: null }];
+  /* Monthly is tried on both trials Paddle's monthly trial price may
+     carry: 7 days (DEPLOY.md 5.6) and the 14 it had before. Yearly
+     keeps 14. */
   const audit = async (account, bought, interval) => {
-    for (const payload of PAYLOADS) await auditOne(account, bought, interval, payload);
+    for (const trialDays of interval === 'month' ? [14, 7] : [14]) {
+      for (const payload of PAYLOADS) await auditOne(account, bought, interval, payload, trialDays);
+    }
   };
-  const auditOne = async (account, bought, interval, payload) => {
-    const p = await purchase({ account, bought, interval, ...payload });
+  const auditOne = async (account, bought, interval, payload, trialDays) => {
+    const p = await purchase({ account, bought, interval, trialDays, ...payload });
     tried++;
     const days = interval === 'month' ? 21 : 30;
+    /* The date no move may fall short of. It is Paddle's own date
+       whenever the payload gives one. With no date of Paddle's in the
+       payload the function stands in the purchase plus 14 days, which
+       is Paddle's own date on a 14-day trial and a later one on a
+       7-day trial. */
+    const standIn = payload.shown === null && payload.periodEnds === null;
+    const floor = standIn ? Math.max(p.shown, at(bought) + 14 * DAY) : p.shown;
     const ok = p.r.status === 200 && p.sent.length <= 1 &&
       p.firstPayment >= at(FIRST_CHARGE) &&
       p.firstPayment >= at(account) + days * DAY &&
       p.firstPayment >= p.shown &&
       // Exactly the latest of the three, so nobody is held longer either.
-      p.firstPayment === Math.max(at(FIRST_CHARGE), at(account) + days * DAY, p.shown) &&
+      p.firstPayment === Math.max(at(FIRST_CHARGE), at(account) + days * DAY, floor) &&
+      /* On the 7-day trial, with Paddle's date in the payload, a monthly
+         subscriber's date depends on the account alone, never on the
+         day they subscribed. */
+      (!(interval === 'month' && trialDays === 7 && !standIn) ||
+        (p.sent.length === 1 && p.firstPayment === Math.max(at(FIRST_CHARGE), at(account) + 21 * DAY))) &&
       (p.movedTo === null || (p.extendedTo === p.movedTo && p.sent[0].proration_billing_mode === 'do_not_bill'));
-    if (!ok) bad.push({ account, bought, interval, payload, movedTo: p.movedTo, shown: iso(p.shown) });
+    if (!ok) bad.push({ account, bought, interval, trialDays, payload, movedTo: p.movedTo, shown: iso(p.shown) });
   };
   // Accounts made on each day from the offer's first to 5 January 2027.
   for (let d = at('2026-11-22T00:00:00+10:30'); d <= at('2027-01-05T00:00:00+10:30'); d += DAY) {
@@ -657,7 +940,7 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
     }
   }
   check('W20 nobody is charged before 1 January 2027 12:00 UTC, before their own days, or before the date checkout showed (' + tried + ' purchases)',
-    bad.length === 0 && tried > 2700, bad.slice(0, 5));
+    bad.length === 0 && tried > 3800, bad.slice(0, 5));
 }
 
 {
@@ -703,8 +986,8 @@ async function purchase({ account, bought, interval, shown, periodEnds }) {
 
   webhookRoute({ paddle: () => reply(400, { error: 'no' }) });
   const refused = await deliver(createdEvent({ event_id: 'evt_test_refused' }));
-  check('W15 a move Paddle refuses changes nothing on the row',
-    refused.status === 200 && extensions().length === 0 && grants().length === 3 && recorded().length === 1, keys());
+  check('W15 a move Paddle refuses changes nothing on the row, and is a 500, unrecorded, so Paddle retries (W23)',
+    refused.status === 500 && extensions().length === 0 && grants().length === 3 && recorded().length === 0, keys());
 
   webhookRoute({ extend: () => reply(500, { message: 'no' }) });
   const failed = await deliver(createdEvent({ event_id: 'evt_test_extend_fail' }));
@@ -831,8 +1114,8 @@ const stamps = (text) => [...text.matchAll(/timestamptz '([^']+)'/g)].map((m) =>
     (webhookCode.match(/\bpurchasedAt\(/g) || []).length === 3 &&
     /function paddleFirstPaymentAt\([^)]*\)[^{]*\{[\s\S]*?purchasedAt\(data, event\)[\s\S]*?\n\}/.test(webhookCode) &&
     /const subscribedAt = isCreation \? purchasedAt\(data, event\) : null;/.test(webhookCode));
-  check('S7 ...and Paddle\'s own next_billed_at is tried first, then the period end',
-    /for \(const value of \[data\?\.next_billed_at, data\?\.current_billing_period\?\.ends_at\]\)/.test(webhookCode));
+  check('S7 ...and Paddle\'s own next_billed_at is tried first, as the stated date, then the period end, as a stand-in',
+    /if \(readable\(data\?\.next_billed_at\)\) return \{ at: data\.next_billed_at, stated: true \};\s*const periodEnd = data\?\.current_billing_period\?\.ends_at;\s*if \(readable\(periodEnd\)\) return \{ at: periodEnd, stated: false \};/.test(webhookCode));
 }
 
 {
@@ -1092,8 +1375,10 @@ for (const [name, html] of Object.entries(PAGES)) {
     hooks.map((m) => text.slice(m.index, m.index + 120)));
   check('P13 ' + name + ' names the offer', text.includes('Black Friday Launch Offer'));
   const metas = [...html.matchAll(/<meta name="description" content="([^"]*)"/g)].map((m) => m[1]);
-  check('P13 ' + name + ': the description gives the hook with its condition too',
-    metas.length === 1 && metas.every((m) => !/pay nothing until 2027/i.test(m) || /pay nothing until 2027\W{1,3}subscribe while your free trial is running and your first payment is taken from 1 January 2027\./i.test(m)), metas);
+  /* Nothing can take a description down when the offer ends, so it
+     carries no offer and no date (P21). The hook is not in it. */
+  check('P13 ' + name + ': there is one description, and the hook is not in it',
+    metas.length === 1 && metas.every((m) => m.length > 40 && !/pay nothing/i.test(m)), metas);
   check('P13 ' + name + ': the first payment is "from" 1 January 2027, never "on"',
     !/\bon 1 January 2027/i.test(text) && metas.every((m) => !/\bon 1 January 2027/i.test(m)));
 }
@@ -1135,15 +1420,22 @@ for (const [name, html] of Object.entries(PAGES)) {
 check('P18 terms.html does not mention 5 December at all', !/5 Dec/.test(reading(TERMS)));
 
 /* P19. The free-time rule, in the owner's words, on both offer pages. */
-const FREE_TIME = 'Every new account starts with a 14-day free trial. Subscribe while it is running and you get more free time before your first payment: 30 days from the day you made your account on a yearly plan, or 21 days on a monthly plan. No first payment is taken before 1 January 2027.';
+/* The owner's sentence (Mal, 22 Nov 2026), kept whole so the date can
+   never be read without its condition: it is for someone who subscribes
+   while their free trial is running, and for nobody else. */
+const OWNER_SENTENCE = 'First payments are not charged before 1 January 2027 if you subscribe while your free 14-day trial is running.';
+const FREE_TIME = 'Every new account starts with a 14-day free trial. Subscribe while it is running and you get more free time before your first payment: 30 days from the day you made your account on a yearly plan, or 21 days on a monthly plan. ' + OWNER_SENTENCE;
 const AFTER_TRIAL = 'If you subscribe after your trial has ended, you pay on the day you subscribe.';
-const CHECKOUT_DATE = 'Checkout may show a different first-payment date. We set it to the right one shortly after you subscribe, and never to a date earlier than checkout showed you.';
+/* Checkout shows the purchase plus the trial on Paddle's price, which
+   for a monthly plan (7 days) is always earlier than the rule's date. */
+const CHECKOUT_DATE = 'Checkout may show an earlier first-payment date. We move it to the right one shortly after you subscribe, and never to a date earlier than checkout showed you.';
 const FOUNDATION_CLOSING = 'Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken.';
 for (const [name, html] of Object.entries(PAGES)) {
   const text = reading(html);
   check('P19 ' + name + ' states the free-time rule', text.includes(FREE_TIME), text.match(/Every new account.{0,300}/));
   check('P19 ' + name + ': ...and straight after it, what happens once the trial has ended', text.includes(FREE_TIME + ' ' + AFTER_TRIAL));
-  check('P19 ' + name + ' says checkout may show a different date, never moved earlier', text.includes(CHECKOUT_DATE));
+  check('P19 ' + name + ' says checkout may show an earlier date, moved to the right one and never moved earlier', text.includes(CHECKOUT_DATE));
+  check('P19 ' + name + ': the old "a different first-payment date" wording is gone', !/a different first-payment date|We set it to the right one/i.test(text));
   check('P19 ' + name + ' says when Foundation closes', text.includes(FOUNDATION_CLOSING));
   check('P19 ' + name + ': the old rule is gone', !/30 days after (you|the day you) (made|signed)|whichever plan you pick|Premium stays free until 31 December/i.test(text));
   const carrier = scripts(html).find((js) => js.includes('foundation-status:begin')) || '';
@@ -1175,18 +1467,22 @@ check('P19 pricing.html: the panel says how long the offer runs',
   check('P15 foundation.html is no longer kept out of search', !/name="robots"/.test(FOUNDATION));
   check('P15 foundation.html no longer calls itself an unlinked draft', !/not linked from any page/i.test(FOUNDATION) && /Not yet reviewed by a lawyer/.test(FOUNDATION));
   const terms = read('app/terms.html');
-  check('P16 terms.html names the offer and keeps its date and its condition, hidden in the Play app',
-    /<span data-hide-in-play>The offer running now is the Black Friday Launch Offer: subscribe while your free trial is running and your first payment is taken from <strong>1 January 2027<\/strong>\. The offer runs to the end of 31 December 2026 \(Adelaide time\)\.<\/span>/.test(squash(terms)));
+  /* terms.html has no date check, so this sentence dates itself: it
+     opens with the day the offer ends and stays true after it. Nobody
+     has to take it out on 1 January 2027. */
+  check('P16 terms.html names the offer in a sentence that dates itself, with its condition, hidden in the Play app',
+    /<span data-hide-in-play>Until the end of 31 December 2026 \(Adelaide time\) the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from <strong>1 January 2027<\/strong>\.<\/span>/.test(squash(terms)));
+  check('P16 ...and never as "the offer running now"', !/offer running now|running now|on now\b/i.test(reading(terms)));
   const termsText = reading(terms);
   check('P16 terms.html says the offer sets a date no first payment is taken before, not one date for everyone',
-    termsText.includes('During a launch or promotional period, no first payment is taken before a date announced with that offer. If your own 30 or 21 days end later than that date, they still apply.') &&
+    termsText.includes('During a launch or promotional period, if you subscribe while your trial is running, no first payment is taken before a date announced with that offer. If your own 30 or 21 days end later than that date, they still apply.') &&
     !/may instead fall|the same date for everyone/i.test(termsText));
   check('P16 ...and that subscribing during the trial never shortens the trial\'s own free time',
     termsText.includes('Either way, subscribing during your trial never shortens the free time your trial gave you.') &&
     !/subscribing early never costs/i.test(termsText));
-  check('P19 terms.html says checkout may show a different date, never moved earlier, hidden in the Play app',
-    termsText.includes(CHECKOUT_DATE) && /<p data-hide-in-play>Checkout may show a different first-payment date\./.test(squash(terms)) &&
-    !/We move that date back|earlier first-payment date than/i.test(termsText));
+  check('P19 terms.html says checkout may show an earlier date, never moved earlier, hidden in the Play app',
+    termsText.includes(CHECKOUT_DATE) && /<p data-hide-in-play>Checkout may show an earlier first-payment date\./.test(squash(terms)) &&
+    !/We move that date back|earlier first-payment date than|a different first-payment date|We set it to the right one/i.test(termsText));
   check('P16 terms.html states the standing rule: 30 days yearly, 21 days monthly, from the day the account was made',
     termsText.includes('If you subscribe while your trial is still running, your first payment is not taken on the day you subscribe. As standard the charge falls 30 days after the day you made your account on a yearly plan, or 21 days on a monthly plan.'));
   check('P16 ...and that a subscription made after the trial has ended is paid on the day',
@@ -1197,6 +1493,257 @@ check('P19 pricing.html: the panel says how long the offer runs',
   check('P16 ...the rule stays visible in the Play app, the offer and its date do not',
     inPlay.includes('or 21 days on a monthly plan.') && inPlay.includes('you pay on the day you subscribe.') &&
     !/2027|Black Friday|Launch Offer|Pay nothing/i.test(inPlay), inPlay.match(/.{40}(2027|Black Friday|Launch Offer).{40}/));
+}
+
+/* P20. The owner's sentence, whole, on every page that used to say "No
+   first payment is taken before 1 January 2027." on its own. That
+   sentence read as a promise to everyone. The rule is only for someone
+   who subscribes while their free trial is running: someone whose trial
+   has ended pays on the day they subscribe, before 2027 or after it. */
+const sentences = (text) => text.split(/(?<=[.!?])\s+/);
+for (const [name, html] of Object.entries(PAGES)) {
+  const text = reading(html);
+  check('P20 ' + name + ' carries the owner\'s sentence whole', text.includes(OWNER_SENTENCE), text.match(/.{0,80}1 January 2027.{0,80}/g));
+  check('P20 ' + name + ': and straight after it, that a lapsed trial pays on the day', text.includes(OWNER_SENTENCE + ' ' + AFTER_TRIAL));
+}
+for (const [name, html] of Object.entries(OFFER_PAGES)) {
+  const text = reading(html);
+  const everything = squash(html.replace(/&nbsp;/g, ' ').replace(/<\/?(?:strong|em|b|span|a)\b[^>]*>/g, ''));
+  check('P20 ' + name + ': the standalone sentence is gone, from the text, the description and the scripts',
+    !/No first payment is taken before 1 January 2027/i.test(everything));
+  const about2027 = sentences(text).filter((t) => /before 1 January 2027|before 2027/i.test(t));
+  check('P20 ' + name + ': every sentence that says "before 1 January 2027" carries its condition in the same sentence',
+    about2027.every((t) => t.endsWith('not charged before 1 January 2027 if you subscribe while your free 14-day trial is running.')), about2027);
+  /* The same promise with no date in it ("before a date announced with
+     that offer") must carry its condition too, or it reads as a promise
+     to everyone. */
+  const notBefore = sentences(text).filter((t) => /no first payment is taken before/i.test(t));
+  check('P20 ' + name + ': any sentence that says "no first payment is taken before" says "while your trial" in the same sentence',
+    notBefore.every((t) => /while your (free )?(14-day )?trial/i.test(t)), notBefore);
+  check('P20 ' + name + ' says a subscription made after the trial has ended is paid on the day', text.includes(AFTER_TRIAL));
+  check('P20 ' + name + ': and puts no date on that', !/From 1 January 2027, if you subscribe|until 2027, if you subscribe after/i.test(everything) &&
+    sentences(text).filter((t) => /after your trial has ended/i.test(t)).every((t) => !/20\d\d/.test(t)), sentences(text).filter((t) => /after your trial has ended/i.test(t)));
+}
+
+/* P21. Nothing on these pages needs a person on 1 January 2027 (Mal,
+   22 Nov 2026: "I'm not sure how available I will be"). Every mention
+   of the offer is either inside something a script takes down at the
+   closing instant, or is written so it stays true after it. */
+for (const [name, html] of Object.entries(OFFER_PAGES)) {
+  /* A description, a title or a link preview cannot be taken down by a
+     script, so none of them carries the offer or a date. */
+  const head = html.slice(0, html.indexOf('</head>'));
+  const metaContent = [...head.matchAll(/<meta\b[^>]*\bcontent="([^"]*)"/g)].map((m) => m[1]);
+  const title = (head.match(/<title>([^<]*)<\/title>/) || [])[1] || '';
+  check('P21 ' + name + ': the description and the title carry no offer, no hook and no date',
+    title !== '' && [title, ...metaContent].every((t) => !/Black Friday|Launch Offer|pay nothing|20\d\d|31 December|1 January|places/i.test(t)), [title, ...metaContent]);
+  check('P21 ' + name + ': nothing is described as on "now"', !/\b(running now|on now|right now|currently|this month|ends soon|closing soon|today only|last chance)\b/i.test(reading(html)));
+  /* Every sentence a reader can see that names the offer, the hook or a
+     closing says which day it ends, or sits right beside one that does. */
+  const text = reading(html);
+  for (const m of text.matchAll(/Black Friday Launch Offer|Pay nothing until 2027|Foundation closes/g)) {
+    const around = text.slice(Math.max(0, m.index - 60), m.index + 330);
+    check('P21 ' + name + ': "' + m[0] + '" is dated to 31 December 2026 where it stands', /31 December 2026/.test(around), around);
+  }
+}
+{
+  /* pricing.html: the offer's name, hook and condition are all inside
+     #offerDates, which renderOfferDates() hides at FOUNDATION_CLOSES (P6). */
+  const panel = PRICING.match(/<div class="offer-dates" id="offerDates">[\s\S]*?<\/div>/);
+  const without = panel ? reading(PRICING.replace(panel[0], ' ')) : '';
+  check('P21 pricing.html: outside the part its script takes down, nothing names the offer or the hook',
+    Boolean(panel) && /Black Friday Launch Offer/.test(panel[0]) && /Pay nothing until 2027/.test(panel[0]) &&
+    !/Black Friday|Launch Offer|Pay nothing/i.test(without), without.match(/.{40}(Black Friday|Launch Offer|Pay nothing).{40}/i));
+  check('P21 pricing.html: ...and what is left about the first payment is the standing rule', without.includes(OWNER_SENTENCE + ' ' + AFTER_TRIAL));
+
+  /* foundation.html: the pie script hides the hook and its condition at
+     END and rewrites the caption to say the offer is over (P6b). The
+     card keeps its name, with that caption under it. */
+  const stripped = FOUNDATION.replace(/<p class="launch-hook" id="launchHook">[\s\S]*?<\/p>/, ' ').replace(/<p class="launch-terms" id="launchTerms">[\s\S]*?<\/p>/, ' ');
+  const left = reading(stripped);
+  check('P21 foundation.html: outside the two lines its script takes down, the hook is nowhere',
+    stripped !== FOUNDATION && !/Pay nothing/i.test(left), left.match(/.{40}Pay nothing.{40}/i));
+  check('P21 foundation.html: the offer is named once more, as the card\'s name, straight above the caption the script rewrites',
+    (left.match(/Black Friday Launch Offer/g) || []).length === 1 &&
+    /<h2 class="launch-name">Black Friday Launch Offer<\/h2>[\s\S]*?<p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026 \(Adelaide time\)\.<\/p>\s*<\/div>/.test(FOUNDATION));
+
+  /* terms.html: no script, so the one sentence dates itself (P16). */
+  const termsLeft = reading(TERMS);
+  check('P21 terms.html names the offer once, in the sentence that opens with its closing day',
+    (termsLeft.match(/Black Friday|Launch Offer/g) || []).length === 2 &&
+    termsLeft.includes('Until the end of 31 December 2026 (Adelaide time) the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from 1 January 2027.'));
+  check('P21 terms.html has no script that would need a date, and none is needed',
+    !/Date\.(UTC|now|parse)/.test(scripts(TERMS).join('\n')));
+
+  const claude = read('CLAUDE.md');
+  check('P21 CLAUDE.md lists nothing to take out by hand on 1 January 2027',
+    !/come out by hand|Take that span out|remove[^.]{0,60}by hand on 1 January 2027/i.test(squash(claude)) &&
+    squash(claude).includes('Nothing in this repo has to be taken down by hand on 1 January 2027'));
+}
+
+{
+  /* P22. Which price checkout opens on, with billing.js and config.js
+     run for real in a sandbox and Paddle's script stubbed. The trial
+     price, the one whose first payment paddle-webhook moves, is offered
+     ONLY while the account's own trial is running. A lapsed account
+     gets the plain price and pays on the day it subscribes, in December
+     2026 as at any other time: billing.js holds no date at all. */
+  const billingSource = read('app/billing.js');
+  const configSource = read('app/config.js');
+  async function priceOpened(row, cadence) {
+    const opened = [];
+    const ctx = {
+      console: { warn() {}, log() {}, error() {} },
+      setTimeout: () => 0,
+      navigator: { userAgent: 'Mozilla/5.0' },
+      location: { hash: '' },
+      sessionStorage: { getItem: () => null },
+      document: {
+        referrer: '',
+        createElement: () => ({}),
+        getElementById: () => null,
+        head: { appendChild(tag) {
+          ctx.Paddle = { Environment: { set() {} }, Initialize() {}, Checkout: { open: (o) => opened.push(o) } };
+          tag.onload();
+        } },
+      },
+    };
+    ctx.window = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(configSource, ctx, { filename: 'config.js' });
+    ctx.CT.auth = { isSignedIn: () => true, getUser: () => ({ id: USER_ID, email: 'someone@example.test' }) };
+    ctx.CT.db = { getEntitlement: async () => row };
+    vm.runInContext(billingSource, ctx, { filename: 'billing.js' });
+    let refused = null;
+    try { await ctx.CT.billing.openCheckout(cadence, ''); } catch (error) { refused = String(error && error.message); }
+    return { priceId: opened.length === 1 ? opened[0].items[0].priceId : null, opened: opened.length, refused, paddle: ctx.CT.config.paddle };
+  }
+  const probe = await priceOpened({ entitled: true, plan: 'trial', status: 'trialing' }, 'annual');
+  const P = probe.paddle;
+  check('P22 config.js has four different price ids: two plain, two with a trial',
+    new Set([P.annualPriceId, P.monthlyPriceId, P.annualTrialPriceId, P.monthlyTrialPriceId].filter(Boolean)).size === 4);
+  check('P22 a trial that is running: the yearly trial price', probe.priceId === P.annualTrialPriceId, probe.priceId);
+  check('P22 a trial that is running: the monthly trial price',
+    (await priceOpened({ entitled: true, plan: 'trial', status: 'trialing' }, 'monthly')).priceId === P.monthlyTrialPriceId);
+  const lapsedRows = {
+    'a trial that has ended': { entitled: false, plan: 'trial', status: 'trialing' },
+    'a trial marked expired': { entitled: false, plan: 'trial', status: 'expired' },
+    'no plan at all': { entitled: false, plan: null, status: 'none' },
+    'a cancelled subscription that has run out': { entitled: false, plan: 'monthly', status: 'canceled' },
+  };
+  for (const [name, row] of Object.entries(lapsedRows)) {
+    const yearly = (await priceOpened(row, 'annual')).priceId;
+    const monthly = (await priceOpened(row, 'monthly')).priceId;
+    check('P22 ' + name + ': the plain prices, paid on the day, never a trial price',
+      yearly === P.annualPriceId && monthly === P.monthlyPriceId, { yearly, monthly });
+  }
+  /* Someone who has ALREADY subscribed. Paddle keeps a subscription
+     made on a trial price at status 'trialing' until its first payment,
+     which under the launch offer is weeks. That is a subscriber, not a
+     free trial: checkout is refused, so there is never a second
+     subscription billing beside the first, and the trial price is never
+     handed out twice. */
+  const subscribedRows = {
+    'subscribed on monthly, waiting for the first payment': { entitled: true, plan: 'monthly', status: 'trialing', current_period_end: '2027-01-01T12:00:00Z' },
+    'subscribed on yearly, waiting for the first payment': { entitled: true, plan: 'annual', status: 'trialing', current_period_end: '2027-01-01T12:00:00Z' },
+    'a paying subscriber': { entitled: true, plan: 'annual', status: 'active' },
+    'a subscriber whose payment is overdue': { entitled: true, plan: 'monthly', status: 'past_due' },
+  };
+  for (const [name, row] of Object.entries(subscribedRows)) {
+    for (const cadence of ['annual', 'monthly']) {
+      const got = await priceOpened(row, cadence);
+      check('P22 ' + name + ', choosing ' + cadence + ': checkout does not open, and the page says why',
+        got.opened === 0 && /already on AibhlínnAI Premium/.test(got.refused || ''), got);
+    }
+  }
+  /* One already set to end will not bill again, so a new plan is how
+     they come back. It is the plain price, paid on the day, even while
+     Paddle still calls the old one 'trialing'. Complimentary access is
+     not a Paddle subscription, so it is not refused either. */
+  const endingRows = {
+    'a subscription set to end': { entitled: true, plan: 'monthly', status: 'active', cancel_at_period_end: true },
+    'a subscription set to end before its first payment': { entitled: true, plan: 'monthly', status: 'trialing', cancel_at_period_end: true },
+    'complimentary access': { entitled: true, plan: 'complimentary', status: 'active', complimentary: true },
+  };
+  for (const [name, row] of Object.entries(endingRows)) {
+    const yearly = (await priceOpened(row, 'annual')).priceId;
+    const monthly = (await priceOpened(row, 'monthly')).priceId;
+    check('P22 ' + name + ': the plain prices, never a trial price',
+      yearly === P.annualPriceId && monthly === P.monthlyPriceId, { yearly, monthly });
+  }
+  /* The entitlement lookup failed (supabase.js answers status 'unknown',
+     with no plan). Opening checkout on that would be the plain price,
+     paid today, for someone whose trial may be running. It stops. */
+  for (const cadence of ['annual', 'monthly']) {
+    const got = await priceOpened({ entitled: true, plan: null, status: 'unknown' }, cadence);
+    check('P22 a lookup that failed, choosing ' + cadence + ': checkout does not open, and the page asks them to try again',
+      got.opened === 0 && /could not check your account just now\. Please try again\./.test(got.refused || ''), got);
+  }
+  check('P22 supabase.js still answers a failed lookup with status "unknown", which is what billing.js stops on',
+    /status: 'unknown'/.test(uncommented(read('app/supabase.js'))) && /entitlement\.status === 'unknown'/.test(uncommented(billingSource)));
+  /* The app, the header chip and the pricing page tell a free trial
+     from a subscriber the same way billing.js does: by plan 'trial'. */
+  const sameTest = {
+    'app.js': /function isTrial\(ent\) \{\s*return ent\.plan === 'trial';\s*\}/,
+    'identity-bridge.js': /var trialing = ent\.plan === 'trial' && ent\.entitled;/,
+    'pricing.html': /var trialing = ent\.plan === 'trial' && ent\.entitled;/,
+  };
+  for (const [file, pattern] of Object.entries(sameTest)) {
+    const code = uncommented(read('app/' + file));
+    check('P22 ' + file + ' counts only plan "trial" as a free trial, never status "trialing" alone',
+      pattern.test(code) && !/status === 'trialing' \|\|/.test(code));
+  }
+  check('P22 app.js names a subscriber waiting for their first payment as that, not as a free trial',
+    /if \(ent\.status === 'trialing' && ent\.currentPeriodEnd\) \{\s*return name \+ ', first payment from '/.test(uncommented(read('app/app.js'))));
+  {
+    /* The Account tab's own label, run for real: the three functions
+       are lifted out of app.js as they stand. */
+    const appSource = read('app/app.js');
+    const from = appSource.indexOf('  function daysLeft(ent) {');
+    const to = appSource.indexOf('  function renderPlan() {');
+    const sandbox = { CT: { billing: { enabled: () => true } }, LOCALE: 'en-AU', Date, Math };
+    vm.createContext(sandbox);
+    vm.runInContext(appSource.slice(from, to) + '\nthis.planLabel = planLabel; this.isTrial = isTrial;', sandbox, { filename: 'app.js (plan label)' });
+    const ahead = new Date(Date.now() + 20 * 86400000).toISOString();
+    const waiting = { entitled: true, plan: 'monthly', status: 'trialing', currentPeriodEnd: ahead };
+    const label = from > 0 && to > from ? sandbox.planLabel(waiting) : '';
+    check('P22 the Account tab calls a subscriber waiting for their first payment "Monthly, first payment from <date>", never a free trial',
+      /^Monthly, first payment from \d/.test(label) && !/trial/i.test(label) && sandbox.isTrial(waiting) === false, label);
+    const yearlyLabel = sandbox.planLabel({ entitled: true, plan: 'annual', status: 'trialing', currentPeriodEnd: ahead });
+    check('P22 ...and the same on a yearly plan', /^Annual, first payment from \d/.test(yearlyLabel), yearlyLabel);
+    const trialLabel = sandbox.planLabel({ entitled: true, plan: 'trial', status: 'trialing', currentPeriodEnd: ahead });
+    check('P22 ...while an account in its own free trial still reads "Free trial: 20 days left"', trialLabel === 'Free trial: 20 days left', trialLabel);
+    check('P22 ...a trial that has ended still reads as ended, and a paying subscriber as renewing',
+      sandbox.planLabel({ entitled: false, plan: 'trial', status: 'trialing', currentPeriodEnd: '2026-01-01T00:00:00Z' }) === 'Free: your trial has ended' &&
+      /^Annual, renews \d/.test(sandbox.planLabel({ entitled: true, plan: 'annual', status: 'active', currentPeriodEnd: ahead })) &&
+      /^Monthly, ends \d/.test(sandbox.planLabel({ entitled: true, plan: 'monthly', status: 'trialing', currentPeriodEnd: ahead, cancelAtPeriodEnd: true })));
+  }
+  for (const file of ['pricing.html', 'index.html']) {
+    check('P22 ' + file + ': the Monthly card does not say "Try before you pay" to someone who would pay on the day',
+      !/Try before you pay/i.test(read('app/' + file)) && /<span class="plan-note">Cancel any time<\/span>/.test(read('app/' + file)));
+  }
+
+  const billingCode = uncommented(billingSource);
+  const configCode = uncommented(configSource);
+  check('P22 billing.js chooses on the account\'s own trial and nothing else: it reads no clock and holds no date',
+    /var inTrial = ent\.plan === 'trial' && ent\.entitled;\s*return \(inTrial && trial\) \? trial : plain;/.test(billingCode) &&
+    !/\bDate\b|\b20\d\d\b/.test(billingCode), billingCode.match(/.{30}(\bDate\b|\b20\d\d\b).{30}/));
+  check('P22 config.js holds no date and no setting that gives everyone the trial price',
+    !/\bDate\b|\b20\d\d\b/.test(configCode) && Object.keys(P).every((k) => !/until|launch|offer|everyone|always/i.test(k)), Object.keys(P));
+}
+
+{
+  /* D1. DEPLOY.md tells the owner to set the monthly trial price's trial
+     to 7 days before the function goes out, and no longer says a failed
+     move is only logged. */
+  const deploy = squash(read('DEPLOY.md'));
+  const iTrial = deploy.indexOf('trial period to **7 days**');
+  const iDeploy = deploy.indexOf('- [ ] Deploy the function: `supabase functions deploy paddle-webhook`.');
+  check('D1 DEPLOY.md has the 7-day tick, before the function is deployed', iTrial > 0 && iDeploy > iTrial, { iTrial, iDeploy });
+  check('D1 ...with its menu path marked as unchecked, and what happens if it is left at 14',
+    deploy.includes('[check label]') && /left at 14 days[^.]*nobody is charged early/i.test(deploy));
+  check('D1 ...and says a failed move is answered 500 and retried, not just logged',
+    /answers 500[^.]*Paddle (sends|retries)/i.test(deploy) && !/only logs it/.test(deploy) && !/so Paddle does not retry and the customer is billed/.test(deploy));
 }
 
 console.log(`${passed} passed, ${failed} failed`);

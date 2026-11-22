@@ -16,6 +16,12 @@
       and the public.subscriptions row is written, through one database
       function that decides each account once. A failed claim is thrown
       before the event is recorded, so Paddle retries. Never swallow it.
+   4. The same goes for the first-payment date. When the rule asks for
+      a later date than Paddle holds and the move does not happen, the
+      failure is held until every other write is done and then thrown
+      before the event is recorded, so Paddle retries. Never swallow it:
+      a move that silently did not happen is a customer charged on a
+      date earlier than the pages promised.
    ============================================================ */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -94,15 +100,32 @@ async function rest(path: string, init: RequestInit = {}) {
    2. LAUNCH_FIRST_CHARGE, so nothing is taken before 2027 ("Pay nothing
       until 2027");
    3. Paddle's own next_billed_at, the date its checkout showed the
-      customer. The trial price runs 14 days from the purchase, so a
-      monthly customer who buys on day 10 was shown day 24, which is
-      later than day 21. A first payment is never moved to a date
-      EARLIER than the customer was shown. Later is always fine.
+      customer. A first payment is never moved to a date EARLIER than
+      the customer was shown. Later is always fine. This is a safety
+      net, and it holds whatever trial Paddle's prices carry: this
+      function never assumes a trial length when Paddle states the
+      date.
       When the payload's next_billed_at is missing or unreadable, the
       next best statement of the same date stands in for it
       (paddleFirstPaymentAt). With no such date at all, nothing is
       moved: a move with nothing to check it against could be a move
       earlier.
+
+   Consistency (Mal, 22 Nov 2026: "consistency is critical when offering
+   value for early loyalty"). Paddle counts a trial price's trial from
+   the PURCHASE, so checkout shows the purchase plus that trial. With a
+   14-day trial on the monthly price, someone who subscribed on day 10
+   was shown day 24 and, by instant 3, kept it, while someone who
+   subscribed on day 1 got day 21: subscribing early was punished. The
+   fix is in Paddle, not here: the monthly trial price carries a 7-day
+   trial (DEPLOY.md 5.6; only true once the owner has set it). Checkout
+   then shows the purchase plus 7 days, which is never later than the
+   account plus 21 for anyone subscribing during a 14-day trial, so the
+   date is always moved LATER, to exactly the account plus 21 days (or
+   LAUNCH_FIRST_CHARGE). The yearly trial price keeps 14 days: the
+   purchase plus 14 is at most day 28, under 30. If the monthly price is
+   left at 14 days nobody is charged early; instant 3 simply holds a
+   late subscriber on the later date checkout showed.
 
    This is the standing rule and it has no cut-off date. Once
    LAUNCH_FIRST_CHARGE is behind us it is simply 30 days yearly, 21 days
@@ -128,10 +151,20 @@ async function rest(path: string, init: RequestInit = {}) {
    This function holds no Foundation date: the Foundation window is
    judged in SQL (supabase/schema-foundation.sql).
 
-   Requires PADDLE_API_KEY. Without that key the subscription still
-   works and the person is simply billed on Paddle's own schedule, so a
-   missing key is logged rather than thrown: a payment that already
-   succeeded must not be undone by a courtesy that failed. */
+   Requires PADDLE_API_KEY. With the monthly trial price on a 7-day
+   trial the date is moved for every monthly subscriber, so a move that
+   does not happen is no longer a missed courtesy: it is a first payment
+   taken on checkout's date, earlier than the pages say. So when a move
+   is needed and does not succeed (the key is missing, Paddle refuses or
+   cannot be reached, the account's creation date cannot be read), this
+   function answers 500 and Paddle sends the event again. Premium is
+   never held back by it: the subscriptions row, the identity grants
+   and the Foundation claim are all written first, and the failure is
+   thrown only afterwards, before the event is recorded. A retry is
+   safe: the target depends only on the account, the plan and the date
+   in the payload, so it is the same date every time, and moving a date
+   to where it already sits changes nothing. (Until 22 Nov 2026 these
+   failures were logged and answered 200.) */
 const PADDLE_API_KEY = Deno.env.get("PADDLE_API_KEY") ?? "";
 const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") === "sandbox"
   ? "https://sandbox-api.paddle.com"
@@ -139,9 +172,20 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
 
 const FREE_DAYS_YEARLY = 30;
 const FREE_DAYS_MONTHLY = 21;
-/* The trial set on Paddle's two trial prices (app/config.js), counted
-   from the purchase. Only used to work out the date checkout showed
-   when the payload does not state it. */
+/* A stand-in, used ONLY when the payload states no date of Paddle's own
+   to work from (paddleFirstPaymentAt). It is never part of the rule:
+   when Paddle states next_billed_at, that date is used as it is and no
+   trial length is assumed.
+
+   It is the LARGER of the two trial lengths in play on Paddle's trial
+   prices (app/config.js): 14 days on the yearly one and 7 on the
+   monthly one (14 there too until the owner changes it, DEPLOY.md 5.6).
+   Larger is the safe direction. The stand-in is the date no move may
+   fall short of, so guessing too long can only leave a first payment
+   LATER than it needed to be, which costs the customer nothing.
+   Guessing too short could move a payment to a date EARLIER than
+   checkout showed, which is the one thing that must never happen. If
+   a trial price is ever given a longer trial than this, raise it. */
 const PADDLE_TRIAL_DAYS = 14;
 const DAY_MS = 86400000;
 
@@ -177,110 +221,162 @@ function firstChargeAt(
 
 /* Paddle's own first-payment date, the one its checkout showed the
    customer: the third instant, and the one no move may fall short of.
-   The payload's next_billed_at says it outright. When that is missing
-   or does not parse, the next best statement of the same date is used:
+   `stated` is true only when the payload's next_billed_at says it
+   outright. When that is missing or does not parse, a stand-in is used:
    the end of the current billing period (on a trialing subscription
-   that period is the trial), then the purchase instant plus the trial
-   set on the trial prices. Each of those is the same date or a later
-   one, and later is always fine. Null when none can be read. */
+   that period is the trial), then the purchase instant plus
+   PADDLE_TRIAL_DAYS. A stand-in is the same date or a later one, and
+   later is always fine, but it is a floor and not a reading of what
+   Paddle holds (deferFirstCharge treats the two differently). Null
+   when none can be read. */
+type ShownDate = { at: string; stated: boolean };
 // deno-lint-ignore no-explicit-any
-function paddleFirstPaymentAt(data: any, event: Record<string, unknown>): string | null {
-  for (const value of [data?.next_billed_at, data?.current_billing_period?.ends_at]) {
-    if (typeof value === "string" && Number.isFinite(Date.parse(value))) return value;
-  }
+function paddleFirstPaymentAt(data: any, event: Record<string, unknown>): ShownDate | null {
+  const readable = (value: unknown) =>
+    typeof value === "string" && Number.isFinite(Date.parse(value));
+  if (readable(data?.next_billed_at)) return { at: data.next_billed_at, stated: true };
+  const periodEnd = data?.current_billing_period?.ends_at;
+  if (readable(periodEnd)) return { at: periodEnd, stated: false };
   const bought = purchasedAt(data, event);
   return bought
-    ? new Date(Date.parse(bought) + PADDLE_TRIAL_DAYS * DAY_MS).toISOString()
+    ? { at: new Date(Date.parse(bought) + PADDLE_TRIAL_DAYS * DAY_MS).toISOString(), stated: false }
     : null;
 }
 
-/* Null, with a log line, when the date cannot be read. No account id in
+/* A move the rule may have asked for did not happen. Writes the log
+   line somebody can search for ("Could not defer first charge") and
+   throws, so the handler can answer 500 and Paddle sends the event
+   again. `why` and `short` carry no account id and no subscription id:
+   the short form goes back to Paddle in the answer. */
+function deferFailed(why: string, short: string): never {
+  console.error(`Could not defer first charge: ${why} Answering 500 so Paddle sends this event again.`);
+  throw new Error(`first charge not deferred: ${short}`);
+}
+
+/* Throws (deferFailed) when the date cannot be read. No account id in
    the log. */
-async function accountCreatedAt(userId: string): Promise<string | null> {
+async function accountCreatedAt(userId: string): Promise<string> {
   /* public.subscriptions is created by the grant_trial trigger the
      moment the account exists, and its created_at is never rewritten,
      so that column dates the account without needing the auth schema exposed. */
-  const response = await rest(`/subscriptions?user_id=eq.${userId}&select=created_at`);
-  if (!response.ok) {
-    console.error(`Could not defer first charge: reading the account's creation date answered ${response.status}. The billing date is left as Paddle set it.`);
-    return null;
+  /* A lookup that cannot be reached, or answers with something that is
+     not JSON, is the same failed move as one that answers an error, so
+     it gets the same searchable log line rather than a bare exception. */
+  let response: Response;
+  try {
+    response = await rest(`/subscriptions?user_id=eq.${userId}&select=created_at`);
+  } catch (_error) {
+    deferFailed("the account lookup could not be reached.", "the account lookup could not be reached");
   }
-  const rows = await response.json();
+  if (!response.ok) {
+    deferFailed(
+      `reading the account's creation date answered ${response.status}.`,
+      `the account lookup answered ${response.status}`,
+    );
+  }
+  // deno-lint-ignore no-explicit-any
+  let rows: any;
+  try {
+    rows = await response.json();
+  } catch (_error) {
+    deferFailed("the account lookup's answer could not be read.", "the account lookup's answer could not be read");
+  }
   const createdAt = rows?.[0]?.created_at ?? null;
   if (!createdAt) {
-    console.error("Could not defer first charge: the account has no creation date on record. The billing date is left as Paddle set it.");
+    deferFailed("the account has no creation date on record.", "no creation date on record");
   }
   return createdAt;
 }
 
 /* Answers with the instant the first charge now sits on when Paddle
-   accepted a move, and null in every other case (nothing to move, no
-   key, a date that could not be read, or Paddle refused). Every case
-   that leaves a trialing subscription on Paddle's own date when the
-   rule may have asked for a later one writes a log line: the customer
-   may be owed a later date, and somebody has to be able to find out.
-   `shownAt` is Paddle's own first-payment date (paddleFirstPaymentAt). */
+   accepted a move, and null when there was nothing to move (not a
+   trial-price subscription, a date already past, or Paddle's own stated
+   date already the right one).
+
+   THROWS in every case where the rule may have asked for a later date
+   and the move did not happen: no date to work from, the account's
+   creation date unreadable, the key missing, Paddle refusing or out of
+   reach. Each writes a log line starting "Could not defer first
+   charge". The handler holds the error until every other write is done
+   and throws it before the event is recorded, so the delivery is
+   answered 500 and Paddle retries. It must never be swallowed: left
+   alone, the customer is charged on checkout's date, which for a
+   monthly subscriber is always earlier than the pages say.
+   `shown` is Paddle's own first-payment date (paddleFirstPaymentAt). */
 async function deferFirstCharge(
-  userId: string, subscriptionId: string, shownAt: string | null,
+  userId: string, subscriptionId: string, shown: ShownDate | null,
   status: string, plan: string | null,
 ): Promise<string | null> {
-  if (!PADDLE_API_KEY) {
-    console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set one.");
-    return null;
-  }
-
   /* Only a subscription that arrived on a trial price. Anyone else has
      paid today and their anniversary is Paddle's business, not ours.
      See the note above: the payload says so, and it is never inferred
-     from a date. */
+     from a date. No key is needed for them, so none is asked for. */
   if (status !== "trialing") return null;
 
   /* No date from Paddle and no purchase time to work one out from: a
      move now would have nothing to be held at or after, so it could be
      a move earlier than checkout showed. Nothing is sent. */
-  if (!shownAt) {
-    console.error("Could not defer first charge: the payload gives neither Paddle's own first-payment date nor a purchase time. The billing date is left as Paddle set it.");
-    return null;
+  if (!shown) {
+    deferFailed(
+      "the payload gives neither Paddle's own first-payment date nor a purchase time.",
+      "no first-payment date and no purchase time in the payload",
+    );
   }
 
   const createdAt = await accountCreatedAt(userId);
-  if (!createdAt) return null;
 
   /* The date depends only on the account, the plan and Paddle's own
      date, never on when this delivery arrived, so a retried delivery
      gets the same answer as the first attempt. The real clock is only
      asked whether that date is still ahead. */
   const now = Date.now();
-  const target = firstChargeAt(createdAt, plan, shownAt);
+  const target = firstChargeAt(createdAt, plan, shown.at);
   if (!target) {
-    console.error("Could not defer first charge: the account's creation date does not parse. The billing date is left as Paddle set it.");
-    return null;
+    deferFailed("the account's creation date does not parse.", "the creation date does not parse");
   }
   /* Already past: nothing to defer to. */
   if (target.getTime() <= now) return null;
 
   /* Paddle's own date is one of the three instants the target is the
-     latest of, so the target is never earlier than it. When it IS
-     Paddle's own date there is nothing to move, and nothing is sent.
-     Exactly equal, not "within a minute": a date a few seconds short
-     of LAUNCH_FIRST_CHARGE is still moved. */
-  if (Date.parse(shownAt) === target.getTime()) return null;
+     latest of, so the target is never earlier than it. When Paddle
+     STATED its date and the target is that date, there is nothing to
+     move, and nothing is sent. Exactly equal, not "within a minute": a
+     date a few seconds short of LAUNCH_FIRST_CHARGE is still moved.
 
-  const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${PADDLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      next_billed_at: target.toISOString(),
-      proration_billing_mode: "do_not_bill",
-    }),
-  });
+     A stand-in is different. It is a floor worked out here, not what
+     Paddle holds, and Paddle's real date may be earlier (a 7-day trial
+     against the 14-day stand-in). Skipping the move because the target
+     equals the stand-in would leave that earlier date in place, which
+     can be earlier than the pages promise. So with a stand-in the date
+     is always sent. At worst that sets the date to where it already is. */
+  if (shown.stated && Date.parse(shown.at) === target.getTime()) return null;
+
+  if (!PADDLE_API_KEY) {
+    deferFailed("PADDLE_API_KEY not set.", "PADDLE_API_KEY not set");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${PADDLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        next_billed_at: target.toISOString(),
+        proration_billing_mode: "do_not_bill",
+      }),
+    });
+  } catch (_error) {
+    deferFailed("Paddle could not be reached.", "Paddle could not be reached");
+  }
 
   if (!response.ok) {
-    console.error(`Could not defer first charge for ${subscriptionId}: ${response.status} ${await response.text()}`);
-    return null;
+    /* The one line that names the subscription, so it can be found in
+       Paddle. The error that travels back in the answer does not. */
+    console.error(`Could not defer first charge for ${subscriptionId}: ${response.status} ${await response.text()} Answering 500 so Paddle sends this event again.`);
+    throw new Error(`first charge not deferred: Paddle answered ${response.status}`);
   }
   return target.toISOString();
 }
@@ -604,15 +700,24 @@ Deno.serve(async (request) => {
     await mirrorToIdentitySchema(userId, status, row.current_period_end);
 
     /* Only on creation, and only after the writes above have stuck:
-       this is a courtesy, and a courtesy must not be what decides
-       whether someone is entitled. A refusal from Paddle is logged, not
-       thrown, so a retry is never triggered by one -- Paddle would
-       replay the whole event, and the date never moving earlier than
-       Paddle's own is what makes that harmless anyway. */
+       the billing date must not be what decides whether someone is
+       entitled. A move that was needed and did not happen is held, like
+       a failed Foundation claim, and thrown below before the event is
+       recorded, so this delivery is answered 500 and Paddle sends it
+       again. The retry replays the whole event, which is safe: every
+       write above is idempotent, and the date is worked out from the
+       account, the plan and the payload, so it is the same date and
+       never earlier than Paddle's own. */
+    let deferError: unknown = null;
     if (isCreation) {
-      const movedTo = await deferFirstCharge(
-        userId, String(data.id), paddleFirstPaymentAt(data, event), status, row.plan,
-      );
+      let movedTo: string | null = null;
+      try {
+        movedTo = await deferFirstCharge(
+          userId, String(data.id), paddleFirstPaymentAt(data, event), status, row.plan,
+        );
+      } catch (error) {
+        deferError = error;
+      }
       /* Paddle accepted the move, so the free period ends on that date.
          Written before a held Foundation error is thrown, so a retry of
          this event always ends with the moved date, not the payload's
@@ -622,6 +727,8 @@ Deno.serve(async (request) => {
 
     // Held until entitlement and the billing date were written. See above.
     if (foundationError) throw foundationError;
+    // Held until the row, the grants and the Foundation claim were written.
+    if (deferError) throw deferError;
 
     // Recorded only now that every write above has actually succeeded.
     // See the file header and recordEvent()'s own comment: this used to

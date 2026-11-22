@@ -246,11 +246,22 @@
 
   /* Which of the two prices for this cadence. Someone still inside
      their account trial takes the price that carries a trial, so
-     checkout takes nothing today and they can cancel free right up to
-     day 30 -- paddle-webhook moves that first charge to exactly day 30
-     afterwards. Someone whose trial has already lapsed takes the plain
-     price and pays now; handing them the trial price would give away a
-     second free fortnight nobody offered.
+     checkout takes nothing today. paddle-webhook then moves that first
+     charge to 30 days after the account was made on a yearly plan, or
+     21 days on a monthly plan, and never before 1 January 2027; they
+     can cancel free right up to that date. Someone whose trial has
+     already lapsed takes the plain price and pays now, before 2027 or
+     after it: the later first payment is only for someone who
+     subscribes while their free trial is running (Mal, 22 Nov 2026).
+     Handing a lapsed account the trial price would give away free time
+     nobody offered. This file holds no date and must not gain one.
+
+     "Inside their account trial" is plan 'trial', the row the
+     grant_trial trigger writes, and never status 'trialing' alone.
+     Paddle reports 'trialing' too for someone who has ALREADY subscribed
+     on a trial price and is waiting for their first payment (plan
+     'monthly' or 'annual'). Until 22 Nov 2026 either one counted, so a
+     subscriber could be handed the trial price a second time.
 
      Falls back to the plain price whenever the trial pair is unset, so
      a half-configured catalogue charges honestly rather than failing. */
@@ -260,9 +271,27 @@
     var trial = cadence === 'monthly' ? p.monthlyTrialPriceId : p.annualTrialPriceId;
 
     var ent = entitlement;
-    var inTrial = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    var inTrial = ent.plan === 'trial' && ent.entitled;
 
     return (inTrial && trial) ? trial : plain;
+  }
+
+  /* A Paddle subscription behind this account. See CT.billing.hasPaidPlan
+     below for why it is not gated on status. */
+  function hasPaidPlan() {
+    return (entitlement.plan === 'monthly' || entitlement.plan === 'annual') &&
+           !entitlement.complimentary;
+  }
+
+  /* A subscription that is running and will bill: checkout is refused,
+     because a second purchase would make a second subscription that
+     bills as well, and the account's one row would only show the newer.
+     That includes someone waiting for their first payment (Paddle status
+     'trialing'). One already set to end is let through: it will not
+     bill again, so buying a new plan is how they come back. */
+  var ALREADY_SUBSCRIBED = "You're already on AibhlínnAI Premium. Manage or cancel from the app's Settings.";
+  function alreadySubscribed() {
+    return hasPaidPlan() && entitlement.entitled && !entitlement.cancelAtPeriodEnd;
   }
 
   function openCheckout(cadence, discountCode) {
@@ -278,7 +307,8 @@
        priceFor() decides between the trial price and the plain one, and a
        stale answer costs the customer money: a trialling account read as
        not-entitled gets the plain price and is charged today instead of on
-       day 30. That is not hypothetical -- a live test account on day 6 of
+       the later date paddle-webhook would have set (day 30 at the time of
+       the test below). That is not hypothetical -- a live test account on day 6 of
        a 14-day trial was charged A$2.90 this way.
 
        Two routes produce a stale read, and only refreshing here closes
@@ -288,10 +318,21 @@
        hears about a sign-in that happened in a different tab, so its
        entitlement stays signed-out indefinitely.
 
-       Costs one request before the overlay opens. A failed refresh falls
-       back to the cached value rather than blocking a purchase -- no worse
-       than the behaviour this replaces. */
+       Costs one request before the overlay opens.
+
+       A lookup that fails stops here. CT.db.getEntitlement never rejects:
+       on a failed lookup it answers status 'unknown' with no plan, which
+       priceFor() would read as "not in a trial" and so open the plain
+       price, charging someone whose trial IS running today rather than
+       on the later date. (The note here used to say a failed refresh
+       fell back to the cached value. It never did: the cache had already
+       been overwritten.) Nothing is lost by stopping, since checkout
+       needs the network anyway. */
     return refresh().catch(function () { return entitlement; }).then(function () {
+      if (entitlement.status === 'unknown') {
+        throw new Error('We could not check your account just now. Please try again.');
+      }
+      if (alreadySubscribed()) throw new Error(ALREADY_SUBSCRIBED);
       var priceId = priceFor(cadence);
       if (!priceId) throw new Error('That plan is not available yet.');
       return initPaddle().then(function (ok) { return { ok: ok, priceId: priceId }; });
@@ -367,10 +408,7 @@
        and 'complimentary' are granted in SQL. Deliberately not gated on
        status: a canceled subscriber still has invoices to read and a
        card to update, so they keep the portal. */
-    hasPaidPlan: function () {
-      return (entitlement.plan === 'monthly' || entitlement.plan === 'annual') &&
-             !entitlement.complimentary;
-    },
+    hasPaidPlan: hasPaidPlan,
     refresh: refresh,
     openCheckout: openCheckout,
     openManagePortal: openManagePortal,

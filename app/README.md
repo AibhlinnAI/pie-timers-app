@@ -339,10 +339,11 @@ Fourteen days covers two real working weeks, which is what the timers need to
 timers to prove themselves. Subscribe inside that window and the first payment
 is not taken until day 30 from sign-up on a yearly plan, or day 21 on a
 monthly plan (`FREE_DAYS_YEARLY` and `FREE_DAYS_MONTHLY` in `paddle-webhook`),
-and never before 1 January 2027. The date is never moved earlier than the one
-checkout showed. So subscribing never costs someone free time they would
-otherwise have had. Subscribe after the trial has ended and the payment is
-taken on the day.
+and never before 1 January 2027. Checkout may show an earlier date; it is
+moved to the right one shortly afterwards, and never to a date earlier than
+the one checkout showed. So subscribing never costs someone free time they
+would otherwise have had, whichever day of the trial they subscribe on.
+Subscribe after the trial has ended and the payment is taken on the day.
 
 The app stays quiet during the trial and only starts mentioning payment in the last
 14 days. When the trial ends, automatic sync stops but nothing is deleted, no card is
@@ -557,14 +558,21 @@ fine for testing but should be pinned to your site before launch.
 
 1. Create a Paddle account and complete seller verification. Budget several days
    for this — they review new sellers, and review is not instant.
-2. Create one product with two prices: annual and monthly.
+2. Create one product with four prices: annual and monthly, each once paid on
+   the day and once with a trial set on the price (14 days on the annual one,
+   7 days on the monthly one). `DEPLOY.md` 5.6 and 8.1 say why.
 3. Optionally create discount codes, each with a redemption limit and expiry.
-4. Put the client token and both price IDs in `config.js`.
+4. Put the client token and all four price IDs in `config.js`.
 5. Add a webhook pointing at `.../functions/v1/paddle-webhook`, subscribed to the
-   `subscription.*` events, then:
+   `subscription.*` events, then set both secrets. `paddle-webhook` needs the
+   API key as well as the webhook secret: it uses the key to move a new
+   subscriber's first payment date, and answers 500 to every subscription made
+   on a trial price while the key is missing or cannot change a subscription
+   (`DEPLOY.md` 5.6 and 8.4).
 
 ```bash
 supabase secrets set PADDLE_WEBHOOK_SECRET=...
+supabase secrets set PADDLE_API_KEY=...
 ```
 
 ```bash

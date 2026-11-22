@@ -64,6 +64,8 @@ arrived.
   - **The end of 31 Dec 2026** (the instant `2027-01-01T00:00+10:30`) ends
     the offer. Foundation closes then, or sooner if all 100 places go. The
     hook comes off the pages then, and the aibhlinn.ai advert comes down.
+    Both happen without anyone doing anything (see "Nothing in this repo
+    has to be taken down by hand" below).
     Adelaide midnight is still the day before everywhere to the west, so
     the date always carries "(Adelaide time)".
   - **The end of 5 Dec 2026** (the instant `2026-12-06T00:00+10:30`) ends
@@ -81,13 +83,67 @@ arrived.
   **30 days on a yearly plan or 21 days on a monthly plan** (30 if the plan
   cannot be read); `LAUNCH_FIRST_CHARGE`; and Paddle's own
   `next_billed_at`, the date its checkout showed the customer, so a date
-  is never moved earlier than the customer was shown (a monthly customer
-  who subscribes on day 10 was shown day 24, and keeps it). If the payload
+  is never moved earlier than the customer was shown. If the payload
   does not state that date, the end of its billing period stands in, then
-  the purchase time plus 14 days; with none of them nothing is moved. After
-  1 January 2027 it is simply 30 days yearly, 21 monthly. Subscribe after
-  the trial has ended and you pay on the day. `LAUNCH_FIRST_CHARGE` is
-  `2027-01-01T12:00:00Z`, not Adelaide midnight. That is Mal's rule: the
+  the purchase time plus 14 days (`PADDLE_TRIAL_DAYS`, the larger of the
+  two trials on Paddle's prices, because too long only ever means later);
+  a stand-in is always sent to Paddle, and with none of them nothing is
+  moved. After 1 January 2027 it is simply 30 days yearly, 21 monthly.
+- **The rule is only for someone who subscribes while their free trial is
+  running.** Mal's sentence (22 Nov 2026): "Initial payments will not be
+  charged before 1 January 2027 if you sign on while in your free 14-day
+  trial period." On the pages it is always written whole: "First payments
+  are not charged before 1 January 2027 if you subscribe while your free
+  14-day trial is running." Never shorten it to "No first payment is taken
+  before 1 January 2027", which reads as a promise to everyone. Subscribe
+  after the trial has ended and you pay on the day, before 2027 or after
+  it. `billing.js` offers the trial price only while the account's own
+  trial is running and holds no date: never give a lapsed account the
+  trial price. (An instruction to do that was drafted on 22 Nov 2026 and
+  withdrawn by Mal minutes later.)
+- **A free trial is plan `trial`. Status `trialing` alone is not one.**
+  Paddle keeps a subscription made on a trial price at status `trialing`
+  until its first payment, which under the launch offer is weeks, so every
+  launch subscriber has status `trialing` and plan `monthly` or `annual`
+  until 1 January 2027. That is a subscriber with a card on file. From
+  22 Nov 2026 `app.js` (`isTrial`), `billing.js` (`priceFor`),
+  `identity-bridge.js` (the header chip) and `pricing.html` all test
+  `plan === 'trial'`; before that they also accepted the status, so a
+  subscriber was told "Free trial, no card is needed", shown the plans
+  again and could open checkout on the trial price a second time.
+  `billing.js` now refuses checkout to an account with a running Paddle
+  subscription that is not set to end, and stops when the entitlement
+  lookup fails (status `unknown`) rather than opening the plain price.
+  The Account tab shows such a subscriber as "Monthly, first payment from
+  <date>". Read from the code and run against stubs (P22), not in a
+  browser, and that Paddle holds `trialing` to the moved date is
+  `DEPLOY.md` Test A's statement, not something observed.
+- **Every monthly subscriber gets the same date, whichever day of the
+  trial they subscribe on, but only once Paddle is set up for it.** Paddle
+  counts a trial price's trial from the purchase, so checkout shows the
+  purchase plus that trial, and the function never moves a date earlier
+  than checkout showed. With 14 days on the monthly trial price, someone
+  subscribing on day 10 was shown day 24 and kept it while someone on
+  day 1 got day 21, which punished subscribing early (Mal: "consistency
+  is critical when offering value for early loyalty"). The fix is a
+  **7-day trial on the monthly trial price in Paddle**: checkout then
+  never shows later than day 21, and the function always moves the date
+  later, to exactly day 21 or 1 January 2027. That setting is in Paddle,
+  not in any file, and is only true once Mal has changed it (`DEPLOY.md`
+  5.6): check before saying so. The yearly trial price stays at 14 days.
+  The never-earlier rule stays in the code as a safety net.
+- **A first-payment move that fails is answered 500, not logged and
+  forgotten.** With the 7-day trial the date is moved for every monthly
+  subscriber, so a missed move is a charge on checkout's date. When a
+  move is needed and does not happen (no `PADDLE_API_KEY`, Paddle refuses
+  or cannot be reached, the account's creation date cannot be read),
+  `paddle-webhook` writes the row, the grants and the Foundation claim
+  first, then answers 500 without recording the event, so Paddle retries.
+  Premium is on from the first attempt. Search the function log for
+  "Could not defer first charge". Only true once the function is
+  deployed.
+- **`LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`, not Adelaide
+  midnight.** That is Mal's rule: the
   moment the last time zone on Earth (UTC-12) reaches midnight on New
   Year's Eve, so it is already 2027 on every customer's calendar. In
   Adelaide it is 10:30 pm on 1 January. Because that moment is early on
@@ -136,16 +192,40 @@ arrived.
   - Outside this repo, the aibhlinn.ai site repo's `index.html` quotes the
     launch price, the hook with its condition and the 31 Dec close in its
     Pie Timers advert, and must move with the rest. That page has no
-    script, so its offer lines come out by hand on 1 January 2027.
-  - `app/terms.html` has no date check either. Section 5 carries one
-    sentence, in a `data-hide-in-play` span, that begins "The offer
-    running now is the Black Friday Launch Offer" and ends "The offer runs
-    to the end of 31 December 2026 (Adelaide time)." Take that span out by
-    hand on 1 January 2027, with the matching P16 check in
-    `tools/foundation-test.mjs`.
+    script. Its advert is taken down by a scheduled GitHub Actions
+    workflow in that repo, `.github/workflows/retire-offer.yml`, which
+    holds the closing instant as `2026-12-31T13:30:00Z`: if the close
+    moves, move it there too.
 
   `DEPLOY.md` was missing from this list until 20 Sep 2026, which is
   exactly why it went stale.
+- **Nothing in this repo has to be taken down by hand on 1 January 2027.**
+  Mal may not be available that day (22 Nov 2026), so nothing may depend
+  on him or on a session being run. Keep it that way: anything a script
+  cannot take down must be written so it never needs taking down.
+  That is about takedowns only. A 500 from `paddle-webhook` still needs a
+  person, that day as any other: `DEPLOY.md` 5.6 has the ticks for before
+  he goes away. Never say "nothing needs a person on 1 January".
+  - `app/pricing.html`: the offer's name, hook and condition sit in
+    `#offerDates`, which `renderOfferDates()` hides at `FOUNDATION_CLOSES`.
+  - `app/foundation.html`: the pie script hides the hook and its condition
+    at `END` and the caption becomes "The offer is over. It ran to the end
+    of 31 December 2026 (Adelaide time)."
+  - The `<meta name="description">` of both pages carries no offer, no
+    hook and no date. A description cannot be taken down by a script, so
+    do not put an offer back in one.
+  - `app/terms.html` has no date check. Its one offer sentence dates
+    itself: "Until the end of 31 December 2026 (Adelaide time) the Black
+    Friday Launch Offer applies: ...". It stays true after that day and
+    can stay where it is. Never reword it to "the offer running now".
+  - Foundation closes in the database, and the first-payment rule has no
+    cut-off.
+  - `tools/foundation-test.mjs` pins all of this (P20, P21). The pages can
+    be tidied whenever someone next works on them; no date forces it.
+  - The aibhlinn.ai advert retires itself too, in its own repo (above).
+    That only works once the workflow file is on that repo's `main`, and
+    GitHub switches scheduled workflows off in a repo with no commits for
+    60 days: check before saying it will run.
 - **Foundation is a price lock, not a trial.** A$2.90/month or A$19/year, 100
   places, closing at the end of 31 December 2026 (Adelaide) or when full.
   Separate from trial length. Never describe it by contrast with paying

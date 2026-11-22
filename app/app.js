@@ -4904,8 +4904,15 @@
     return ms <= 0 ? 0 : Math.ceil(ms / 86400000);
   }
 
+  /* The account's own free trial, and nothing else. Plan 'trial' is what
+     the grant_trial trigger writes. Status alone cannot say: Paddle also
+     reports 'trialing' for someone who HAS subscribed and is waiting for
+     their first payment (plan 'monthly' or 'annual'), and that is a
+     subscriber with a card on file, not a free trial. Telling them "no
+     card is needed, and nothing happens automatically" would be false,
+     and offering them the plans again invites a second subscription. */
   function isTrial(ent) {
-    return ent.status === 'trialing' || ent.plan === 'trial';
+    return ent.plan === 'trial';
   }
 
   function planLabel(ent) {
@@ -4926,6 +4933,11 @@
     var name = ent.plan === 'monthly' ? 'Monthly' : 'Annual';
     if (ent.cancelAtPeriodEnd && ent.currentPeriodEnd) {
       return name + ', ends ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
+    }
+    /* Subscribed during the trial and not yet charged: the period ends
+       on the date the first payment is taken. */
+    if (ent.status === 'trialing' && ent.currentPeriodEnd) {
+      return name + ', first payment from ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
     }
     if (ent.currentPeriodEnd) {
       return name + ', renews ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);

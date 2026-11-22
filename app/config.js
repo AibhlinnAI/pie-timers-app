@@ -95,17 +95,24 @@ window.CT.config = {
        Four, not two. Paddle puts the trial length on the price, so it
        is the same for everyone who buys it -- and the two audiences
        need different answers. Someone subscribing during their account
-       trial owes nothing yet, and their first charge is moved to day 30
-       by paddle-webhook. Someone subscribing after it expired owes
-       money today; giving them the trial price would hand them a second
-       free fortnight nobody promised.
+       trial owes nothing yet, and paddle-webhook moves their first
+       charge to 30 days after the account was made on a yearly plan or
+       21 days on a monthly plan, never before 1 January 2027. Someone
+       subscribing after it expired owes money today, before 2027 or
+       after it; giving them the trial price would hand them free time
+       nobody promised.
 
        billing.js chooses. If the trial pair is left blank, everyone
        gets the plain price and is charged on the spot. */
     annualPriceId: 'pri_01m1effmxgfb45pmtyfz1dnh77',
     monthlyPriceId: 'pri_01m1efkevnwpn0rj7g2kzjne0j',
 
-    /* The same two plans, with a 14-day trial set on the price. */
+    /* The same two plans, with a trial set on the price in Paddle:
+       14 days on the yearly one and 7 days on the monthly one. (The
+       monthly one was 14 until 22 Nov 2026 and is 7 only once the owner
+       has changed it in Paddle: DEPLOY.md 5.6 says why. Nothing in this
+       repo sets it.) The trial on the price only decides the date
+       checkout shows; paddle-webhook then moves the first charge. */
     annualTrialPriceId: 'pri_01m1xrvghx8896bxbf9rgtmx0m',
     monthlyTrialPriceId: 'pri_01m1xrry3351rzzgjvr2aqk2vd',
 

@@ -36,7 +36,11 @@
   }());
 </script>
 <title>Pricing · Pie Timers</title>
-<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed. Black Friday Launch Offer: pay nothing until 2027. Subscribe while your free trial is running and your first payment is taken from 1 January 2027.">
+<!-- The description carries no offer and no date, on purpose. Nothing can
+     take a description down when an offer ends, so it must stay true
+     without anyone touching it. The dated offer lives in #offerDates,
+     which the script below takes down. -->
+<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed. Free forever on one device, and every new account starts with a 14-day free trial of Premium.">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
@@ -162,7 +166,7 @@
       <button class="plan-card" id="buyMonthly" type="button">
         <span class="plan-name">Monthly</span>
         <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
-        <span class="plan-note">Try before you pay, cancel any time</span>
+        <span class="plan-note">Cancel any time</span>
       </button>
     </div>
 
@@ -171,11 +175,12 @@
     currency. Every new account starts with a 14-day free trial. Subscribe
     while it is running and you get more free time before your first payment:
     30 days from the day you made your account on a yearly plan, or 21 days
-    on a monthly plan. No first payment is taken before 1 January 2027. If
-    you subscribe after your trial has ended, you pay on the day you
-    subscribe. Checkout may show a different first-payment date. We set it to
-    the right one shortly after you subscribe, and never to a date earlier
-    than checkout showed you. The trial needs no card, and nothing is charged
+    on a monthly plan. First payments are not charged before 1 January 2027
+    if you subscribe while your free 14-day trial is running. If you
+    subscribe after your trial has ended, you pay on the day you subscribe.
+    Checkout may show an earlier first-payment date. We move it to the right
+    one shortly after you subscribe, and never to a date earlier than
+    checkout showed you. The trial needs no card, and nothing is charged
     until you choose a plan above. If you made your account before
     22 November 2026 (Adelaide time), your free trial runs to the end of
     5 December 2026 (Adelaide time), even if an earlier trial had run out.</p>
@@ -338,7 +343,10 @@
     $('buyMonthly').disabled = !billingOn;
 
     var ent = CT.billing.get();
-    var trialing = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    /* Plan 'trial' is the account's own free trial. Someone who has
+       subscribed and is waiting for their first payment is 'trialing'
+       in Paddle's words too, and is already on Premium. */
+    var trialing = ent.plan === 'trial' && ent.entitled;
     var status = $('pricingStatus');
     status.classList.remove('is-error');
 
