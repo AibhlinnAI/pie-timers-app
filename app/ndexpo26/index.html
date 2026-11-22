@@ -1638,7 +1638,7 @@ button,select{ font:inherit; }
 
     /* Left running, the clock would slide past the close, then past
        midnight, onto a date the program knows nothing about — a demo
-       somebody left open on a desk would be sitting on "Already over"
+       somebody left open on a desk would be sitting on "Finished"
        inside two minutes. Loop it back to the run-up instead. */
     if (demo.running && !mode.live) {
       var d0 = PRESET.days[0];
@@ -1746,7 +1746,7 @@ button,select{ font:inherit; }
       accent(null);
       meter(false);
       set('idle', dayWord(day), PRESET.name, where, '',
-        day.date > today ? 'Still to come.' : 'Already over.');
+        day.date > today ? 'Still to come.' : 'Finished.');
       dialSays('The expo is not running today');
       setPie(null, 0);
       return;

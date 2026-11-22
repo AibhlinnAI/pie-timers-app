@@ -255,7 +255,7 @@ arrived.
   when live, where the draft makes it neutral; on `/nwc26` under `?live=1`
   the footer still says the clock is simulated and to press Pause, a button
   that is hidden; on `/nwc26` a preview left running never loops back and
-  ends on "Already over."; and `/nwc26` lacks some small accessibility items
+  ends on "Finished." (it read "Already over." until 22 Nov 2026); and `/nwc26` lacks some small accessibility items
   (focus-ring contrast, the slider spoken as a clock time). The draft also
   keeps the day tabs when live and pins a day, where `main` hides them on
   purpose: that is a design choice to make, not a fault. `/nls26` was not

@@ -817,7 +817,7 @@ html.live .days{ display:none; }
       set('idle', dayWord(day), day.items[0].title,
         'Starts ' + clock(day.items[0].time) + ' · ' + day.items.length +
         (day.items.length === 1 ? ' item' : ' items') + ' · runs to ' + clock(day.end),
-        '', day.date > today ? 'Still to come.' : 'Already over.');
+        '', day.date > today ? 'Still to come.' : 'Finished.');
       setPie(null, 0);
       return;
     }

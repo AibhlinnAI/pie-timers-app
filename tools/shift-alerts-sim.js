@@ -482,7 +482,7 @@ function expectedAlerts(schedule, tz, t0, t1, breaks, settings) {
         const finishAt = after(finish) || 1440;
         if ((endAt === null || after(finish) < endAt) && at + b.minutes < 1440 &&
             onPies(schedule, day, cfg, finishAt)) {
-          reached(day, cfg.start + finishAt, tag('finish'), 'Break over. Ease back in.', b.name);
+          reached(day, cfg.start + finishAt, tag('finish'), 'Break time done. Ease back in.', b.name);
         }
       }
     });

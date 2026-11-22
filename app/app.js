@@ -1481,7 +1481,7 @@
      until it ends or the next break starts; then the boundary moves to
      where the break ended. Past the last break, a break with no length
      leaves its "time reached" up, exactly as lunch always has, and one
-     with a length gives way to the quiet "No more breaks today".
+     with a length gives way to the quiet "Next stop - end of day!".
 
      Worked in seconds after the day's start rather than the wall clock:
      after midnight on a night shift a boundary like 1:30am is smaller
@@ -3709,9 +3709,23 @@
      is on the card whenever breaks are not in use. */
   var breakHeadingOwned = false;
 
+  /* What the card says once the day's breaks are done. Mal's wording,
+     22 Nov 2026: it looks forward to the next thing, and says nothing
+     about what has gone. After End of Day there is no next stop, so it
+     says only that the breaks are done. */
+  function breaksDoneLine(phase) {
+    return phase.dayReached ? 'Breaks done for today' : 'Next stop - end of day!';
+  }
+
   function paintBreakCard(pies, list) {
     var shift = pies.shift;
     var phase = breakPhase(pies, list);
+    /* Once the day's breaks are done the card looks ahead, to End of Day.
+       That is only true while End of Day is still to come, so the phase
+       says whether it has been reached. */
+    if (phase.mode === 'done') {
+      phase.dayReached = shift.sec - shift.cfg.start * 60 >= shiftLengthSec(shift.cfg);
+    }
     var card = $('cardLunch');
     var heading = $('lunchHeading');
     var setBreaks = $('breaksSet');
@@ -3770,12 +3784,12 @@
     $('lunchPie').setAttribute('d', '');
     renderNotchPair('lunch', 0);
     $('lunchBig').textContent = over ? 'Done' : 'None';
-    $('lunchSmall').textContent = over ? 'no more breaks today' : 'no breaks today';
+    $('lunchSmall').textContent = over ? breaksDoneLine(phase) : 'no breaks today';
     $('lunchBar').style.width = '0%';
     $('lunchTarget').textContent = '—';
     $('lunchElapsed').textContent = '0';
     $('lunchRemaining').textContent = '0';
-    $('lunchStatus').textContent = over ? 'No more breaks today' : 'No breaks today';
+    $('lunchStatus').textContent = over ? breaksDoneLine(phase) : 'No breaks today';
     return phase;
   }
 
@@ -3791,7 +3805,7 @@
     if (dialLabelShipped === null) dialLabelShipped = el.textContent;
     var text = phase.mode === 'during' ? 'Proportion of your break left'
       : phase.mode === 'before' || phase.mode === 'reached' ? 'Proportion of time remaining until ' + phase.brk.name
-      : phase.mode === 'done' ? 'No more breaks today'
+      : phase.mode === 'done' ? breaksDoneLine(phase)
       : phase.mode === 'none' ? 'No breaks today'
       : null;
     if (text === null) {
@@ -3942,7 +3956,7 @@
         if (brk.isLunch && firedAlerts[announcedKey]) tag += '|' + finish;
         var announced = announceReached(computeTimer(shift.sec, cfg.start, finish),
           todayKey + '|' + brk.key + '|finish' + suffix, brk.key + '|finish' + suffix,
-          brk.name, 'Break over. Ease back in.', tag);
+          brk.name, 'Break time done. Ease back in.', tag);
         // A finish hushed was never said, so it does not take the plain tag.
         if (announced && brk.isLunch && !hushing) firedAlerts[announcedKey] = true;
       }

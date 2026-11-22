@@ -1511,7 +1511,7 @@ button,select{ font:inherit; }
 
     /* Left running, the clock would slide past the close, then past
        midnight, onto a date the program knows nothing about — a demo
-       somebody left open on a desk would be sitting on "Already over"
+       somebody left open on a desk would be sitting on "Finished"
        inside a minute. Roll to the next day instead, and from the last
        day back to the first.
 
@@ -1656,7 +1656,7 @@ button,select{ font:inherit; }
         (day.items.length === 1 ? ' item' : ' items') + ' · ' +
         (last.open ? 'last item ' + clock(last.time) + ' onwards'
                    : 'runs to ' + clock(day.end)),
-        '', day.date > today ? 'Still to come.' : 'Already over.');
+        '', day.date > today ? 'Still to come.' : 'Finished.');
       dialSays('This day is not running today');
       setPie(null, 0);
       return;

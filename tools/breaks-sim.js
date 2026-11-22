@@ -614,7 +614,7 @@ function expectedAlerts(schedule, brks, settings, t0, t1) {
          Start itself, or one before Start that runs past it. */
       const neverCounted = rel(b.start) === 0 || rel(b.start) + (b.minutes || 0) >= 1440;
       if (b.minutes && !neverCounted && !(endAt !== null && rel(finish) >= endAt)) {
-        due(relW(finish), b.key, 'finish', b.name, 'Break over. Ease back in.', 0);
+        due(relW(finish), b.key, 'finish', b.name, 'Break time done. Ease back in.', 0);
       }
     });
     if (typeof cfg.end === 'number') ladder(cfg.end, 'end', 'End of Day' + (cfg.endHeadHome ? ' | Head Home' : ''), 'Time reached.');
@@ -1330,9 +1330,9 @@ function checkDashboard() {
   same('strip heading over the list reads Breaks, as the week table\'s does', $('stripLunchKey').textContent, 'Breaks');
   app.at(at('2026-09-28 15:30'));
   same('strip at 3:30: all over', strip(), '(10:30 AM) · (12:30 PM) · (3:00 PM)');
-  expectCard('2026-09-28 15:30', { heading: 'Breaks', chip: '—', big: 'Done', small: 'no more breaks today',
-    status: 'No more breaks today', classes: 'is-off', setBreaks: 'hidden', title: 'Pie Timers' });
-  same('dial label once the breaks are over', dialLabel(), 'No more breaks today');
+  expectCard('2026-09-28 15:30', { heading: 'Breaks', chip: '—', big: 'Done', small: 'Next stop - end of day!',
+    status: 'Next stop - end of day!', classes: 'is-off', setBreaks: 'hidden', title: 'Pie Timers' });
+  same('dial label once the breaks are over', dialLabel(), 'Next stop - end of day!');
 
   const rows = () => $('weekPreview').querySelector('tbody').children.map((tr) => tr.children.map((td) => td.textContent + (td.className === 'breaks-cell' ? '*' : '')).join(' | '));
   same('week table: Monday stacks its breaks; Tuesday (no lunch), Wednesday, and Thursday (its extra is before Start) stay as ever',
@@ -2265,7 +2265,7 @@ async function checkEditsAndFocus() {
   app.at(at('2026-09-28 13:10:31'));
   same('arrow keys through a break\'s lengths: nothing is announced for the lengths passed through', said(app, from), []);
   app.at(at('2026-09-28 13:30'));
-  same('...and the length it ends up at still gets its "Break over"', said(app, from), ['Tea: Break over. Ease back in. 2026-09-28|brk780-810|finish']);
+  same('...and the length it ends up at still gets its "Break over"', said(app, from), ['Tea: Break time done. Ease back in. 2026-09-28|brk780-810|finish']);
   app = bootWith(schedule, {}, '2026-09-28 12:40:30');
   showDay(app, 'Monday');
   from = app.shown.length;
@@ -2275,7 +2275,7 @@ async function checkEditsAndFocus() {
   app.at(at('2026-09-28 12:40:31'));
   same('...lunch\'s row too', said(app, from), []);
   app.at(at('2026-09-28 12:50'));
-  same('...whose finish then comes at the length chosen', said(app, from), ['Lunch: Break over. Ease back in. 2026-09-28|lunch|finish']);
+  same('...whose finish then comes at the length chosen', said(app, from), ['Lunch: Break time done. Ease back in. 2026-09-28|lunch|finish']);
 
   /* Hushing is for the break edited. Another break's alert, due at the
      moment of the edit and not yet announced (the tick had not run),
@@ -2291,7 +2291,7 @@ async function checkEditsAndFocus() {
   teaTime.dispatch('change');
   app.at(at('2026-09-28 13:05:01'));
   same('an edit to Tea just as Walk ends and Kettle starts: theirs are still announced',
-    said(app, from), ['Walk: Break over. Ease back in. 2026-09-28|brk770-785|finish', 'Kettle: Break time. Back at 1:15 PM. 2026-09-28|brk785-795|start']);
+    said(app, from), ['Walk: Break time done. Ease back in. 2026-09-28|brk770-785|finish', 'Kettle: Break time. Back at 1:15 PM. 2026-09-28|brk785-795|start']);
 
   /* The table's Lunch cell passes through times as the Breaks box does
      ("1 5" into 12:00's minutes is 12:01, then 12:15), and a lunch with a
@@ -2305,7 +2305,7 @@ async function checkEditsAndFocus() {
   app.at(at('2026-09-28 13:02:11'));
   same('a lunch with a length typed into the table: the finishes passed through announce nothing', said(app, from), []);
   app.at(at('2026-09-28 13:15'));
-  same('...and the lunch it ends up at still ends with "Break over", under the plain tag', said(app, from), ['Lunch: Break over. Ease back in. 2026-09-28|lunch|finish']);
+  same('...and the lunch it ends up at still ends with "Break over", under the plain tag', said(app, from), ['Lunch: Break time done. Ease back in. 2026-09-28|lunch|finish']);
 
   // Add a break's time is a suggestion, there to be typed over.
   app = bootWith(schedule, {}, '2026-09-28 14:40:30');
@@ -2336,7 +2336,7 @@ async function checkEditsAndFocus() {
   app.at(at('2026-09-29 10:50'));
   same('a new length in the heads-up minute, then on the break: one heads-up, one "Break time", "Break over" at the new time',
     said(app, from), ['Tea: Starts in 5 minutes. 2026-09-29|brk630-645|5', 'Tea: Break time. Back at 11:00 AM. 2026-09-29|brk630-660|start',
-      'Tea: Break over. Ease back in. 2026-09-29|brk630-650|finish']);
+      'Tea: Break time done. Ease back in. 2026-09-29|brk630-650|finish']);
 
   /* The Lunch cell's blur acts only when this focus took the lunch away.
      Tabbing through a cell already empty, with a length left behind in
@@ -2510,9 +2510,9 @@ async function checkEditsAndFocus() {
     a.CT.app.replaceState({ schedule, settings: a.saved().settings, appointments: [], updatedAt: rowAt, breaks: brks }, { fromSync: true, rowAt });
   };
   const onTheBreak = ['Tea: Starts in 5 minutes. 2026-09-29|brk630-645|5', 'Tea: Break time. Back at 10:45 AM. 2026-09-29|brk630-645|start',
-    'Tea: Break over. Ease back in. 2026-09-29|brk630-660|finish'];
+    'Tea: Break time done. Ease back in. 2026-09-29|brk630-660|finish'];
   const inTheHeadsUp = ['Tea: Starts in 5 minutes. 2026-09-29|brk630-645|5', 'Tea: Break time. Back at 11:00 AM. 2026-09-29|brk630-660|start',
-    'Tea: Break over. Ease back in. 2026-09-29|brk630-660|finish'];
+    'Tea: Break time done. Ease back in. 2026-09-29|brk630-660|finish'];
   const replacements = [
     ['Copy a day', (a) => copyOnto(a, 'Wednesday', 'Tuesday')],
     ['an import', (a) => importOnto(a, breaksFor({ Tuesday: teaFor(30), Wednesday: teaFor(30) }))],

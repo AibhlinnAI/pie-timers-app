@@ -578,7 +578,7 @@ button,select{ font:inherit; }
    (a laptop at 150%, not in full screen) at 136. The list beside the hero
    already says the same thing, with the session on now lit up and the next
    one marked "next", so on those screens the line goes. Only while the day
-   is running: "Still to come", "Already over" and the sign-off are short,
+   is running: "Still to come", "Finished" and the sign-off are short,
    and they stay. */
 @media (max-height:1000px) and (max-width:1100px) and (orientation:landscape),
        (max-height:640px) and (orientation:landscape){
@@ -1191,7 +1191,7 @@ button,select{ font:inherit; }
 
     /* Left running, the clock would slide past the close, then past
        midnight, onto a date the program knows nothing about: the first
-       version of this page did exactly that and sat on "Already over"
+       version of this page did exactly that and sat on "Finished"
        for good about seven minutes after it opened. Loop it back to the
        run-up instead, on the conference day. */
     if (demo.running && !mode.live) {
@@ -1289,7 +1289,7 @@ button,select{ font:inherit; }
       meter(false);
       set('idle', dayWord(day), PRESET.name,
         longDate(day) + ' · ' + clock(day.start) + ' – ' + clock(day.end), '',
-        day.date > today ? 'Still to come.' : 'Already over.');
+        day.date > today ? 'Still to come.' : 'Finished.');
       dialSays('The conference is not running today');
       setPie(null, 0);
       return;
