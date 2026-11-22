@@ -1409,7 +1409,7 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
 /* P18. The one thing that still ends at the end of 5 December: the free
    trial of an account made before 22 November. Said once on each offer
    page, as a statement about that trial and nothing else. */
-const OLDER_ACCOUNTS = /If you made your account before 22 November 2026 \(Adelaide time\), your free trial runs to the end of 5 December 2026 \(Adelaide time\), even if an earlier trial had (already )?run out\./;
+const OLDER_ACCOUNTS = /If you made your account before 22 November 2026 \(Adelaide time\), your free trial runs to the end of 5 December 2026 \(Adelaide time\), even if an earlier trial had (already )?ended./;
 for (const [name, html] of Object.entries(PAGES)) {
   const text = reading(html);
   check('P18 ' + name + ' keeps the sentence about older accounts\' trials', OLDER_ACCOUNTS.test(text));
