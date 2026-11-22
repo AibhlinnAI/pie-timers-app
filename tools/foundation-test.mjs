@@ -193,7 +193,7 @@ const upserts = () => calls.filter((c) => c.method === 'POST' && c.path === '/re
 /* The row's period end written again, after Paddle accepted the moved
    first-charge date. */
 const extensions = () => calls.filter((c) => c.host === 'proj.supabase.co' && c.method === 'PATCH' && c.path === '/rest/v1/subscriptions');
-const FIRST_CHARGE = '2027-01-01T10:00:00.000Z';
+const FIRST_CHARGE = '2027-01-01T12:00:00.000Z';
 const indexOfCall = (pred) => calls.findIndex(pred);
 
 /* ───────────────────── Part 1: the webhook, run for real ───────────────────── */
@@ -382,14 +382,22 @@ for (const type of ['subscription.updated', 'subscription.canceled']) {
 
 {
   /* "Pay nothing until 2027" has to be true on the customer's own
-     calendar, not only in Adelaide. The first charge is 1 January 2027
-     from Hawaii (UTC-10) to New Zealand in summer (UTC+13). */
+     calendar, not only in Adelaide. Mal's rule: the first charge falls
+     when the last time zone on Earth, UTC-12, reaches midnight on New
+     Year's Eve. So it is 2027 in every zone from UTC-12 to UTC+14. */
   const charge = at(FIRST_CHARGE);
   const dayAt = (offsetHours) => new Date(charge + offsetHours * 3600000).toISOString().slice(0, 10);
   check('W16 the first charge is 1 January 2027 in Adelaide', dayAt(10.5) === '2027-01-01');
   check('W16 ...in Perth, London, New York and Los Angeles',
     [8, 0, -5, -8].every((h) => dayAt(h) === '2027-01-01'), [8, 0, -5, -8].map(dayAt));
-  check('W16 ...and from Hawaii to New Zealand', dayAt(-10) === '2027-01-01' && dayAt(13) === '2027-01-01', [dayAt(-10), dayAt(13)]);
+  check('W16 ...and it is exactly midnight starting 1 January at UTC-12, the last zone',
+    new Date(charge - 12 * 3600000).toISOString() === '2027-01-01T00:00:00.000Z', new Date(charge - 12 * 3600000).toISOString());
+  const zones = [];
+  for (let h = -12; h <= 14; h += 0.25) zones.push(h);
+  check('W16 ...and already 2027 in every zone from UTC-12 to UTC+14',
+    zones.every((h) => dayAt(h).slice(0, 4) === '2027'), zones.filter((h) => dayAt(h).slice(0, 4) !== '2027'));
+  check('W16 ...and one second earlier it would still be 2026 at UTC-12',
+    new Date(charge - 1000 - 12 * 3600000).toISOString().slice(0, 4) === '2026');
   const constant = (WEBHOOK_SOURCE.match(/const LAUNCH_FIRST_CHARGE = Date\.parse\("([^"]+)"\)/) || [])[1];
   check('W16 LAUNCH_FIRST_CHARGE in paddle-webhook is that instant', at(constant) === charge, constant);
 }

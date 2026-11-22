@@ -69,9 +69,10 @@ arrived.
   while your free trial is running" wording. The closing instant is
   Adelaide midnight, which is earlier on 5 December everywhere to the west,
   so the date always carries "(Adelaide time)". The first charge is the
-  other way round: `LAUNCH_FIRST_CHARGE` is `2027-01-01T10:00:00Z`, not
-  Adelaide midnight, so it is 1 January 2027 on the customer's own calendar
-  from Hawaii to New Zealand. The 100 places are enforced by
+  other way round: `LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`, not
+  Adelaide midnight. That is Mal's rule: the moment the last time zone on
+  Earth (UTC-12) reaches midnight on New Year's Eve, so it is already 2027
+  on every customer's calendar. In Adelaide it is 10:30 pm on 1 January. The 100 places are enforced by
   `supabase/schema-foundation.sql` and `paddle-webhook`, which is only true
   once Mal has run the SQL and deployed the function: check before saying so
   (`select public.foundation_status();`). Until then nothing stops

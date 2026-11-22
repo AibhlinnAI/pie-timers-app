@@ -155,11 +155,14 @@ const FREE_DAYS_FROM_SIGNUP = 30;
    is "Pay nothing until 2027", and the app is public, so it has to be
    2027 on the customer's own calendar. Midnight on 1 January in Adelaide
    is still 31 December 2026 everywhere to the west: 9:30 pm in Perth,
-   1:30 pm in London, 8:30 am in New York. 10:00 UTC on 1 January 2027 is
-   1 January from Hawaii (midnight) to New Zealand (11 pm), and 8:30 pm
-   in Adelaide. It can only ever make a charge later, never earlier. */
+   1:30 pm in London, 8:30 am in New York. Mal's rule (22 Nov 2026): the
+   first charge falls when the last time zone on Earth reaches midnight
+   on New Year's Eve. That is UTC-12, so 12:00 UTC on 1 January 2027:
+   10:30 pm on 1 January in Adelaide, and already 2027 everywhere, from
+   midnight on 1 January at UTC-12 to 2 am on 2 January at UTC+14. It can
+   only ever make a charge later, never earlier. */
 const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
-const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T10:00:00Z");
+const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T12:00:00Z");
 
 function firstChargeAt(createdAt: string, purchasedAt: number): Date {
   if (purchasedAt < LAUNCH_OFFER_END) return new Date(LAUNCH_FIRST_CHARGE);

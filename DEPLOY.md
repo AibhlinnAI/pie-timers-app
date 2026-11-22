@@ -513,7 +513,7 @@ moved one again (`extendFreePeriod` in `paddle-webhook`). The function is
 built so the retry ends on the moved date, but that has only been checked
 against stubs, never against Paddle. So after any 500 followed by a retry,
 whatever caused it, check that account: `current_period_end` in
-`public.subscriptions` must read 1 Jan 2027 (`2027-01-01 10:00:00+00`) and
+`public.subscriptions` must read 1 Jan 2027 (`2027-01-01 12:00:00+00`) and
 match `next_billed_at` in Paddle. If it reads the trial price's own end
 instead, the account would lose Premium in December: set it to the Paddle
 date by hand.
@@ -789,12 +789,13 @@ Test A — still in trial, takes no money, exercises the most code:
       that exercises `deferFirstCharge`, and therefore the only proof
       `PADDLE_API_KEY` is set — without that key the function logs a warning and
       silently leaves Paddle's own date. The exact instant is
-      `2027-01-01T10:00:00Z`: 8:30 pm on 1 Jan in Adelaide, and 1 January
-      from Hawaii to New Zealand, so "Pay nothing until 2027" holds on the
-      customer's own calendar. It is not Adelaide midnight, which is still
-      31 December 2026 everywhere to the west.
+      `2027-01-01T12:00:00Z`: the moment the last time zone on Earth
+      (UTC-12) reaches midnight on New Year's Eve, so "Pay nothing until
+      2027" holds on every customer's calendar. It is 10:30 pm on 1 Jan in
+      Adelaide. It is not Adelaide midnight, which is still 31 December
+      2026 everywhere to the west.
 - [ ] Confirm `current_period_end` on the `public.subscriptions` row reads
-      the same instant (`2027-01-01 10:00:00+00`), not the trial price's own
+      the same instant (`2027-01-01 12:00:00+00`), not the trial price's own
       end 14 days out. `has_active_plan()` reads this column, so it is what
       keeps Premium on until the first payment.
 - [ ] Read the function log for this purchase. If any delivery answered 500
