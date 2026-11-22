@@ -5,8 +5,10 @@
 --
 -- Pie Timers went public on Google Play on 22 Nov 2026 and the launch
 -- offer was reset to match: an account made before 22 Nov 2026 gets
--- Premium free until the end of 5 Dec 2026 (6 Dec 00:00 +10:30,
--- Adelaide time), even if its earlier trial had already run out.
+-- Premium free until the end of 5 Dec 2026 in the last time zone on
+-- Earth (2026-12-06 12:00 UTC, which is 10:30 pm on 6 Dec in Adelaide),
+-- even if its earlier trial had already ended. "Before 22 Nov" is
+-- counted the same way: before 2026-11-22 12:00 UTC.
 --
 -- trial_length() cannot do this. It only acts when an account is
 -- created, and every account this is for already exists. So this file
@@ -28,22 +30,22 @@ select count(*) as rows_to_move
   from public.subscriptions
  where plan = 'trial'
    and coalesce(complimentary, false) = false
-   and created_at < timestamptz '2026-11-22 00:00:00+10:30'
+   and created_at < timestamptz '2026-11-22 12:00:00+00:00'
    and (current_period_end is null
-        or current_period_end < timestamptz '2026-12-06 00:00:00+10:30');
+        or current_period_end < timestamptz '2026-12-06 12:00:00+00:00');
 
 
 -- 2. THE CHANGE. Returns one row per account moved, with no personal
 --    details: count the rows and compare with step 1.
 update public.subscriptions
    set status = 'trialing',
-       current_period_end = timestamptz '2026-12-06 00:00:00+10:30',
+       current_period_end = timestamptz '2026-12-06 12:00:00+00:00',
        updated_at = now()
  where plan = 'trial'
    and coalesce(complimentary, false) = false
-   and created_at < timestamptz '2026-11-22 00:00:00+10:30'
+   and created_at < timestamptz '2026-11-22 12:00:00+00:00'
    and (current_period_end is null
-        or current_period_end < timestamptz '2026-12-06 00:00:00+10:30')
+        or current_period_end < timestamptz '2026-12-06 12:00:00+00:00')
 returning status, plan, current_period_end;
 
 
@@ -54,13 +56,13 @@ select
      from public.subscriptions
     where plan = 'trial'
       and coalesce(complimentary, false) = false
-      and created_at < timestamptz '2026-11-22 00:00:00+10:30'
+      and created_at < timestamptz '2026-11-22 12:00:00+00:00'
       and (current_period_end is null
-           or current_period_end < timestamptz '2026-12-06 00:00:00+10:30')) as rows_to_move,
+           or current_period_end < timestamptz '2026-12-06 12:00:00+00:00')) as rows_to_move,
   (select count(*)
      from public.subscriptions
     where plan = 'trial'
-      and current_period_end = timestamptz '2026-12-06 00:00:00+10:30')      as on_the_finish_line,
+      and current_period_end = timestamptz '2026-12-06 12:00:00+00:00')      as on_the_finish_line,
   (select count(*)
      from public.subscriptions
     where coalesce(complimentary, false))                                    as complimentary_untouched;

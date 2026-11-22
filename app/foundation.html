@@ -88,7 +88,7 @@
     <p class="launch-hook" id="launchHook">Pay nothing until 2027</p>
     <p class="launch-terms" id="launchTerms">Subscribe while your free trial
     is running and your first payment is taken from 1 January 2027.</p>
-    <p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026 (Adelaide time).</p>
+    <p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026.</p>
   </div>
 
   <h2>Your price is locked</h2>
@@ -96,9 +96,10 @@
   at <strong>A$2.90 a month</strong> or <strong>A$19 a year</strong>, for as
   long as their subscription stays active and AibhlínnAI offers a Premium
   subscription.</p>
-  <p>There are <strong>100 places</strong>. Foundation closes at the end of
-  <strong>31 December 2026</strong> (Adelaide time), or sooner if all 100
-  places are taken.</p>
+  <p>There are <strong>100 Foundation places</strong> available to the first
+  100 subscribers, locking in their subscription costs at the current rates.
+  Foundation closes at the end of <strong>31 December 2026</strong>, or
+  sooner if all 100 places are taken.</p>
   <p id="foundationState" role="status" aria-live="polite" hidden></p>
   <p>Prices are in Australian dollars and include GST, VAT or sales tax where
   it applies. Checkout shows the final price in your currency. Whichever plan
@@ -123,8 +124,8 @@
   </ul>
 
   <h2>Who can join</h2>
-  <p>The first 100 people to subscribe by the end of 31 December 2026
-  (Adelaide time).</p>
+  <p>AibhlínnAI's first 100 subscribers before the end of 31 December
+  2026.</p>
   <p>A place is given when your subscription is recorded, in the order
   subscriptions are recorded. The number of places shown on this page can be a
   moment behind. If the last place goes while you are checking out, you still
@@ -137,17 +138,19 @@
 
   <h2>When your first payment is taken</h2>
   <p>Every new account starts with a <strong>14-day free trial</strong>.
-  Subscribe while it is running and you get more free time before your first
-  payment: <strong>30 days</strong> from the day you made your account on a
-  yearly plan, or <strong>21 days</strong> on a monthly plan. First payments
-  are not charged before <strong>1 January 2027</strong> if you subscribe
-  while your free 14-day trial is running.</p>
+  Subscribe while the free trial is running and you get more free time before
+  your first payment: on a yearly plan you will get your first
+  <strong>30 days</strong> free from the day you started your AibhlínnAI
+  account, or <strong>21 days</strong> for a monthly plan. <span id="offerSentence">During
+  the Black Friday Launch Offer, first payments will not be charged before
+  <strong>1 January 2027</strong> if you subscribe while your free 14-day
+  trial is running.</span></p>
   <p>If you subscribe after your trial has ended, you pay on the day you
   subscribe.</p>
   <p>The trial needs no card, and the app shows how long your own trial has
-  left. If you made your account before 22 November 2026 (Adelaide time),
-  your free trial runs to the end of 5 December 2026 (Adelaide time), even if
-  an earlier trial had already ended.</p>
+  left. If you made your account before 22 November 2026, your free trial
+  runs to the end of 5 December 2026, even if an earlier trial had already
+  ended.</p>
   <p>Checkout may show an earlier first-payment date. We move it to the right
   one shortly after you subscribe, and never to a date earlier than checkout
   showed you. If the date in your Paddle account looks wrong, write to us
@@ -193,7 +196,9 @@
      5 December; Mal moved the close on 22 Nov 2026.) END is also the
      instant Foundation closes, FOUNDATION_CLOSES in the next script.
      The instants are fixed in UTC, so the result does not depend on the
-     phone's own time zone. Adelaide is on +10:30 for the whole window.
+     phone's own time zone. START is Adelaide midnight (+10:30). END is
+     noon UTC on 1 January 2027, the end of 31 December in the last
+     time zone on Earth, so the page's dates carry no time zone.
      Without this script the page keeps the full pie and the caption
      written in the markup. Once the offer is over the hook and its
      condition come down, so the card never invites anyone to an offer
@@ -202,7 +207,7 @@
      the next script's job. */
   (function () {
     var START = Date.UTC(2026, 10, 21, 13, 30); // 22 Nov 2026 00:00 +10:30
-    var END = Date.UTC(2026, 11, 31, 13, 30);   // 1 Jan 2027 00:00 +10:30
+    var END = Date.UTC(2027, 0, 1, 12, 0);      // end of 31 Dec 2026 at UTC-12
     var R = 37;
 
     var pie = document.getElementById('launchPie');
@@ -237,18 +242,20 @@
         text = 'The offer starts on 22 November 2026.';
       } else if (now < END) {
         left = (END - now) / (END - START);
-        // START and END are both Adelaide midnights, so this counts
-        // Adelaide calendar days, today included.
+        // Whole or part days of 24 hours left to END.
         var days = Math.ceil((END - now) / 86400000);
         text = days === 1 ? 'Last day of the offer.' : days + ' days left in the offer.';
       } else {
         left = 0;
-        text = 'The offer is over. It ran to the end of 31 December 2026 (Adelaide time).';
+        text = 'The offer is over. It ran to the end of 31 December 2026.';
       }
       pie.setAttribute('d', wedge(left));
       caption.textContent = text;
       if (hook) hook.hidden = now >= END;
       if (terms) terms.hidden = now >= END;
+      // The owner's sentence names the offer, so it comes down with it.
+      var sentence = document.getElementById('offerSentence');
+      if (sentence) sentence.hidden = now >= END;
     }
   })();
 </script>
@@ -267,7 +274,7 @@
        One request, to the one function the public may call. It sends
        nothing about the visitor and never a session. Anything but a
        well-formed answer is null, and null never shows a number. */
-    var FOUNDATION_CLOSES = Date.UTC(2026, 11, 31, 13, 30); // 1 Jan 2027 00:00 +10:30
+    var FOUNDATION_CLOSES = Date.UTC(2027, 0, 1, 12, 0); // end of 31 Dec 2026 at UTC-12
     function readFoundation(waitMs) {
       var cfg = (window.CT && window.CT.config) || {};
       if (!cfg.isConfigured || !window.fetch) return Promise.resolve(null);
@@ -326,7 +333,7 @@
       } else if (state === 'full') {
         show('Foundation is full. All 100 places have been taken. You can still subscribe at the same price, without the price lock.', true);
       } else if (state === 'closed') {
-        show('Foundation has closed. It ran to the end of 31 December 2026 (Adelaide time).');
+        show('Foundation has closed. It ran to the end of 31 December 2026.');
       } else {
         line.hidden = true;
       }

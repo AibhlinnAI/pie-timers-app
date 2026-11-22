@@ -92,7 +92,7 @@
      1 January 2027. It has no subscribe-by date (Mal, 22 Nov 2026).
      Foundation is 100 places with a price lock, counted by the
      database (supabase/schema-foundation.sql). Both come down at the
-     end of 31 December 2026, Adelaide time (FOUNDATION_CLOSES). A full
+     end of 31 December 2026 in the last time zone (FOUNDATION_CLOSES). A full
      Foundation does not end the hook, so "Pay nothing until 2027"
      always sits outside #foundationLine and beside its "subscribe
      while your free trial is running" wording, and no price figure
@@ -151,9 +151,9 @@
         <p class="offer-hook">Pay nothing until 2027</p>
         <p class="offer-terms">Subscribe while your free trial is running and
         your first payment is taken from 1 January 2027. The offer runs to
-        the end of 31 December 2026 (Adelaide time).</p>
+        the end of 31 December 2026.</p>
       </div>
-      <p class="hint" id="foundationLine" role="status" aria-live="polite">Foundation has 100 places. Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken. Foundation members keep the price they subscribe at. <a href="foundation.html">How Foundation works</a>.</p>
+      <p class="hint" id="foundationLine" role="status" aria-live="polite">Foundation has 100 places. Foundation closes at the end of 31 December 2026, or sooner if all 100 places are taken. Foundation members keep the price they subscribe at. <a href="foundation.html">How Foundation works</a>.</p>
     </div>
 
     <div class="plan-options">
@@ -173,17 +173,19 @@
     <p class="hint">Prices are shown in Australian dollars and include GST,
     VAT or sales tax where it applies. Checkout shows the final price in your
     currency. Every new account starts with a 14-day free trial. Subscribe
-    while it is running and you get more free time before your first payment:
-    30 days from the day you made your account on a yearly plan, or 21 days
-    on a monthly plan. First payments are not charged before 1 January 2027
-    if you subscribe while your free 14-day trial is running. If you
+    while the free trial is running and you get more free time before your
+    first payment: on a yearly plan you will get your first 30 days free from
+    the day you started your AibhlínnAI account, or 21 days for a monthly
+    plan. <span id="offerSentence">During the Black Friday Launch Offer,
+    first payments will not be charged before 1 January 2027 if you subscribe
+    while your free 14-day trial is running.</span> If you
     subscribe after your trial has ended, you pay on the day you subscribe.
     Checkout may show an earlier first-payment date. We move it to the right
     one shortly after you subscribe, and never to a date earlier than
     checkout showed you. The trial needs no card, and nothing is charged
     until you choose a plan above. If you made your account before
-    22 November 2026 (Adelaide time), your free trial runs to the end of
-    5 December 2026 (Adelaide time), even if an earlier trial had ended.</p>
+    22 November 2026, your free trial runs to the end of 5 December 2026,
+    even if an earlier trial had ended.</p>
 
     <p class="status-line" id="pricingStatus" role="status" aria-live="polite"></p>
   </section>
@@ -226,7 +228,7 @@
      One request, to the one function the public may call. It sends
      nothing about the visitor and never a session. Anything but a
      well-formed answer is null, and null never shows a number. */
-  var FOUNDATION_CLOSES = Date.UTC(2026, 11, 31, 13, 30); // 1 Jan 2027 00:00 +10:30
+  var FOUNDATION_CLOSES = Date.UTC(2027, 0, 1, 12, 0); // end of 31 Dec 2026 at UTC-12
   function readFoundation(waitMs) {
     var cfg = (window.CT && window.CT.config) || {};
     if (!cfg.isConfigured || !window.fetch) return Promise.resolve(null);
@@ -281,7 +283,7 @@
 
   /* The dated half of the panel (the offer's name, hook and condition)
      comes down once this device's clock is past the end of 31 December
-     2026, Adelaide time. The offer and Foundation close on the same
+     2026 in the last time zone. The offer and Foundation close on the same
      instant, so FOUNDATION_CLOSES serves for both. Like the Foundation
      line, the clock can only close it. A full Foundation does not: the
      first-payment rule has nothing to do with Foundation's places, and
@@ -289,6 +291,9 @@
   function renderOfferDates() {
     var dates = $('offerDates');
     if (dates) dates.hidden = Date.now() >= FOUNDATION_CLOSES;
+    // The owner's sentence in the small print names the offer too.
+    var sentence = $('offerSentence');
+    if (sentence) sentence.hidden = Date.now() >= FOUNDATION_CLOSES;
   }
 
   function renderFoundation(s) {
@@ -296,13 +301,13 @@
     foundationShown = state;
     renderOfferDates();
     if (state === 'open') {
-      setFoundationLine('Foundation: ' + s.left + ' of 100 places left. Subscribe by the end of 31 December 2026 (Adelaide time) while a place is left and you keep the price you subscribe at. Your place is confirmed when your subscription is recorded.');
+      setFoundationLine('Foundation: ' + s.left + ' of 100 places left. Subscribe by the end of 31 December 2026 while a place is left and you keep the price you subscribe at. Your place is confirmed when your subscription is recorded.');
     } else if (state === 'full') {
       setFoundationLine('Foundation is full. All 100 places have been taken. You can still subscribe at the same price, without the price lock.');
     } else if (state === 'closed') {
-      setFoundationLine('Foundation has closed. It ran to the end of 31 December 2026 (Adelaide time).');
+      setFoundationLine('Foundation has closed. It ran to the end of 31 December 2026.');
     } else {
-      setFoundationLine('Foundation has 100 places. Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken. We could not check how many places are left just now.');
+      setFoundationLine('Foundation has 100 places. Foundation closes at the end of 31 December 2026, or sooner if all 100 places are taken. We could not check how many places are left just now.');
     }
     return state;
   }

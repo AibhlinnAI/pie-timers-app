@@ -428,8 +428,12 @@ that page, and until then the live page still describes the October offer.
 
 **The terms were revised on 22 Nov 2026, and two things here changed with
 them.** Foundation first closed at the end of 5 Dec 2026. It now closes at
-the end of 31 Dec 2026 (Adelaide time), the instant
-`2027-01-01T00:00+10:30`, or when all 100 places are taken. That instant is
+the end of 31 Dec 2026 in the last time zone on Earth, the instant
+`2027-01-01T12:00Z` (10:30 pm on 1 Jan in Adelaide, the same instant as the
+first payment), or when all 100 places are taken. It was Adelaide midnight
+for a few hours on 22 Nov; the owner moved it so the pages need no
+"(Adelaide time)". The trial dates moved the same way: "before 22 Nov" is
+before `2026-11-22T12:00Z` and "the end of 5 Dec" is `2026-12-06T12:00Z`. That instant is
 written into the two functions in `schema-foundation.sql`, so if the file
 was run before the change, run it again. It is idempotent and touches no
 row. Then run `test-foundation.sql`: its step 5 fails on the old close. And
@@ -543,8 +547,9 @@ and the function still uses the old rule, whatever the pages say. The end of
       browser, so this tick is the first real look at it.
 - [ ] Last, publish the aibhlinn.ai site branch, once the live
       `foundation.html` shows the Black Friday Launch Offer. That site's
-      advert takes itself down after the end of 31 Dec 2026 (Adelaide
-      time): `.github/workflows/retire-offer.yml` in the site repo, which
+      advert takes itself down after the end of 31 Dec 2026. Its
+      time must not be earlier than `2027-01-01T12:00Z`, the instant this
+      repo closes the offer: `.github/workflows/retire-offer.yml` in the site repo, which
       only runs once it is on that repo's `main`. Its README says how to
       run it by hand, and how to take down only the Foundation line if the
       100 places fill early.

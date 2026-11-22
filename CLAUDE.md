@@ -50,7 +50,7 @@ arrived.
 ## Things worth knowing before you act
 
 - **The Black Friday Launch Offer runs from 22 Nov 2026 to the end of
-  31 Dec 2026 (Adelaide time).** It first ran in October 2026 ("Launch
+  31 Dec 2026.** It first ran in October 2026 ("Launch
   Month": 18 Oct, 1 Nov, 1 Dec), before the app was public. Mal reset it on
   22 Nov 2026, the day Pie Timers went public on Google Play, and revised
   its terms the same day. `app/foundation.html` is the product-facing
@@ -61,16 +61,22 @@ arrived.
   few hours ("subscribe by 5 December") and Mal took it off: do not bring
   it back.
 - **Two dates end two different things. Do not mix them up.**
-  - **The end of 31 Dec 2026** (the instant `2027-01-01T00:00+10:30`) ends
+  - **The end of 31 Dec 2026** (the instant `2027-01-01T12:00Z`) ends
     the offer. Foundation closes then, or sooner if all 100 places go. The
     hook comes off the pages then, and the aibhlinn.ai advert comes down.
     Both happen without anyone doing anything (see "Nothing in this repo
     has to be taken down by hand" below).
-    Adelaide midnight is still the day before everywhere to the west, so
-    the date always carries "(Adelaide time)".
-  - **The end of 5 Dec 2026** (the instant `2026-12-06T00:00+10:30`) ends
-    one thing only: the free trial of an account made **before 22 Nov 2026
-    00:00 +10:30**. Those accounts were given Premium free to that fixed
+    **The offer's dates carry no time zone (Mal, 22 Nov 2026: "thought we
+    went away from Adelaide time").** Each instant is noon UTC on the day
+    after, which is midnight in the last time zone on Earth (UTC-12), so
+    "the end of 31 December 2026" is true on every customer's own
+    calendar. It is the same instant as the first payment, 10:30 pm on
+    1 Jan in Adelaide. Never write "(Adelaide time)" beside an offer date,
+    and never move an instant back to Adelaide midnight: the words and the
+    instants go together.
+  - **The end of 5 Dec 2026** (the instant `2026-12-06T12:00Z`) ends
+    one thing only: the free trial of an account made **before 22 Nov 2026**
+    (before `2026-11-22T12:00Z`, counted the same way). Those accounts were given Premium free to that fixed
     finish line, even if an earlier trial had run out (`trial_length()`,
     and `supabase/relaunch-2026-11.sql` for the accounts that already
     existed, which is only true once Mal has run it: check before saying
@@ -210,12 +216,15 @@ arrived.
     `#offerDates`, which `renderOfferDates()` hides at `FOUNDATION_CLOSES`.
   - `app/foundation.html`: the pie script hides the hook and its condition
     at `END` and the caption becomes "The offer is over. It ran to the end
-    of 31 December 2026 (Adelaide time)."
+    of 31 December 2026." Both pages also hide `#offerSentence` then: the
+    owner's sentence "During the Black Friday Launch Offer, first payments
+    will not be charged before 1 January 2027 if you subscribe while your
+    free 14-day trial is running."
   - The `<meta name="description">` of both pages carries no offer, no
     hook and no date. A description cannot be taken down by a script, so
     do not put an offer back in one.
   - `app/terms.html` has no date check. Its one offer sentence dates
-    itself: "Until the end of 31 December 2026 (Adelaide time) the Black
+    itself: "Until the end of 31 December 2026 the Black
     Friday Launch Offer applies: ...". It stays true after that day and
     can stay where it is. Never reword it to "the offer running now".
   - Foundation closes in the database, and the first-payment rule has no

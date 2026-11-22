@@ -6,9 +6,9 @@
 -- trial automatically on sign-up, which does the same job with
 -- nothing to leak, guess, or resell. How long it runs is set in
 -- one place, trial_length() below. It is a fixed finish line, not
--- a rolling window: an account made before 22 Nov 2026 00:00
--- +10:30 runs to 6 Dec 2026 00:00 +10:30 (the end of 5 Dec)
--- however early it arrived, and from 22 Nov the standard 14 days
+-- a rolling window: an account made before 22 Nov 2026 12:00
+-- UTC runs to 6 Dec 2026 12:00 UTC (the end of 5 Dec in the last
+-- time zone on Earth) however early it arrived, and from 22 Nov the standard 14 days
 -- from signup applies. The two rules meet without a step, because
 -- 22 Nov plus 14 days is 6 Dec.
 --
@@ -67,7 +67,11 @@ as $$
   --
   -- grant_trial() adds this to now(), so returning the remaining time
   -- to the finish line lands the whole cohort on the same instant.
-  -- Adelaide time (+10:30, ACDT, for both instants).
+  -- Both instants are noon UTC, which is midnight in the last time zone
+  -- on Earth (UTC-12). So "before 22 November" and "the end of
+  -- 5 December" are true on every customer's own calendar, and the
+  -- pages state the dates with no time zone (owner's decision,
+  -- 22 Nov 2026). In Adelaide they are 10:30 pm on 22 Nov and 6 Dec.
   --
   -- The boundary was already past when this was deployed, so in
   -- practice this returns 14 days. The dates are kept so the function
@@ -75,9 +79,9 @@ as $$
   --
   -- Set the boundary to null after the offer; nothing else changes.
   select case
-    when (timestamptz '2026-11-22 00:00:00+10:30') is not null
-         and now() < (timestamptz '2026-11-22 00:00:00+10:30')
-      then (timestamptz '2026-12-06 00:00:00+10:30') - now()
+    when (timestamptz '2026-11-22 12:00:00+00:00') is not null
+         and now() < (timestamptz '2026-11-22 12:00:00+00:00')
+      then (timestamptz '2026-12-06 12:00:00+00:00') - now()
     else interval '14 days'
   end;
 $$;

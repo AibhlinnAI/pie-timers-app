@@ -7,8 +7,8 @@
 -- Paddle keeps retrying.
 --
 -- Foundation is a price lock with 100 places: the first 100 people
--- to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (Adelaide
--- time). Subscriber 101 still subscribes at the same price, without
+-- to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (in the
+-- last time zone on Earth: noon UTC on 1 Jan 2027). Subscriber 101 still subscribes at the same price, without
 -- the lock. Nothing here ever blocks a purchase. This file is what
 -- makes 100 mean 100.
 --
@@ -131,10 +131,11 @@ set search_path = public
 set lock_timeout = '5s'
 as $$
 declare
-  -- Adelaide time (+10:30). Open from the start of 22 Nov 2026 to
-  -- the end of 31 Dec 2026.
+  -- Open from the start of 22 Nov 2026 in Adelaide (+10:30) to the
+  -- end of 31 Dec 2026 in the last time zone on Earth (UTC-12), which
+  -- is noon UTC on 1 Jan 2027: the same instant as the first payment.
   c_opens  constant timestamptz := timestamptz '2026-11-22 00:00:00+10:30';
-  c_closes constant timestamptz := timestamptz '2027-01-01 00:00:00+10:30';
+  c_closes constant timestamptz := timestamptz '2027-01-01 12:00:00+00:00';
   v_row    public.foundation_claims;
   v_place  smallint;
   v_plan   text := case when p_plan in ('monthly', 'annual') then p_plan end;
@@ -222,7 +223,7 @@ as $$
   select jsonb_build_object(
     'places_left', greatest(0, 100 - taken.n),
     'open', now() >= timestamptz '2026-11-22 00:00:00+10:30'
-        and now() <  timestamptz '2027-01-01 00:00:00+10:30'
+        and now() <  timestamptz '2027-01-01 12:00:00+00:00'
         and taken.n < 100
   )
   from (select count(place)::int as n from public.foundation_claims) as taken;
@@ -295,7 +296,7 @@ notify pgrst, 'reload schema';
 --  where e.event_type like 'subscription.%'
 --    and e.user_id is not null
 --    and (e.payload->'data'->>'created_at')::timestamptz >= timestamptz '2026-11-22 00:00:00+10:30'
---    and (e.payload->'data'->>'created_at')::timestamptz <  timestamptz '2027-01-01 00:00:00+10:30'
+--    and (e.payload->'data'->>'created_at')::timestamptz <  timestamptz '2027-01-01 12:00:00+00:00'
 --    and not exists (select 1 from public.foundation_claims f where f.user_id = e.user_id)
 --  order by e.payload->'data'->>'id', e.received_at;
 

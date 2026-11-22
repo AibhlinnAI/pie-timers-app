@@ -73,14 +73,23 @@ const ENV = {
 
 const at = (iso) => Date.parse(iso);
 /* Foundation, and the Black Friday Launch Offer as a whole, run from the
-   start of 22 Nov 2026 to the end of 31 Dec 2026, Adelaide time. (The
-   close was first the end of 5 Dec; Mal moved it on 22 Nov 2026.) */
-const CLOSES = at('2027-01-01T00:00:00+10:30');
+   start of 22 Nov 2026 in Adelaide to the end of 31 Dec 2026 in the
+   last time zone on Earth (UTC-12), noon UTC on 1 Jan 2027: the same
+   instant as the first payment. (The close was first the end of 5 Dec,
+   then the end of 31 Dec in Adelaide; the owner moved it both times on
+   22 Nov 2026, the second time so the pages need no "(Adelaide time)".) */
+const CLOSES = at('2027-01-01T12:00:00Z');
+/* The close before that one, Adelaide midnight. Nothing may still use it. */
+const ADELAIDE_CLOSE = at('2027-01-01T00:00:00+10:30');
 const OPENS = at('2026-11-22T00:00:00+10:30');
 /* The one thing that still ends at the end of 5 Dec 2026: the free
    trial of an account made before 22 Nov. Nothing in this file may
-   treat it as the offer's close. */
+   treat it as the offer's close. OLD_CLOSE is where the offer once
+   closed (Adelaide midnight); TRIAL_FINISH is where those trials end
+   now, the end of 5 Dec in the last time zone. */
 const OLD_CLOSE = at('2026-12-06T00:00:00+10:30');
+const TRIAL_FINISH = at('2026-12-06T12:00:00Z');
+const TRIAL_BOUNDARY = at('2026-11-22T12:00:00Z');
 
 /* ─────────────────────── Edge function harness ─────────────────────── */
 
@@ -1064,6 +1073,7 @@ for (const banned of ['create policy', 'create view', 'drop table', 'truncate', 
     creates.length === 3 && creates.every((c) => /^create table if not exists /i.test(c) || /^create or replace function /i.test(c)), creates);
 }
 
+const uncommentedPage = (html) => html.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const stamps = (text) => [...text.matchAll(/timestamptz '([^']+)'/g)].map((m) => at(m[1].replace(' ', 'T')));
 {
   const inClaim = stamps(CLAIM_BODY);
@@ -1074,14 +1084,16 @@ const stamps = (text) => [...text.matchAll(/timestamptz '([^']+)'/g)].map((m) =>
   check('S7 the claim is open from its first instant and shut at its last',
     /p_subscribed_at < c_opens or p_subscribed_at >= c_closes/.test(CLAIM_BODY));
 
-  /* Foundation closes at the end of 31 December 2026 in Adelaide, the
-     instant 2027-01-01T00:00+10:30, written out here so it is not only
-     compared with this file's own constant. */
-  check('S7 the closing instant is 2027-01-01T00:00+10:30, 40 days after opening',
-    CLOSES === Date.UTC(2026, 11, 31, 13, 30) && CLOSES - OPENS === 40 * 86400000);
+  /* Foundation closes at the end of 31 December 2026 in the last time
+     zone, the instant 2027-01-01T12:00Z, written out here so it is not
+     only compared with this file's own constant. */
+  check('S7 the closing instant is 2027-01-01T12:00Z, 22.5 hours after Adelaide midnight',
+    CLOSES === Date.UTC(2027, 0, 1, 12, 0) && CLOSES - ADELAIDE_CLOSE === 22.5 * 3600000 && CLOSES - OPENS === 40 * 86400000 + 22.5 * 3600000);
   check('S7 the claim function is written with that instant',
-    CLAIM_BODY.includes("c_closes constant timestamptz := timestamptz '2027-01-01 00:00:00+10:30';"));
-  check('S7 ...and so is the status function', STATUS_BODY.includes("now() <  timestamptz '2027-01-01 00:00:00+10:30'"));
+    CLAIM_BODY.includes("c_closes constant timestamptz := timestamptz '2027-01-01 12:00:00+00:00';"));
+  check('S7 ...and so is the status function', STATUS_BODY.includes("now() <  timestamptz '2027-01-01 12:00:00+00:00'"));
+  check('S7 the Adelaide-midnight close is nowhere in the SQL file',
+    !stamps(SQL_RAW).includes(ADELAIDE_CLOSE) && !/2027-01-01 00:00:00\+10:30/.test(SQL_RAW));
   check('S7 the old close, the end of 5 December, is nowhere in the SQL file as a date',
     !/2026-12-0[56]/.test(SQL_RAW) && !stamps(SQL_RAW).includes(OLD_CLOSE), stamps(SQL_RAW).map((t) => new Date(t).toISOString()));
   const everyStamp = stamps(SQL_RAW);
@@ -1131,11 +1143,11 @@ const stamps = (text) => [...text.matchAll(/timestamptz '([^']+)'/g)].map((m) =>
     /raise exception 'REHEARSAL FINISHED\. Nothing was saved\. %', v_out;\s*end \$\$;\s*$/.test(rehearsal));
   check('S9 ...and is one block with no commit', (rehearsal.match(/^do \$\$/gm) || []).length === 1 && !/\bcommit\b/i.test(rehearsal));
   // ...and it rehearses the close that is now in force.
-  check('S9 the rehearsal refuses a subscription at the closing instant, 2027-01-01T00:00+10:30',
-    /'rehearsal_late', timestamptz '2027-01-01 00:00:00\+10:30'/.test(rehearsal));
-  check('S9 ...gives the last place one second before it, at the end of 31 December 2026',
-    (rehearsal.match(/'rehearsal_a', timestamptz '2026-12-31 23:59:59\+10:30'/g) || []).length === 2 &&
-    at('2026-12-31T23:59:59+10:30') === CLOSES - 1000);
+  check('S9 the rehearsal refuses a subscription at the closing instant, 2027-01-01T12:00Z',
+    /'rehearsal_late', timestamptz '2027-01-01 12:00:00\+00:00'/.test(rehearsal));
+  check('S9 ...gives the last place one second before it, at the end of 31 December 2026 in the last time zone',
+    (rehearsal.match(/'rehearsal_a', timestamptz '2027-01-01 11:59:59\+00:00'/g) || []).length === 2 &&
+    at('2027-01-01T11:59:59Z') === CLOSES - 1000 && at('2027-01-01T11:59:59Z') > ADELAIDE_CLOSE);
   check('S9 ...and has no trace of the old close', !/2026-12-0[56]/.test(rehearsal));
 }
 
@@ -1256,24 +1268,26 @@ const AFTER = CLOSES + 1000;
 
 {
   const { ctx } = sandbox(json(null));
-  check('P6 FOUNDATION_CLOSES is the end of 31 December 2026 in Adelaide, 2027-01-01T00:00+10:30',
-    ctx.FOUNDATION_CLOSES === CLOSES && ctx.FOUNDATION_CLOSES === at('2027-01-01T00:00:00+10:30'), ctx.FOUNDATION_CLOSES);
+  check('P6 FOUNDATION_CLOSES is the end of 31 December 2026 in the last time zone, 2027-01-01T12:00Z',
+    ctx.FOUNDATION_CLOSES === CLOSES && ctx.FOUNDATION_CLOSES === at('2027-01-01T12:00:00Z'), ctx.FOUNDATION_CLOSES);
   for (const [name, html] of Object.entries(PAGES)) {
     const written = (html.match(/var FOUNDATION_CLOSES = Date\.UTC\(([^)]*)\);/g) || []);
-    check('P6 ' + name + ' writes that instant once, as Date.UTC(2026, 11, 31, 13, 30)',
-      written.length === 1 && written[0] === 'var FOUNDATION_CLOSES = Date.UTC(2026, 11, 31, 13, 30);' &&
-      Date.UTC(2026, 11, 31, 13, 30) === CLOSES, written);
+    check('P6 ' + name + ' writes that instant once, as Date.UTC(2027, 0, 1, 12, 0)',
+      written.length === 1 && written[0] === 'var FOUNDATION_CLOSES = Date.UTC(2027, 0, 1, 12, 0);' &&
+      Date.UTC(2027, 0, 1, 12, 0) === CLOSES, written);
+    check('P6 ' + name + ' has no script date on the Adelaide-midnight close',
+      !/Date\.UTC\(2026, 11, 31, 13, 30\)/.test(html) && Date.UTC(2026, 11, 31, 13, 30) === ADELAIDE_CLOSE);
     check('P6 ' + name + ' has no script date on the old close, 6 Dec 2026 00:00 +10:30',
       !/Date\.UTC\(2026, 11, 5, 13, 30\)/.test(html) && Date.UTC(2026, 11, 5, 13, 30) === OLD_CLOSE);
   }
   check('P6 the offer panel on pricing.html comes down on the same instant',
-    /function renderOfferDates\(\) \{\s*var dates = \$\('offerDates'\);\s*if \(dates\) dates\.hidden = Date\.now\(\) >= FOUNDATION_CLOSES;\s*\}/.test(PRICING));
+    /function renderOfferDates\(\) \{\s*var dates = \$\('offerDates'\);\s*if \(dates\) dates\.hidden = Date\.now\(\) >= FOUNDATION_CLOSES;\s*\/\/[^\n]*\n\s*var sentence = \$\('offerSentence'\);\s*if \(sentence\) sentence\.hidden = Date\.now\(\) >= FOUNDATION_CLOSES;\s*\}/.test(PRICING));
 }
 
 {
   /* P6b. The pie on foundation.html, run for real with the clock held.
      It empties across the offer, the start of 22 November to the end of
-     31 December 2026 in Adelaide, 40 days, and the hook and its
+     31 December 2026 in the last time zone, and the hook and its
      condition come down when the offer is over. */
   const pieScript = [...FOUNDATION.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((js) => js.includes("getElementById('launchPie')")) || '';
   const pieAt = (now) => {
@@ -1292,20 +1306,23 @@ const AFTER = CLOSES + 1000;
   const starts = (pieScript.match(/var START = Date\.UTC\(([^)]*)\);/) || [])[1];
   const ends = (pieScript.match(/var END = Date\.UTC\(([^)]*)\);/) || [])[1];
   check('P6b the pie runs from 22 Nov 2026 00:00 +10:30', starts === '2026, 10, 21, 13, 30' && Date.UTC(2026, 10, 21, 13, 30) === OPENS, starts);
-  check('P6b ...to 1 Jan 2027 00:00 +10:30, which is 40 days', ends === '2026, 11, 31, 13, 30' && Date.UTC(2026, 11, 31, 13, 30) === CLOSES && (CLOSES - OPENS) / 86400000 === 40, ends);
+  check('P6b ...to 1 Jan 2027 12:00 UTC, the end of 31 December in the last time zone', ends === '2027, 0, 1, 12, 0' && Date.UTC(2027, 0, 1, 12, 0) === CLOSES, ends);
 
   const first = pieAt(OPENS);
-  check('P6b at the start: a full pie and 40 days left', first.caption === '40 days left in the offer.' && /^M 0 -37 A 37 37 0 1 1 0 37 A/.test(first.d) && first.hook && first.terms, first);
-  const half = pieAt(OPENS + 20 * 86400000);
-  check('P6b halfway, on 12 December: half a pie and 20 days left', half.caption === '20 days left in the offer.' && half.d === 'M 0 0 L 0.000 37.000 A 37 37 0 0 1 0 -37 Z', half);
+  check('P6b at the start: a full pie and 41 days left (40 days and 22.5 hours)', first.caption === '41 days left in the offer.' && /^M 0 -37 A 37 37 0 1 1 0 37 A/.test(first.d) && first.hook && first.terms, first);
+  const half = pieAt((OPENS + CLOSES) / 2);
+  check('P6b halfway: half a pie and 21 days left', half.caption === '21 days left in the offer.' && half.d === 'M 0 0 L 0.000 37.000 A 37 37 0 0 1 0 -37 Z', half);
   const oldClose = pieAt(OLD_CLOSE);
-  check('P6b at the old close, the start of 6 December, the offer is still running: 26 days left, hook showing',
-    oldClose.caption === '26 days left in the offer.' && oldClose.hook && oldClose.terms && oldClose.d !== '', oldClose);
+  check('P6b at the old close, the start of 6 December, the offer is still running: 27 days left, hook showing',
+    oldClose.caption === '27 days left in the offer.' && oldClose.hook && oldClose.terms && oldClose.d !== '', oldClose);
+  const adelaideMidnight = pieAt(ADELAIDE_CLOSE);
+  check('P6b at Adelaide midnight on New Year the offer is still running, on its last day',
+    adelaideMidnight.caption === 'Last day of the offer.' && adelaideMidnight.hook && adelaideMidnight.terms && adelaideMidnight.d !== '', adelaideMidnight);
   const lastDay = pieAt(CLOSES - 3600000);
   check('P6b on 31 December: the last day, hook still showing', lastDay.caption === 'Last day of the offer.' && lastDay.hook && lastDay.terms, lastDay);
   const over = pieAt(CLOSES);
   check('P6b at the closing instant: no pie, the hook and its condition come down',
-    over.caption === 'The offer is over. It ran to the end of 31 December 2026 (Adelaide time).' && over.d === '' && !over.hook && !over.terms, over);
+    over.caption === 'The offer is over. It ran to the end of 31 December 2026.' && over.d === '' && !over.hook && !over.terms, over);
   check('P6b before the start it says when it starts', pieAt(OPENS - 1000).caption === 'The offer starts on 22 November 2026.');
 }
 
@@ -1409,7 +1426,7 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
 /* P18. The one thing that still ends at the end of 5 December: the free
    trial of an account made before 22 November. Said once on each offer
    page, as a statement about that trial and nothing else. */
-const OLDER_ACCOUNTS = /If you made your account before 22 November 2026 \(Adelaide time\), your free trial runs to the end of 5 December 2026 \(Adelaide time\), even if an earlier trial had (already )?ended./;
+const OLDER_ACCOUNTS = /If you made your account before 22 November 2026, your free trial runs to the end of 5 December 2026, even if an earlier trial had (already )?ended./;
 for (const [name, html] of Object.entries(PAGES)) {
   const text = reading(html);
   check('P18 ' + name + ' keeps the sentence about older accounts\' trials', OLDER_ACCOUNTS.test(text));
@@ -1419,17 +1436,24 @@ for (const [name, html] of Object.entries(PAGES)) {
 }
 check('P18 terms.html does not mention 5 December at all', !/5 Dec/.test(reading(TERMS)));
 
+/* P19a. The owner, 22 Nov 2026: the offer's dates carry no time zone.
+   They are true on every customer's own calendar because each instant
+   is the end of that day in the last time zone on Earth. */
+for (const [name, html] of Object.entries({ 'pricing.html': PRICING, 'foundation.html': FOUNDATION, 'terms.html': TERMS })) {
+  check('P19a ' + name + ': no offer date says "Adelaide time", in the text or the scripts',
+    !/\(Adelaide time\)|Adelaide time\)/.test(uncommentedPage(html)), (uncommentedPage(html).match(/.{50}Adelaide time.{10}/g)));
+}
 /* P19. The free-time rule, in the owner's words, on both offer pages. */
 /* The owner's sentence (Mal, 22 Nov 2026), kept whole so the date can
    never be read without its condition: it is for someone who subscribes
    while their free trial is running, and for nobody else. */
-const OWNER_SENTENCE = 'First payments are not charged before 1 January 2027 if you subscribe while your free 14-day trial is running.';
-const FREE_TIME = 'Every new account starts with a 14-day free trial. Subscribe while it is running and you get more free time before your first payment: 30 days from the day you made your account on a yearly plan, or 21 days on a monthly plan. ' + OWNER_SENTENCE;
+const OWNER_SENTENCE = 'During the Black Friday Launch Offer, first payments will not be charged before 1 January 2027 if you subscribe while your free 14-day trial is running.';
+const FREE_TIME = 'Every new account starts with a 14-day free trial. Subscribe while the free trial is running and you get more free time before your first payment: on a yearly plan you will get your first 30 days free from the day you started your AibhlínnAI account, or 21 days for a monthly plan. ' + OWNER_SENTENCE;
 const AFTER_TRIAL = 'If you subscribe after your trial has ended, you pay on the day you subscribe.';
 /* Checkout shows the purchase plus the trial on Paddle's price, which
    for a monthly plan (7 days) is always earlier than the rule's date. */
 const CHECKOUT_DATE = 'Checkout may show an earlier first-payment date. We move it to the right one shortly after you subscribe, and never to a date earlier than checkout showed you.';
-const FOUNDATION_CLOSING = 'Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken.';
+const FOUNDATION_CLOSING = 'Foundation closes at the end of 31 December 2026, or sooner if all 100 places are taken.';
 for (const [name, html] of Object.entries(PAGES)) {
   const text = reading(html);
   check('P19 ' + name + ' states the free-time rule', text.includes(FREE_TIME), text.match(/Every new account.{0,300}/));
@@ -1439,19 +1463,19 @@ for (const [name, html] of Object.entries(PAGES)) {
   check('P19 ' + name + ' says when Foundation closes', text.includes(FOUNDATION_CLOSING));
   check('P19 ' + name + ': the old rule is gone', !/30 days after (you|the day you) (made|signed)|whichever plan you pick|Premium stays free until 31 December/i.test(text));
   const carrier = scripts(html).find((js) => js.includes('foundation-status:begin')) || '';
-  check('P19 ' + name + ': what the script says about the close is the end of 31 December 2026 (Adelaide time)',
-    uncommented(carrier).includes('Foundation has closed. It ran to the end of 31 December 2026 (Adelaide time).'));
+  check('P19 ' + name + ': what the script says about the close is the end of 31 December 2026',
+    uncommented(carrier).includes('Foundation has closed. It ran to the end of 31 December 2026.'));
 }
 check('P19 pricing.html: the line it writes when the count cannot be read says the same close',
   PRICING.includes("setFoundationLine('Foundation has 100 places. " + FOUNDATION_CLOSING + ' We could not check how many places are left just now.\');'));
-check('P19 pricing.html: the open line asks for a subscription by the end of 31 December 2026 (Adelaide time)',
-  PRICING.includes("' of 100 places left. Subscribe by the end of 31 December 2026 (Adelaide time) while a place is left and you keep the price you subscribe at."));
-check('P19 foundation.html: who can join is the first 100 by the end of 31 December 2026 (Adelaide time)',
-  reading(FOUNDATION).includes('The first 100 people to subscribe by the end of 31 December 2026 (Adelaide time).'));
+check('P19 pricing.html: the open line asks for a subscription by the end of 31 December 2026',
+  PRICING.includes("' of 100 places left. Subscribe by the end of 31 December 2026 while a place is left and you keep the price you subscribe at."));
+check('P19 foundation.html: who can join is the first 100 subscribers before the end of 31 December 2026',
+  reading(FOUNDATION).includes("AibhlínnAI's first 100 subscribers before the end of 31 December 2026."));
 check('P19 foundation.html: the card says how long the offer runs',
-  /<p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026 \(Adelaide time\)\.<\/p>/.test(FOUNDATION));
+  /<p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026\.<\/p>/.test(FOUNDATION));
 check('P19 pricing.html: the panel says how long the offer runs',
-  reading(PRICING).includes('Pay nothing until 2027 Subscribe while your free trial is running and your first payment is taken from 1 January 2027. The offer runs to the end of 31 December 2026 (Adelaide time).'));
+  reading(PRICING).includes('Pay nothing until 2027 Subscribe while your free trial is running and your first payment is taken from 1 January 2027. The offer runs to the end of 31 December 2026.'));
 
 {
   const line = (PRICING.match(/<p class="hint" id="foundationLine"[^>]*>([\s\S]*?)<\/p>/) || [])[1] || '';
@@ -1471,7 +1495,7 @@ check('P19 pricing.html: the panel says how long the offer runs',
      opens with the day the offer ends and stays true after it. Nobody
      has to take it out on 1 January 2027. */
   check('P16 terms.html names the offer in a sentence that dates itself, with its condition, hidden in the Play app',
-    /<span data-hide-in-play>Until the end of 31 December 2026 \(Adelaide time\) the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from <strong>1 January 2027<\/strong>\.<\/span>/.test(squash(terms)));
+    /<span data-hide-in-play>Until the end of 31 December 2026 the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from <strong>1 January 2027<\/strong>\.<\/span>/.test(squash(terms)));
   check('P16 ...and never as "the offer running now"', !/offer running now|running now|on now\b/i.test(reading(terms)));
   const termsText = reading(terms);
   check('P16 terms.html says the offer sets a date no first payment is taken before, not one date for everyone',
@@ -1513,7 +1537,7 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     !/No first payment is taken before 1 January 2027/i.test(everything));
   const about2027 = sentences(text).filter((t) => /before 1 January 2027|before 2027/i.test(t));
   check('P20 ' + name + ': every sentence that says "before 1 January 2027" carries its condition in the same sentence',
-    about2027.every((t) => t.endsWith('not charged before 1 January 2027 if you subscribe while your free 14-day trial is running.')), about2027);
+    about2027.every((t) => t.endsWith('not be charged before 1 January 2027 if you subscribe while your free 14-day trial is running.')), about2027);
   /* The same promise with no date in it ("before a date announced with
      that offer") must carry its condition too, or it reads as a promise
      to everyone. */
@@ -1540,7 +1564,10 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('P21 ' + name + ': nothing is described as on "now"', !/\b(running now|on now|right now|currently|this month|ends soon|closing soon|today only|last chance)\b/i.test(reading(html)));
   /* Every sentence a reader can see that names the offer, the hook or a
      closing says which day it ends, or sits right beside one that does. */
-  const text = reading(html);
+  /* The owner's sentence in #offerSentence names the offer without its
+     closing day. Each page's script hides that span at the close (checked
+     below), so it is left out here. */
+  const text = reading(html.replace(/<span id="offerSentence">[\s\S]*?<\/span>/, ' '));
   for (const m of text.matchAll(/Black Friday Launch Offer|Pay nothing until 2027|Foundation closes/g)) {
     const around = text.slice(Math.max(0, m.index - 60), m.index + 330);
     check('P21 ' + name + ': "' + m[0] + '" is dated to 31 December 2026 where it stands', /31 December 2026/.test(around), around);
@@ -1550,28 +1577,33 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   /* pricing.html: the offer's name, hook and condition are all inside
      #offerDates, which renderOfferDates() hides at FOUNDATION_CLOSES (P6). */
   const panel = PRICING.match(/<div class="offer-dates" id="offerDates">[\s\S]*?<\/div>/);
-  const without = panel ? reading(PRICING.replace(panel[0], ' ')) : '';
+  const without = panel ? reading(PRICING.replace(panel[0], ' ').replace(/<span id="offerSentence">[\s\S]*?<\/span>/, ' ')) : '';
+  check('P21 pricing.html: the owner\'s sentence sits in #offerSentence, which the same script hides at the close',
+    /<span id="offerSentence">[\s\S]*?<\/span>/.test(PRICING) && reading((PRICING.match(/<span id="offerSentence">[\s\S]*?<\/span>/) || [''])[0]) === OWNER_SENTENCE);
   check('P21 pricing.html: outside the part its script takes down, nothing names the offer or the hook',
     Boolean(panel) && /Black Friday Launch Offer/.test(panel[0]) && /Pay nothing until 2027/.test(panel[0]) &&
     !/Black Friday|Launch Offer|Pay nothing/i.test(without), without.match(/.{40}(Black Friday|Launch Offer|Pay nothing).{40}/i));
-  check('P21 pricing.html: ...and what is left about the first payment is the standing rule', without.includes(OWNER_SENTENCE + ' ' + AFTER_TRIAL));
+  check('P21 pricing.html: ...and what is left about the first payment is the standing rule', without.includes('or 21 days for a monthly plan. ' + AFTER_TRIAL), without.match(/.{60}If you subscribe after.{40}/));
 
   /* foundation.html: the pie script hides the hook and its condition at
      END and rewrites the caption to say the offer is over (P6b). The
      card keeps its name, with that caption under it. */
-  const stripped = FOUNDATION.replace(/<p class="launch-hook" id="launchHook">[\s\S]*?<\/p>/, ' ').replace(/<p class="launch-terms" id="launchTerms">[\s\S]*?<\/p>/, ' ');
+  const stripped = FOUNDATION.replace(/<p class="launch-hook" id="launchHook">[\s\S]*?<\/p>/, ' ').replace(/<p class="launch-terms" id="launchTerms">[\s\S]*?<\/p>/, ' ').replace(/<span id="offerSentence">[\s\S]*?<\/span>/, ' ');
+  check('P21 foundation.html: the owner\'s sentence sits in #offerSentence, which the pie script hides at END',
+    reading((FOUNDATION.match(/<span id="offerSentence">[\s\S]*?<\/span>/) || [''])[0]) === OWNER_SENTENCE &&
+    /var sentence = document\.getElementById\('offerSentence'\);\s*if \(sentence\) sentence\.hidden = now >= END;/.test(FOUNDATION));
   const left = reading(stripped);
   check('P21 foundation.html: outside the two lines its script takes down, the hook is nowhere',
     stripped !== FOUNDATION && !/Pay nothing/i.test(left), left.match(/.{40}Pay nothing.{40}/i));
   check('P21 foundation.html: the offer is named once more, as the card\'s name, straight above the caption the script rewrites',
     (left.match(/Black Friday Launch Offer/g) || []).length === 1 &&
-    /<h2 class="launch-name">Black Friday Launch Offer<\/h2>[\s\S]*?<p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026 \(Adelaide time\)\.<\/p>\s*<\/div>/.test(FOUNDATION));
+    /<h2 class="launch-name">Black Friday Launch Offer<\/h2>[\s\S]*?<p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026\.<\/p>\s*<\/div>/.test(FOUNDATION));
 
   /* terms.html: no script, so the one sentence dates itself (P16). */
   const termsLeft = reading(TERMS);
   check('P21 terms.html names the offer once, in the sentence that opens with its closing day',
     (termsLeft.match(/Black Friday|Launch Offer/g) || []).length === 2 &&
-    termsLeft.includes('Until the end of 31 December 2026 (Adelaide time) the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from 1 January 2027.'));
+    termsLeft.includes('Until the end of 31 December 2026 the Black Friday Launch Offer applies: subscribe while your free trial is running and your first payment is taken from 1 January 2027.'));
   check('P21 terms.html has no script that would need a date, and none is needed',
     !/Date\.(UTC|now|parse)/.test(scripts(TERMS).join('\n')));
 
