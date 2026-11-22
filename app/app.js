@@ -1131,19 +1131,23 @@
     };
   }
 
-  /* ──────────────────── Android tester invite ────────────────────
+  /* ──────────────────── Android: the app is on Google Play ────────────────────
      The funnel behind the QR code printed on t-shirts, which points at
      the bare pietimers.aibhlinn.ai root and cannot be changed -- so this
      has to live on the first thing a cold, unauthenticated visit shows,
      not behind a route of its own.
 
-     Android only: Play closed testing is the only thing on offer, and
-     leading an iPhone toward a page it cannot use is worse than saying
-     nothing -- the web app already in front of them is the whole offer
-     for that visitor. Gone once onboarding finishes even if never
-     acted on, same as the welcome panel it sits above: a first-run
-     moment, not a standing pitch. Never inside the Play app, which is
-     the thing it invites people to test. */
+     Until 22 Nov 2026 this panel took an email address for the closed
+     test. Pie Timers is public on Google Play from that day, so it is
+     now a link to the listing. The ids keep their old "tester" names,
+     and so does settings.testerInviteDone, so nobody who dismissed the
+     old panel sees this one.
+
+     Android only: an iPhone cannot use the listing, and the web app
+     already in front of that visitor is the whole offer. Gone once
+     onboarding finishes even if never acted on, same as the welcome
+     panel it sits above: a first-run moment, not a standing pitch.
+     Never inside the Play app, which is the thing it points to. */
   function isAndroid() { return /android/i.test(navigator.userAgent || ''); }
 
   function renderTesterInvite() {
@@ -1161,34 +1165,9 @@
   }
 
   $('testerDismiss').addEventListener('click', dismissTesterInvite);
-
-  var testerTypoHolds = emailTypoGate('testerEmail', 'testerEmailTypo', 'testerSubmit');
-
-  $('testerInviteForm').addEventListener('submit', function (event) {
-    event.preventDefault();
-    var email = $('testerEmail').value.trim();
-    if (!email) return;
-    if (testerTypoHolds()) return;
-    var button = $('testerSubmit');
-    var status = $('testerStatus');
-    button.disabled = true;
-    button.textContent = 'Joining…';
-    status.classList.remove('is-error');
-    status.textContent = '';
-
-    CT.db.registerTester(email, 'android').then(function () {
-      $('testerInviteForm').hidden = true;
-      status.textContent = "You're on the list. We'll email the install " +
-        'link once you have been added, usually within a few days.';
-      state.settings.testerInviteDone = true;
-      save();
-    }).catch(function (err) {
-      button.disabled = false;
-      button.textContent = 'Join the list';
-      status.classList.add('is-error');
-      status.textContent = err.message || 'Could not join right now. Please try again.';
-    });
-  });
+  /* Following the link counts as acting on the panel, so it does not
+     come back on the next open. */
+  $('testerPlayLink').addEventListener('click', dismissTesterInvite);
 
   /* ─────────────────────── Screen reader announcements ───────────────────
      The dials update every second, but a live region that fired every
