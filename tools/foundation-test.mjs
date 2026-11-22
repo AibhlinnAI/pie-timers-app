@@ -710,12 +710,12 @@ for (const [name, html] of Object.entries(PAGES)) {
   const hooks = [...text.matchAll(/pay nothing until 2027/gi)];
   check('P13 ' + name + ' carries the hook', hooks.length >= 1);
   check('P13 ' + name + ': the hook is always followed by its condition',
-    hooks.every((m) => /^\W{0,3}subscribe by 5 December 2026 \(Adelaide time\) while your free trial is running and your first payment is taken on 1 January 2027\./i.test(text.slice(m.index + m[0].length))),
+    hooks.every((m) => /^\W{0,3}subscribe by 5 December 2026 \(Adelaide time\) while your free trial is running and your first payment is taken from 1 January 2027\./i.test(text.slice(m.index + m[0].length))),
     hooks.map((m) => text.slice(m.index, m.index + 120)));
   check('P13 ' + name + ' names the offer', text.includes('Black Friday Launch Offer'));
   const metas = [...html.matchAll(/<meta name="description" content="([^"]*)"/g)].map((m) => m[1]);
   check('P13 ' + name + ': the description gives the hook with its date too',
-    metas.every((m) => !/pay nothing until 2027/i.test(m) || /pay nothing until 2027\W{1,3}subscribe by 5 December 2026 \(Adelaide time\) while your free trial is running and your first payment is taken on 1 January 2027\./i.test(m)), metas);
+    metas.every((m) => !/pay nothing until 2027/i.test(m) || /pay nothing until 2027\W{1,3}subscribe by 5 December 2026 \(Adelaide time\) while your free trial is running and your first payment is taken from 1 January 2027\./i.test(m)), metas);
 }
 
 {
@@ -733,7 +733,7 @@ for (const [name, html] of Object.entries(PAGES)) {
   check('P15 foundation.html no longer calls itself an unlinked draft', !/not linked from any page/i.test(FOUNDATION) && /Not yet reviewed by a lawyer/.test(FOUNDATION));
   const terms = read('app/terms.html');
   check('P16 terms.html names the offer and keeps its two dates and its condition, hidden in the Play app',
-    /<span data-hide-in-play>The offer running now is the Black Friday Launch Offer: subscribe by <strong>5 December 2026<\/strong> \(Adelaide time\) while your free trial is running and your first payment is taken on <strong>1 January 2027<\/strong>\.<\/span>/.test(squash(terms)));
+    /<span data-hide-in-play>The offer running now is the Black Friday Launch Offer: subscribe by <strong>5 December 2026<\/strong> \(Adelaide time\) while your free trial is running and your first payment is taken from <strong>1 January 2027<\/strong>\.<\/span>/.test(squash(terms)));
 }
 
 console.log(`${passed} passed, ${failed} failed`);
