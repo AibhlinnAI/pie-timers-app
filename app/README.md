@@ -337,9 +337,12 @@ twice or forged from the client.
 
 Fourteen days covers two real working weeks, which is what the timers need to
 timers to prove themselves. Subscribe inside that window and the first payment
-is not taken until day 30 from sign-up (`FREE_DAYS_FROM_SIGNUP` in
-`paddle-webhook`), so subscribing early never costs someone free time they
-would otherwise have had.
+is not taken until day 30 from sign-up on a yearly plan, or day 21 on a
+monthly plan (`FREE_DAYS_YEARLY` and `FREE_DAYS_MONTHLY` in `paddle-webhook`),
+and never before 1 January 2027. The date is never moved earlier than the one
+checkout showed. So subscribing never costs someone free time they would
+otherwise have had. Subscribe after the trial has ended and the payment is
+taken on the day.
 
 The app stays quiet during the trial and only starts mentioning payment in the last
 14 days. When the trial ends, automatic sync stops but nothing is deleted, no card is

@@ -49,34 +49,60 @@ arrived.
 
 ## Things worth knowing before you act
 
-- **The launch offer was reset on 22 Nov 2026 and runs to the end of
-  5 Dec 2026.** It first ran in October 2026 ("Launch Month": 18 Oct, 1 Nov,
-  1 Dec), before the app was public; Mal reset it the day Pie Timers went
-  public on Google Play. `app/foundation.html` is the product-facing source
-  of truth for the dates. The offer: accounts made before **22 Nov 2026
-  00:00 +10:30** get Premium free to the end of **5 Dec** (the instant is
-  6 Dec 00:00 +10:30; a fixed finish line, not a rolling window); from
-  22 Nov the standard 14 days from signup applies, which for a 22 Nov signup
-  is the same instant. Subscribe by **5 Dec** and the first charge falls
-  **1 Jan 2027**; after that, 30 days from signup. Foundation closes at the
-  end of 5 Dec or when 100 places go, and its 100 places count from 22 Nov
-  (nobody had subscribed before then). Accounts that already existed were
-  moved to the new finish line by `supabase/relaunch-2026-11.sql`, which is
-  only true once Mal has run it: check before saying so. Since 22 Nov 2026
-  the offer is called the **Black Friday Launch Offer** and its hook is
-  **"Pay nothing until 2027"**. The hook is only true with its condition, so
-  it always sits right beside "subscribe by 5 December 2026 (Adelaide time)
-  while your free trial is running" wording. The closing instant is
-  Adelaide midnight, which is earlier on 5 December everywhere to the west,
-  so the date always carries "(Adelaide time)". The first charge is the
-  other way round: `LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`, not
-  Adelaide midnight. That is Mal's rule: the moment the last time zone on
-  Earth (UTC-12) reaches midnight on New Year's Eve, so it is already 2027
-  on every customer's calendar. In Adelaide it is 10:30 pm on 1 January. Because that moment is early on 2 January in New Zealand and a few Pacific islands, customer-facing wording says the first payment is taken **"from 1 January 2027"**, never "on" (Mal, 22 Nov 2026). Inside the offer the charge is that date or 30 days after the account was made, whichever is later, so an account made in the offer's last three days is never charged sooner than the standard rule would (also Mal, 22 Nov 2026). The 100 places are enforced by
-  `supabase/schema-foundation.sql` and `paddle-webhook`, which is only true
-  once Mal has run the SQL and deployed the function: check before saying so
+- **The Black Friday Launch Offer runs from 22 Nov 2026 to the end of
+  31 Dec 2026 (Adelaide time).** It first ran in October 2026 ("Launch
+  Month": 18 Oct, 1 Nov, 1 Dec), before the app was public. Mal reset it on
+  22 Nov 2026, the day Pie Timers went public on Google Play, and revised
+  its terms the same day. `app/foundation.html` is the product-facing
+  source of truth. The hook is **"Pay nothing until 2027"**. It is only
+  true with its condition, so it always sits right beside "Subscribe while
+  your free trial is running and your first payment is taken from
+  1 January 2027." The hook has **no subscribe-by date**. It had one for a
+  few hours ("subscribe by 5 December") and Mal took it off: do not bring
+  it back.
+- **Two dates end two different things. Do not mix them up.**
+  - **The end of 31 Dec 2026** (the instant `2027-01-01T00:00+10:30`) ends
+    the offer. Foundation closes then, or sooner if all 100 places go. The
+    hook comes off the pages then, and the aibhlinn.ai advert comes down.
+    Adelaide midnight is still the day before everywhere to the west, so
+    the date always carries "(Adelaide time)".
+  - **The end of 5 Dec 2026** (the instant `2026-12-06T00:00+10:30`) ends
+    one thing only: the free trial of an account made **before 22 Nov 2026
+    00:00 +10:30**. Those accounts were given Premium free to that fixed
+    finish line, even if an earlier trial had run out (`trial_length()`,
+    and `supabase/relaunch-2026-11.sql` for the accounts that already
+    existed, which is only true once Mal has run it: check before saying
+    so). It is not the offer's close, not Foundation's close and not a
+    subscribe-by date. From 22 Nov every new account gets the standard
+    14 days from signup, for ever.
+- **The first-payment rule is permanent and has no cut-off date.**
+  Subscribe while the free trial is running and the first payment is taken
+  at the LATEST of three instants: the day the account was made plus
+  **30 days on a yearly plan or 21 days on a monthly plan** (30 if the plan
+  cannot be read); `LAUNCH_FIRST_CHARGE`; and Paddle's own
+  `next_billed_at`, the date its checkout showed the customer, so a date
+  is never moved earlier than the customer was shown (a monthly customer
+  who subscribes on day 10 was shown day 24, and keeps it). If the payload
+  does not state that date, the end of its billing period stands in, then
+  the purchase time plus 14 days; with none of them nothing is moved. After
+  1 January 2027 it is simply 30 days yearly, 21 monthly. Subscribe after
+  the trial has ended and you pay on the day. `LAUNCH_FIRST_CHARGE` is
+  `2027-01-01T12:00:00Z`, not Adelaide midnight. That is Mal's rule: the
+  moment the last time zone on Earth (UTC-12) reaches midnight on New
+  Year's Eve, so it is already 2027 on every customer's calendar. In
+  Adelaide it is 10:30 pm on 1 January. Because that moment is early on
+  2 January in New Zealand and a few Pacific islands, customer-facing
+  wording says the first payment is taken **"from 1 January 2027"**, never
+  "on" (Mal, 22 Nov 2026). The rule lives in `paddle-webhook`, which is
+  only true once it is deployed: check before saying so.
+- **The 100 places are enforced by `supabase/schema-foundation.sql` and
+  `paddle-webhook`**, which is only true once Mal has run the SQL and
+  deployed the function: check before saying so
   (`select public.foundation_status();`). Until then nothing stops
-  subscriber 101.
+  subscriber 101. The closing instant is written into the SQL functions,
+  so a database that ran the file while it still said 5 December closes
+  Foundation on 5 December until the file is run again. Step 5 of
+  `supabase/test-foundation.sql` fails on the old close.
 - **Pie Timers is public on Google Play, since 22 Nov 2026** (release 7,
   1.0.6). Closed testing came before it. Older notes that say it has not
   launched, or that its Play page is a 404, are out of date.
@@ -88,22 +114,40 @@ arrived.
   effect — `select public.trial_length();` for the SQL, `supabase functions
   list` for the functions. On 20 Sep 2026 both had been edited and neither had
   been deployed, and the gap was invisible from the repo.
-- **The launch dates live in several places.** `public.trial_length()` in
-  `supabase/schema-access-codes.sql`; `LAUNCH_OFFER_END` and
-  `LAUNCH_FIRST_CHARGE` in `supabase/functions/paddle-webhook/index.ts`;
-  `claim_foundation_place()` and `foundation_status()` in
-  `supabase/schema-foundation.sql`; `FOUNDATION_CLOSES` in the status block
-  on `app/pricing.html` and `app/foundation.html`; the copy on
-  `app/pricing.html`, `app/foundation.html` and `app/terms.html`; and
-  sections 5.6, 8.4 and 8.5 of `DEPLOY.md`. Outside this repo, the aibhlinn.ai
-  site repo's `index.html` now quotes the launch price and the closing date
-  in its Pie Timers advert, and must move with the rest. That page has no
-  script, so its offer lines come out by hand when the offer closes. If one
-  moves, move all of them, and bump `CACHE` in `app/sw.js`. `DEPLOY.md` was
-  missing from this list until 20 Sep 2026, which is exactly why it went
-  stale.
+- **The launch dates live in several places.** If one moves, move all of
+  them, and bump `CACHE` in `app/sw.js`.
+  - The 31 Dec close (`2027-01-01T00:00+10:30`): `claim_foundation_place()`
+    and `foundation_status()` in `supabase/schema-foundation.sql`, and the
+    rehearsal in `supabase/test-foundation.sql`; `FOUNDATION_CLOSES` in the
+    status block on `app/pricing.html` and `app/foundation.html`, which
+    also takes the offer panel down on `pricing.html`; `END` in the pie
+    script on `app/foundation.html`; and the copy on those two pages.
+  - The first-payment rule: `LAUNCH_FIRST_CHARGE`, `FREE_DAYS_YEARLY` and
+    `FREE_DAYS_MONTHLY` in `supabase/functions/paddle-webhook/index.ts`
+    (it holds no closing date any more: `LAUNCH_OFFER_END` is gone); the
+    copy on `app/pricing.html`, `app/foundation.html` and
+    `app/terms.html`; and `app/README.md`.
+  - The 5 Dec trial finish line for accounts made before 22 Nov:
+    `public.trial_length()` in `supabase/schema-access-codes.sql`,
+    `supabase/relaunch-2026-11.sql`, and one sentence each on
+    `app/pricing.html` and `app/foundation.html`.
+  - All three: sections 5.6, 8.4 and 8.5 of `DEPLOY.md`, and
+    `tools/foundation-test.mjs`, which pins them.
+  - Outside this repo, the aibhlinn.ai site repo's `index.html` quotes the
+    launch price, the hook with its condition and the 31 Dec close in its
+    Pie Timers advert, and must move with the rest. That page has no
+    script, so its offer lines come out by hand on 1 January 2027.
+  - `app/terms.html` has no date check either. Section 5 carries one
+    sentence, in a `data-hide-in-play` span, that begins "The offer
+    running now is the Black Friday Launch Offer" and ends "The offer runs
+    to the end of 31 December 2026 (Adelaide time)." Take that span out by
+    hand on 1 January 2027, with the matching P16 check in
+    `tools/foundation-test.mjs`.
+
+  `DEPLOY.md` was missing from this list until 20 Sep 2026, which is
+  exactly why it went stale.
 - **Foundation is a price lock, not a trial.** A$2.90/month or A$19/year, 100
-  places, closing at the end of 5 December 2026 (Adelaide) or when full.
+  places, closing at the end of 31 December 2026 (Adelaide) or when full.
   Separate from trial length. Never describe it by contrast with paying
   nothing.
 - **Foundation's 100 is held by the database.**
@@ -120,8 +164,9 @@ arrived.
   the SQL file (`DEPLOY.md` 5.6), which is only true once he has run it.
   `tools/foundation-test.mjs` holds the wiring; it runs no SQL, so
   `supabase/test-foundation.sql` (run by Mal, rolls itself back) is the
-  first real test of the SQL. A full Foundation does not end the 1 January
-  first-payment date, which depends only on when someone subscribes.
+  first real test of the SQL. A full Foundation does not take the hook
+  down or change the first-payment rule, which has nothing to do with
+  places.
 - **Before reusing an event page for a new event, port the live-mode fixes.**
   The branch `live-clock-port-draft` holds an early draft of the live-clock
   work (23 Sep 2026, built on `ee3e91d`). Most of it reached `main` another

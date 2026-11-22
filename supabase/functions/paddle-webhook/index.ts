@@ -83,59 +83,50 @@ async function rest(path: string, init: RequestInit = {}) {
   return response;
 }
 
-/* ─────────────────── Honouring the unused trial ───────────────────
-   A person who buys on day 10 of a 14-day trial should not lose the
-   four days they had left. The rule: the first charge lands a fixed
-   number of days after the account was created, whenever they happen
-   to buy.
+/* ─────────────────── When the first payment is taken ───────────────────
+   Someone who subscribes while their 14-day free trial is running gets
+   more free time before the first payment. The rule (Mal, 22 Nov 2026)
+   is the LATEST of three instants:
 
-   That number is 30 normally. The launch offer replaces the rule rather
-   than lengthening it: subscribe by 5 December 2026 (Adelaide time) and
-   the first charge falls on 1 January 2027, whoever you are and whenever
-   you signed up.
-   (The offer first ran in October 2026, with 1 November and 1 December.
-   It was reset on 22 Nov 2026, the day the app went public on Google
-   Play.)
+   1. the account's creation plus 30 days on a yearly plan, or plus 21
+      days on a monthly plan (the trial and one extra week). A plan this
+      function cannot read gets 30 days, the later and safer of the two;
+   2. LAUNCH_FIRST_CHARGE, so nothing is taken before 2027 ("Pay nothing
+      until 2027");
+   3. Paddle's own next_billed_at, the date its checkout showed the
+      customer. The trial price runs 14 days from the purchase, so a
+      monthly customer who buys on day 10 was shown day 24, which is
+      later than day 21. A first payment is never moved to a date
+      EARLIER than the customer was shown. Later is always fine.
+      When the payload's next_billed_at is missing or unreadable, the
+      next best statement of the same date stands in for it
+      (paddleFirstPaymentAt). With no such date at all, nothing is
+      moved: a move with nothing to check it against could be a move
+      earlier.
 
-   A fixed date, not a count of days, and keyed on the moment of
-   purchase rather than the account's creation date. Both departures
-   from the old rule are deliberate. The offer as promised is a date --
-   "free Premium until 31 December" -- and the honest implementation of
-   a promise phrased as a date is a date. Keying on purchase is safe
-   here in a way it was not before, because the answer is the same for
-   everyone inside the window: there is no click to time and no days to
-   gain. It also means a tester whose account predates the launch offer is
-   treated like anyone else who buys during it, which is the promise.
+   This is the standing rule and it has no cut-off date. Once
+   LAUNCH_FIRST_CHARGE is behind us it is simply 30 days yearly, 21 days
+   monthly, or Paddle's own date when that is later.
+   (History: until 22 Nov 2026 it was 30 days for every plan, and
+   1 January 2027 only for a purchase made by the end of 5 December.)
 
-   LAUNCH_OFFER_END and LAUNCH_FIRST_CHARGE must match the dates inside
-   public.trial_length() in supabase/schema-access-codes.sql and the
-   copy on pricing.html, foundation.html and terms.html. Several copies
-   of one date is not ideal; the alternative is a round trip to Postgres
-   on every subscription.created, and a date that is wrong in one place
-   is visible immediately as a wrong billing date rather than silently.
-   If one moves, move all of them.
-
-   Paddle has no way to say this at checkout -- a trial length lives on
-   the price and is the same for everyone -- so the date is corrected
-   here, once, when the subscription first appears. next_billed_at moves
-   to the end of the free window, with proration_billing_mode
-   do_not_bill so moving the date does not itself raise an invoice.
+   Paddle has no way to say this at checkout: a trial length lives on
+   the price and is the same for everyone. So the date is corrected
+   here, once, when the subscription first appears. next_billed_at is
+   moved with proration_billing_mode do_not_bill, so moving the date
+   does not itself raise an invoice.
 
    Applies ONLY to a subscription that arrived on a trial price, which
-   the payload states outright as status trialing. Earlier this was
-   inferred from the target date still being in the future, which held
-   only while the free window and the trial length matched. Once they
-   diverge the inference breaks: someone who lets their trial lapse and
-   subscribes afterwards pays the full price today, and would have had
-   their next charge dragged back to a date they have already partly
-   spent -- paying for a month and receiving less. Ask the payload;
-   never infer.
+   the payload states outright as status trialing. Someone whose trial
+   had already ended pays the full price on the day, and moving their
+   next payment would hand them less than the period they paid for. Ask
+   the payload; never infer it from a date. Refunding a lapsed trial
+   into the offer is a support decision, not one this function makes.
 
-   That exclusion is also the one place the launch offer does not reach. A
-   lapsed trial that is revived by a purchase during the offer is charged
-   on the day, not on 1 January, because the money has already moved and
-   Paddle cannot unmove it from here. Refunding into the offer is a
-   support decision, not one this function should make silently.
+   The pages (pricing.html, foundation.html, terms.html) state the same
+   rule and the same 1 January 2027. If one moves, move all of them.
+   This function holds no Foundation date: the Foundation window is
+   judged in SQL (supabase/schema-foundation.sql).
 
    Requires PADDLE_API_KEY. Without that key the subscription still
    works and the person is simply billed on Paddle's own schedule, so a
@@ -146,12 +137,15 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
   ? "https://sandbox-api.paddle.com"
   : "https://api.paddle.com";
 
-const FREE_DAYS_FROM_SIGNUP = 30;
-/* Subscribe before LAUNCH_OFFER_END -- the instant Foundation closes,
-   the end of 5 December 2026 in Adelaide -- and the first charge falls
-   on LAUNCH_FIRST_CHARGE.
+const FREE_DAYS_YEARLY = 30;
+const FREE_DAYS_MONTHLY = 21;
+/* The trial set on Paddle's two trial prices (app/config.js), counted
+   from the purchase. Only used to work out the date checkout showed
+   when the payload does not state it. */
+const PADDLE_TRIAL_DAYS = 14;
+const DAY_MS = 86400000;
 
-   LAUNCH_FIRST_CHARGE is deliberately NOT Adelaide midnight. The promise
+/* LAUNCH_FIRST_CHARGE is deliberately NOT Adelaide midnight. The promise
    is "Pay nothing until 2027", and the app is public, so it has to be
    2027 on the customer's own calendar. Midnight on 1 January in Adelaide
    is still 31 December 2026 everywhere to the west: 9:30 pm in Perth,
@@ -159,44 +153,76 @@ const FREE_DAYS_FROM_SIGNUP = 30;
    first charge falls when the last time zone on Earth reaches midnight
    on New Year's Eve. That is UTC-12, so 12:00 UTC on 1 January 2027:
    10:30 pm on 1 January in Adelaide, and already 2027 everywhere, from
-   midnight on 1 January at UTC-12 to 2 am on 2 January at UTC+14. It can
-   only ever make a charge later, never earlier. */
-const LAUNCH_OFFER_END = Date.parse("2026-12-06T00:00:00+10:30");
+   midnight on 1 January at UTC-12 to 2 am on 2 January at UTC+14. That
+   is early on 2 January in New Zealand, which is why the pages say
+   "from 1 January 2027", never "on". */
 const LAUNCH_FIRST_CHARGE = Date.parse("2027-01-01T12:00:00Z");
 
-/* Inside the offer the first charge is LAUNCH_FIRST_CHARGE or the
-   standard 30 days after the account was made, WHICHEVER IS LATER.
-   The offer is two weeks long and its charge date is under four weeks
-   after it closes, so an account made in the offer's last three days
-   (from 12:00 UTC on 2 December) would reach 1 January with fewer than
-   30 days behind it. The terms promise that subscribing early never
-   costs free time someone would otherwise have had, so the offer must
-   never give less than the rule it replaces. October's offer never met
-   this: its charge date was a full month after its close. Decided by
-   Mal, 22 Nov 2026. The pages say "from 1 January 2027", which stays
-   true either way. */
-function firstChargeAt(createdAt: string, purchasedAt: number): Date {
-  const standard = Date.parse(createdAt) + FREE_DAYS_FROM_SIGNUP * 86400000;
-  if (purchasedAt < LAUNCH_OFFER_END) return new Date(Math.max(LAUNCH_FIRST_CHARGE, standard));
-  return new Date(standard);
+/* The latest of the three instants above. `plan` is "annual",
+   "monthly" or null (planFromInterval); only "monthly" gets the shorter
+   run. `shownAt` is Paddle's own first-payment date
+   (paddleFirstPaymentAt). Answers null when the account's creation date
+   or Paddle's own date cannot be read, so nothing is moved on a guess
+   and nothing is ever moved without a date to hold it at or after. */
+function firstChargeAt(
+  createdAt: string, plan: string | null, shownAt: string | null,
+): Date | null {
+  const created = Date.parse(createdAt);
+  if (!Number.isFinite(created)) return null;
+  const shown = shownAt ? Date.parse(shownAt) : NaN;
+  if (!Number.isFinite(shown)) return null;
+  const days = plan === "monthly" ? FREE_DAYS_MONTHLY : FREE_DAYS_YEARLY;
+  return new Date(Math.max(LAUNCH_FIRST_CHARGE, created + days * DAY_MS, shown));
 }
 
+/* Paddle's own first-payment date, the one its checkout showed the
+   customer: the third instant, and the one no move may fall short of.
+   The payload's next_billed_at says it outright. When that is missing
+   or does not parse, the next best statement of the same date is used:
+   the end of the current billing period (on a trialing subscription
+   that period is the trial), then the purchase instant plus the trial
+   set on the trial prices. Each of those is the same date or a later
+   one, and later is always fine. Null when none can be read. */
+// deno-lint-ignore no-explicit-any
+function paddleFirstPaymentAt(data: any, event: Record<string, unknown>): string | null {
+  for (const value of [data?.next_billed_at, data?.current_billing_period?.ends_at]) {
+    if (typeof value === "string" && Number.isFinite(Date.parse(value))) return value;
+  }
+  const bought = purchasedAt(data, event);
+  return bought
+    ? new Date(Date.parse(bought) + PADDLE_TRIAL_DAYS * DAY_MS).toISOString()
+    : null;
+}
+
+/* Null, with a log line, when the date cannot be read. No account id in
+   the log. */
 async function accountCreatedAt(userId: string): Promise<string | null> {
   /* public.subscriptions is created by the grant_trial trigger the
      moment the account exists, and its created_at is never rewritten,
      so that column dates the account without needing the auth schema exposed. */
   const response = await rest(`/subscriptions?user_id=eq.${userId}&select=created_at`);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.error(`Could not defer first charge: reading the account's creation date answered ${response.status}. The billing date is left as Paddle set it.`);
+    return null;
+  }
   const rows = await response.json();
-  return rows?.[0]?.created_at ?? null;
+  const createdAt = rows?.[0]?.created_at ?? null;
+  if (!createdAt) {
+    console.error("Could not defer first charge: the account has no creation date on record. The billing date is left as Paddle set it.");
+  }
+  return createdAt;
 }
 
 /* Answers with the instant the first charge now sits on when Paddle
    accepted a move, and null in every other case (nothing to move, no
-   key, or Paddle refused). */
+   key, a date that could not be read, or Paddle refused). Every case
+   that leaves a trialing subscription on Paddle's own date when the
+   rule may have asked for a later one writes a log line: the customer
+   may be owed a later date, and somebody has to be able to find out.
+   `shownAt` is Paddle's own first-payment date (paddleFirstPaymentAt). */
 async function deferFirstCharge(
-  userId: string, subscriptionId: string, currentNextBilledAt: string | null,
-  status: string, purchasedAtMs: number,
+  userId: string, subscriptionId: string, shownAt: string | null,
+  status: string, plan: string | null,
 ): Promise<string | null> {
   if (!PADDLE_API_KEY) {
     console.warn("PADDLE_API_KEY not set; leaving the billing date as Paddle set one.");
@@ -205,30 +231,40 @@ async function deferFirstCharge(
 
   /* Only a subscription that arrived on a trial price. Anyone else has
      paid today and their anniversary is Paddle's business, not ours.
-     See the note above: this used to be inferred from the date and the
-     inference stops holding once the free window outlasts the trial. */
+     See the note above: the payload says so, and it is never inferred
+     from a date. */
   if (status !== "trialing") return null;
+
+  /* No date from Paddle and no purchase time to work one out from: a
+     move now would have nothing to be held at or after, so it could be
+     a move earlier than checkout showed. Nothing is sent. */
+  if (!shownAt) {
+    console.error("Could not defer first charge: the payload gives neither Paddle's own first-payment date nor a purchase time. The billing date is left as Paddle set it.");
+    return null;
+  }
 
   const createdAt = await accountCreatedAt(userId);
   if (!createdAt) return null;
 
-  /* Inside the offer or not is decided by when the person subscribed,
-     the same instant Foundation is judged on. A delivery retried after
-     midnight on 5 December therefore gets the same date as the first
-     attempt would have. The real clock is only asked whether that date
-     is still ahead. */
+  /* The date depends only on the account, the plan and Paddle's own
+     date, never on when this delivery arrived, so a retried delivery
+     gets the same answer as the first attempt. The real clock is only
+     asked whether that date is still ahead. */
   const now = Date.now();
-  const target = firstChargeAt(createdAt, purchasedAtMs);
-  /* Already past the free window -- nothing to defer to. */
+  const target = firstChargeAt(createdAt, plan, shownAt);
+  if (!target) {
+    console.error("Could not defer first charge: the account's creation date does not parse. The billing date is left as Paddle set it.");
+    return null;
+  }
+  /* Already past: nothing to defer to. */
   if (target.getTime() <= now) return null;
 
-  /* Otherwise pin to the end of the free window exactly, in whichever
-     direction. The trial price gives everyone the same fixed run from
-     the day they buy, so an early buyer falls short of the window and a
-     late one overshoots; Paddle's own date never knows where the window
-     actually ends. Pulling a date earlier can only ever bring one back
-     to that boundary, never to today, because of the check above. */
-  if (currentNextBilledAt && Math.abs(new Date(currentNextBilledAt).getTime() - target.getTime()) < 60000) return null;
+  /* Paddle's own date is one of the three instants the target is the
+     latest of, so the target is never earlier than it. When it IS
+     Paddle's own date there is nothing to move, and nothing is sent.
+     Exactly equal, not "within a minute": a date a few seconds short
+     of LAUNCH_FIRST_CHARGE is still moved. */
+  if (Date.parse(shownAt) === target.getTime()) return null;
 
   const response = await fetch(`${PADDLE_API_BASE}/subscriptions/${subscriptionId}`, {
     method: "PATCH",
@@ -296,7 +332,7 @@ function planFromInterval(interval: string | undefined) {
 
 /* ─────────────────────────── Foundation ───────────────────────────
    Foundation is a price lock with 100 places, for the first 100 people
-   to subscribe from 22 Nov 2026 to the end of 5 Dec 2026 (Adelaide).
+   to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (Adelaide).
    The database decides who gets one (supabase/schema-foundation.sql):
    the table cannot hold a 101st place, and an account is decided once,
    so a replay or a retry gets the same answer and never a second place.
@@ -571,12 +607,11 @@ Deno.serve(async (request) => {
        this is a courtesy, and a courtesy must not be what decides
        whether someone is entitled. A refusal from Paddle is logged, not
        thrown, so a retry is never triggered by one -- Paddle would
-       replay the whole event and the guard against moving the date
-       earlier is what makes that harmless anyway. */
+       replay the whole event, and the date never moving earlier than
+       Paddle's own is what makes that harmless anyway. */
     if (isCreation) {
       const movedTo = await deferFirstCharge(
-        userId, String(data.id), data?.next_billed_at ?? null, status,
-        subscribedAt ? Date.parse(subscribedAt) : Date.now(),
+        userId, String(data.id), paddleFirstPaymentAt(data, event), status, row.plan,
       );
       /* Paddle accepted the move, so the free period ends on that date.
          Written before a held Foundation error is thrown, so a retry of

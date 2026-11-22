@@ -36,7 +36,7 @@
   }());
 </script>
 <title>Pricing · Pie Timers</title>
-<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed. Black Friday Launch Offer: pay nothing until 2027. Subscribe by 5 December 2026 (Adelaide time) while your free trial is running and your first payment is taken from 1 January 2027.">
+<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed. Black Friday Launch Offer: pay nothing until 2027. Subscribe while your free trial is running and your first payment is taken from 1 January 2027.">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
@@ -83,14 +83,19 @@
      the in-app one cannot quote different figures.
 
      The offer panel (#launchOffer) carries two separate things. The
-     Black Friday Launch Offer is a date: subscribe by 5 December 2026
-     (Adelaide time) while the free trial is running and the first
-     payment is taken from 1 January 2027. Foundation is 100 places with a price lock, counted
-     by the database (supabase/schema-foundation.sql). A full Foundation
-     does not end the date offer, so "Pay nothing until 2027" always sits
-     outside #foundationLine and beside its "subscribe by 5 December
-     2026" wording, and no price figure goes in #foundationLine.
-     Foundation is never described by contrast with paying nothing. ============================================================ -->
+     Black Friday Launch Offer's hook is a date: subscribe while the
+     free trial is running and the first payment is taken from
+     1 January 2027. It has no subscribe-by date (Mal, 22 Nov 2026).
+     Foundation is 100 places with a price lock, counted by the
+     database (supabase/schema-foundation.sql). Both come down at the
+     end of 31 December 2026, Adelaide time (FOUNDATION_CLOSES). A full
+     Foundation does not end the hook, so "Pay nothing until 2027"
+     always sits outside #foundationLine and beside its "subscribe
+     while your free trial is running" wording, and no price figure
+     goes in #foundationLine. Foundation is never described by contrast
+     with paying nothing. The end of 5 December 2026 in the small print
+     is only the trial finish line of accounts made before 22 November.
+     ============================================================ -->
 </head>
 <body class="legal-page">
 
@@ -140,12 +145,11 @@
       <div class="offer-dates" id="offerDates">
         <h4 class="offer-name">Black Friday Launch Offer</h4>
         <p class="offer-hook">Pay nothing until 2027</p>
-        <p class="offer-terms">Subscribe by 5 December 2026 (Adelaide time)
-        while your free trial is running and your first payment is taken from
-        1 January 2027. The offer closes at the end of 5 December 2026
-        (Adelaide time).</p>
+        <p class="offer-terms">Subscribe while your free trial is running and
+        your first payment is taken from 1 January 2027. The offer runs to
+        the end of 31 December 2026 (Adelaide time).</p>
       </div>
-      <p class="hint" id="foundationLine" role="status" aria-live="polite">Foundation has 100 places and closes at the end of 5 December 2026, or sooner if they are all taken. Foundation members keep the price they subscribe at. <a href="foundation.html">How Foundation works</a>.</p>
+      <p class="hint" id="foundationLine" role="status" aria-live="polite">Foundation has 100 places. Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken. Foundation members keep the price they subscribe at. <a href="foundation.html">How Foundation works</a>.</p>
     </div>
 
     <div class="plan-options">
@@ -164,16 +168,17 @@
 
     <p class="hint">Prices are shown in Australian dollars and include GST,
     VAT or sales tax where it applies. Checkout shows the final price in your
-    currency. New accounts start on a free trial of 14 days, and nothing is
-    charged until you choose a plan above. An account made before
-    22 November 2026 (Adelaide time) has its trial running to the end of
-    5 December, even if an earlier trial had run out. If you subscribe by
-    5 December (Adelaide time) while your trial is still running, Premium stays free until
-    31 December and your first charge is taken from 1 January 2027,
-    whichever plan you pick; subscribe after that and your first charge lands
-    30 days after you made your account. Checkout may show an earlier date; we
-    move it to the right one shortly after you subscribe. If your trial has
-    already ended, you are charged when you subscribe.</p>
+    currency. Every new account starts with a 14-day free trial. Subscribe
+    while it is running and you get more free time before your first payment:
+    30 days from the day you made your account on a yearly plan, or 21 days
+    on a monthly plan. No first payment is taken before 1 January 2027. If
+    you subscribe after your trial has ended, you pay on the day you
+    subscribe. Checkout may show a different first-payment date. We set it to
+    the right one shortly after you subscribe, and never to a date earlier
+    than checkout showed you. The trial needs no card, and nothing is charged
+    until you choose a plan above. If you made your account before
+    22 November 2026 (Adelaide time), your free trial runs to the end of
+    5 December 2026 (Adelaide time), even if an earlier trial had run out.</p>
 
     <p class="status-line" id="pricingStatus" role="status" aria-live="polite"></p>
   </section>
@@ -216,7 +221,7 @@
      One request, to the one function the public may call. It sends
      nothing about the visitor and never a session. Anything but a
      well-formed answer is null, and null never shows a number. */
-  var FOUNDATION_CLOSES = Date.UTC(2026, 11, 5, 13, 30); // 6 Dec 2026 00:00 +10:30
+  var FOUNDATION_CLOSES = Date.UTC(2026, 11, 31, 13, 30); // 1 Jan 2027 00:00 +10:30
   function readFoundation(waitMs) {
     var cfg = (window.CT && window.CT.config) || {};
     if (!cfg.isConfigured || !window.fetch) return Promise.resolve(null);
@@ -269,10 +274,13 @@
     el.appendChild(document.createTextNode('.'));
   }
 
-  /* The dated half of the panel comes down once this device's clock is
-     past the closing instant. Like the Foundation line, the clock can
-     only close it. A full Foundation does not: the 1 January date
-     depends only on when someone subscribes. */
+  /* The dated half of the panel (the offer's name, hook and condition)
+     comes down once this device's clock is past the end of 31 December
+     2026, Adelaide time. The offer and Foundation close on the same
+     instant, so FOUNDATION_CLOSES serves for both. Like the Foundation
+     line, the clock can only close it. A full Foundation does not: the
+     first-payment rule has nothing to do with Foundation's places, and
+     it carries on after the offer, as 30 days yearly and 21 monthly. */
   function renderOfferDates() {
     var dates = $('offerDates');
     if (dates) dates.hidden = Date.now() >= FOUNDATION_CLOSES;
@@ -283,13 +291,13 @@
     foundationShown = state;
     renderOfferDates();
     if (state === 'open') {
-      setFoundationLine('Foundation: ' + s.left + ' of 100 places left. Subscribe by 5 December 2026 (Adelaide time) while a place is left and you keep the price you subscribe at. Your place is confirmed when your subscription is recorded.');
+      setFoundationLine('Foundation: ' + s.left + ' of 100 places left. Subscribe by the end of 31 December 2026 (Adelaide time) while a place is left and you keep the price you subscribe at. Your place is confirmed when your subscription is recorded.');
     } else if (state === 'full') {
       setFoundationLine('Foundation is full. All 100 places have been taken. You can still subscribe at the same price, without the price lock.');
     } else if (state === 'closed') {
-      setFoundationLine('Foundation has closed. It ran to the end of 5 December 2026.');
+      setFoundationLine('Foundation has closed. It ran to the end of 31 December 2026 (Adelaide time).');
     } else {
-      setFoundationLine('Foundation has 100 places and closes at the end of 5 December 2026, or sooner if they are all taken. We could not check how many places are left just now.');
+      setFoundationLine('Foundation has 100 places. Foundation closes at the end of 31 December 2026 (Adelaide time), or sooner if all 100 places are taken. We could not check how many places are left just now.');
     }
     return state;
   }

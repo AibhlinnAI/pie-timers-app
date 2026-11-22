@@ -7,10 +7,17 @@
 -- Paddle keeps retrying.
 --
 -- Foundation is a price lock with 100 places: the first 100 people
--- to subscribe from 22 Nov 2026 to the end of 5 Dec 2026 (Adelaide
+-- to subscribe from 22 Nov 2026 to the end of 31 Dec 2026 (Adelaide
 -- time). Subscriber 101 still subscribes at the same price, without
 -- the lock. Nothing here ever blocks a purchase. This file is what
 -- makes 100 mean 100.
+--
+-- The close was first the end of 5 Dec 2026. Mal moved it to the end
+-- of 31 Dec 2026 on 22 Nov 2026. The closing instant is written into
+-- the two function bodies below, and both are "create or replace", so
+-- running this file again is what moves a database that still has the
+-- old close. No row is touched. Check afterwards with
+-- supabase/test-foundation.sql: its step 5 fails on the old close.
 --
 -- The cap is a property of the table, not of any code. place is
 -- unique and must be 1 to 100, so a 101st place cannot be stored by
@@ -34,12 +41,15 @@
 -- foundation_status(): how many places are left and whether
 -- Foundation is open.
 --
--- The two instants below must match LAUNCH_OFFER_END in
--- supabase/functions/paddle-webhook/index.ts, trial_length() in
--- schema-access-codes.sql, FOUNDATION_CLOSES in app/pricing.html and
--- app/foundation.html, and the copy on those pages and terms.html.
--- If one moves, move all of them. tools/foundation-test.mjs compares
--- them.
+-- The opening instant below is the 22 Nov boundary in trial_length()
+-- (schema-access-codes.sql). The closing instant must match
+-- FOUNDATION_CLOSES in app/pricing.html and app/foundation.html, the
+-- pie on foundation.html, and the copy on those pages. If one moves,
+-- move all of them. tools/foundation-test.mjs compares them.
+-- paddle-webhook holds neither instant: it passes on when the
+-- subscription was made and this file judges it. The close is NOT the
+-- end of 5 Dec 2026 in trial_length(): that one is only the finish
+-- line of the free trial for accounts made before 22 Nov.
 -- ============================================================
 
 create table if not exists public.foundation_claims (
@@ -122,9 +132,9 @@ set lock_timeout = '5s'
 as $$
 declare
   -- Adelaide time (+10:30). Open from the start of 22 Nov 2026 to
-  -- the end of 5 Dec 2026.
+  -- the end of 31 Dec 2026.
   c_opens  constant timestamptz := timestamptz '2026-11-22 00:00:00+10:30';
-  c_closes constant timestamptz := timestamptz '2026-12-06 00:00:00+10:30';
+  c_closes constant timestamptz := timestamptz '2027-01-01 00:00:00+10:30';
   v_row    public.foundation_claims;
   v_place  smallint;
   v_plan   text := case when p_plan in ('monthly', 'annual') then p_plan end;
@@ -212,7 +222,7 @@ as $$
   select jsonb_build_object(
     'places_left', greatest(0, 100 - taken.n),
     'open', now() >= timestamptz '2026-11-22 00:00:00+10:30'
-        and now() <  timestamptz '2026-12-06 00:00:00+10:30'
+        and now() <  timestamptz '2027-01-01 00:00:00+10:30'
         and taken.n < 100
   )
   from (select count(place)::int as n from public.foundation_claims) as taken;
@@ -285,7 +295,7 @@ notify pgrst, 'reload schema';
 --  where e.event_type like 'subscription.%'
 --    and e.user_id is not null
 --    and (e.payload->'data'->>'created_at')::timestamptz >= timestamptz '2026-11-22 00:00:00+10:30'
---    and (e.payload->'data'->>'created_at')::timestamptz <  timestamptz '2026-12-06 00:00:00+10:30'
+--    and (e.payload->'data'->>'created_at')::timestamptz <  timestamptz '2027-01-01 00:00:00+10:30'
 --    and not exists (select 1 from public.foundation_claims f where f.user_id = e.user_id)
 --  order by e.payload->'data'->>'id', e.received_at;
 

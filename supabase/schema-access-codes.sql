@@ -12,10 +12,15 @@
 -- from signup applies. The two rules meet without a step, because
 -- 22 Nov plus 14 days is 6 Dec.
 --
--- These are the dates of the offer as reset on 22 Nov 2026. It first
--- ran in October (18 Oct, 1 Nov). Accounts that already existed on
--- 22 Nov are moved to the new finish line by relaunch-2026-11.sql,
+-- These are the trial dates of the offer as reset on 22 Nov 2026. It
+-- first ran in October (18 Oct, 1 Nov). Accounts that already existed
+-- on 22 Nov are moved to the new finish line by relaunch-2026-11.sql,
 -- because this function only ever acts on a new account.
+--
+-- The end of 5 Dec is the trial finish line for those older accounts
+-- and nothing else. The offer itself and Foundation run to the end of
+-- 31 Dec 2026, and that date is not in this file
+-- (schema-foundation.sql holds Foundation's close).
 --
 -- Access codes remain only for friends and family, and are
 -- hardened accordingly: single-use, random, optionally bound to
@@ -32,11 +37,12 @@ create extension if not exists pg_cron;
 -- Granted by a trigger on account creation rather than by anything
 -- the client can call, so it cannot be requested twice or forged.
 --
--- Two shapes, not two lengths. Anyone who registers during launch
--- offer runs to a fixed finish line, the end of 5 December; everyone after gets a
--- rolling fortnight from the day they sign up. A finish line is the
--- better instrument for a launch cohort -- the whole group arrives at
--- the decision together, on the day Foundation closes, rather than
+-- Two shapes, not two lengths. An account made before 22 Nov 2026
+-- runs to a fixed finish line, the end of 5 December; every account
+-- from 22 Nov gets a rolling fortnight from the day it is made. A
+-- finish line is the better instrument for that earlier cohort -- the
+-- whole group arrives at
+-- the decision together, on one day, rather than
 -- trickling past it one account at a time. A fortnight is long enough
 -- to decide, and the price it leads to is A$2.90.
 --
@@ -65,7 +71,7 @@ as $$
   --
   -- The boundary was already past when this was deployed, so in
   -- practice this returns 14 days. The dates are kept so the function
-  -- states the offer that is running.
+  -- states the trial finish line the older accounts were given.
   --
   -- Set the boundary to null after the offer; nothing else changes.
   select case

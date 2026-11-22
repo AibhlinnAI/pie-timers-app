@@ -425,6 +425,19 @@ Publish the aibhlinn.ai site branch only after that merge is live and
 `foundation.html` shows the Black Friday Launch Offer. Its advert links to
 that page, and until then the live page still describes the October offer.
 
+**The terms were revised on 22 Nov 2026, and two things here changed with
+them.** Foundation first closed at the end of 5 Dec 2026. It now closes at
+the end of 31 Dec 2026 (Adelaide time), the instant
+`2027-01-01T00:00+10:30`, or when all 100 places are taken. That instant is
+written into the two functions in `schema-foundation.sql`, so if the file
+was run before the change, run it again. It is idempotent and touches no
+row. Then run `test-foundation.sql`: its step 5 fails on the old close. And
+`paddle-webhook` carries a new first-payment rule (8.4), so deploy it again
+as well. Until both are done the database closes Foundation on 5 December
+and the function still uses the old rule, whatever the pages say. The end of
+5 December is now only the trial finish line for accounts made before
+22 Nov. It is not the offer's close and not a subscribe-by date.
+
 - [ ] The trial rules the pages describe are running. Both are read-only:
       `select public.trial_length();` returns `14 days` (so
       `schema-access-codes.sql` has been re-run with the 22 Nov dates), and
@@ -457,7 +470,9 @@ that page, and until then the live page still describes the October offer.
 - [ ] `select public.foundation_status();` Expect
       `{"open": true, "places_left": 100}`.
 - [ ] Run `supabase/test-foundation.sql`. It always ends in an error: that is
-      what undoes it. Every line of the message must start with PASS.
+      what undoes it. Every line of the message must start with PASS. A FAIL
+      on line 5 means the database still closes Foundation on 5 December:
+      run `schema-foundation.sql` again.
 - [ ] `select public.foundation_status();` again. Still 100.
 - [ ] Confirm the SQL is in place one more time, straight before the
       function goes out: `select public.foundation_status();` answers. Do
@@ -475,7 +490,9 @@ that page, and until then the live page still describes the October offer.
       subscribe from the moment the offer is published. Keep the addresses
       out of this repo.
 - [ ] Run Test A in 8.4 on a throwaway account. Do not publish the pages
-      until it has shown `next_billed_at` on 1 Jan 2027.
+      until it has shown `next_billed_at` on 1 Jan 2027. (That is the date
+      for an account made and subscribed on the same day until early
+      December. 8.4 gives the dates after that.)
 - [ ] Publish the pages. Open `pricing.html` and `foundation.html` signed out:
       both say 100 of 100 places.
 - [ ] Block the Supabase host in the browser's developer tools and reload:
@@ -493,15 +510,27 @@ While Foundation is open, run the "no decision" query in the SQL file every
 day or two. It should return no rows. A row is a subscriber whose claim
 never happened: run the catch-up.
 
-While the offer is open, also open each new subscription in Paddle and check
-`next_billed_at` reads 1 Jan 2027. If the Paddle key is missing, or Paddle
-refuses the date change, `paddle-webhook` only logs it ("Could not defer
-first charge") and still answers 200, so Paddle does not retry and the
-customer is billed on the trial price's own schedule, 14 days after
-subscribing. That would be a charge in December 2026 for someone promised
+Also open each new subscription made on a trial price in Paddle and check
+`next_billed_at` against the rule in 8.4. Until the new year that is 1 Jan
+2027 (`2027-01-01T12:00:00Z`) for most accounts, and later for an account
+whose own 30 days (yearly) or 21 days (monthly) run past it. It is never
+before 1 Jan 2027, and never earlier than the date checkout showed. There
+are four ways the date can be left where Paddle put it when the rule asked
+for a later one: the Paddle key is missing ("PADDLE_API_KEY not set"); the
+account's creation date could not be read (the lookup failed, there was no
+row, or the date did not parse); the payload gave neither Paddle's own date
+nor a purchase time; or Paddle refused the date change. In each of them
+`paddle-webhook` only logs it (search the function log for "Could not defer
+first charge", and for "PADDLE_API_KEY not set") and that alone does not
+stop it answering 200, so Paddle does not retry and the customer is billed
+on the trial price's own schedule, 14 days after subscribing. Only the
+refusal names the subscription in its log line. Match the others to a
+subscription by the time of the line. For anyone who subscribes before
+18 Dec 2026 that would be a charge in December 2026 for someone promised
 none until 2027. Move the date by hand in Paddle if you find one. Making the
 function answer 500 there instead, so Paddle retries, is a change to billing
-code that needs Mal's yes.
+code that needs Mal's yes. This check does not end with the offer: the
+30-day and 21-day rule is permanent.
 
 If things are deployed in the wrong order: pages before the SQL show "could
 not check" and buying works as before. The function before the SQL is not
@@ -513,10 +542,10 @@ moved one again (`extendFreePeriod` in `paddle-webhook`). The function is
 built so the retry ends on the moved date, but that has only been checked
 against stubs, never against Paddle. So after any 500 followed by a retry,
 whatever caused it, check that account: `current_period_end` in
-`public.subscriptions` must read 1 Jan 2027 (`2027-01-01 12:00:00+00`) and
-match `next_billed_at` in Paddle. If it reads the trial price's own end
-instead, the account would lose Premium in December: set it to the Paddle
-date by hand.
+`public.subscriptions` must match `next_billed_at` in Paddle (1 Jan 2027,
+`2027-01-01 12:00:00+00`, for most accounts until the new year). If it reads
+the trial price's own end instead, the account would lose Premium before its
+first payment: set it to the Paddle date by hand.
 
 `node --experimental-strip-types tools/foundation-test.mjs` checks the
 function's wiring, the SQL file's shape and both pages against stubs. It
@@ -780,27 +809,39 @@ Test A — still in trial, takes no money, exercises the most code:
       `can_use_calendar`, `can_use_screensaver`. Note that `grant_trial` may
       already have written here, so check `source` and the timestamps rather
       than just counting rows.
-- [ ] Confirm `next_billed_at` in Paddle sits on **1 Jan 2027** if you are
-      buying by 5 Dec 2026 (`LAUNCH_OFFER_END` / `LAUNCH_FIRST_CHARGE` in
-      `paddle-webhook`), or day 30 from account creation if you are buying
-      after (`FREE_DAYS_FROM_SIGNUP`). Note this branch is keyed on **the
-      moment of purchase**, not the account's creation date — so a throwaway
-      account made today and bought today expects 1 Jan. This is the only check
-      that exercises `deferFirstCharge`, and therefore the only proof
-      `PADDLE_API_KEY` is set — without that key the function logs a warning and
-      silently leaves Paddle's own date. The exact instant is
-      `2027-01-01T12:00:00Z`: the moment the last time zone on Earth
-      (UTC-12) reaches midnight on New Year's Eve, so "Pay nothing until
-      2027" holds on every customer's calendar. It is 10:30 pm on 1 Jan in
-      Adelaide. It is not Adelaide midnight, which is still 31 December
-      2026 everywhere to the west.
+- [ ] Confirm `next_billed_at` in Paddle follows the first-payment rule
+      (`firstChargeAt` in `paddle-webhook`). The first payment is taken at
+      the latest of three instants: the day the account was made plus
+      30 days on a yearly plan or 21 days on a monthly plan
+      (`FREE_DAYS_YEARLY`, `FREE_DAYS_MONTHLY`; 30 if the plan cannot be
+      read); `LAUNCH_FIRST_CHARGE`; and Paddle's own `next_billed_at`, the
+      date its checkout showed, 14 days after the purchase. There is no
+      subscribe-by date: the rule is keyed on **the account's creation
+      date and the plan**, not on when the purchase is made. So a throwaway
+      account made today and bought today on the monthly plan expects
+      **1 Jan 2027** if it is made before 10:30 pm on 11 Dec 2026, Adelaide
+      time (before 10:30 pm on 2 Dec on the yearly plan), and day 21
+      (monthly) or day 30 (yearly) from account creation after that.
+      **Buy on the day the account is made.** The date is never moved
+      earlier than checkout showed, so from 18 Dec 2026 a monthly purchase
+      made after day 7 of the trial keeps Paddle's own date, nothing is sent
+      to Paddle, and the test proves nothing about the key. This is the
+      only check that exercises `deferFirstCharge`, and therefore the only
+      proof `PADDLE_API_KEY` is set — without that key the function logs a
+      warning and silently leaves Paddle's own date. The exact instant of
+      `LAUNCH_FIRST_CHARGE` is `2027-01-01T12:00:00Z`: the moment the last
+      time zone on Earth (UTC-12) reaches midnight on New Year's Eve, so
+      "Pay nothing until 2027" holds on every customer's calendar. It is
+      10:30 pm on 1 Jan in Adelaide. It is not Adelaide midnight, which is
+      still 31 December 2026 everywhere to the west.
 - [ ] Confirm `current_period_end` on the `public.subscriptions` row reads
-      the same instant (`2027-01-01 12:00:00+00`), not the trial price's own
-      end 14 days out. `has_active_plan()` reads this column, so it is what
-      keeps Premium on until the first payment.
+      the same instant as `next_billed_at` (`2027-01-01 12:00:00+00` in the
+      1 January case), not the trial price's own end 14 days out.
+      `has_active_plan()` reads this column, so it is what keeps Premium on
+      until the first payment.
 - [ ] Read the function log for this purchase. If any delivery answered 500
       and was then retried, check `current_period_end` again after the
-      retry: it must still read 1 Jan 2027. Note here what Paddle sent after
+      retry: it must still read the moved date. Note here what Paddle sent after
       the repeated date move (a second `subscription.updated`, or nothing);
       that has not been observed yet.
 - [ ] Confirm a row in `public.foundation_claims` for the test account with a

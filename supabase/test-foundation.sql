@@ -43,8 +43,9 @@ begin
        and not exists (select 1 from public.foundation_claims where user_id = v_a)
     then 'PASS' else 'FAIL' end || ' 1 a subscription before opening gets no place: ' || r::text;
 
-  -- 2. The closing instant itself is too late, and leaves no row.
-  r := public.claim_foundation_place(v_a, 'rehearsal_late', timestamptz '2026-12-06 00:00:00+10:30', 'monthly');
+  -- 2. The closing instant itself (1 Jan 2027 00:00, Adelaide time) is
+  --    too late, and leaves no row.
+  r := public.claim_foundation_place(v_a, 'rehearsal_late', timestamptz '2027-01-01 00:00:00+10:30', 'monthly');
   v_out := v_out || nl || case when r->>'reason' = 'outside_window'
        and not exists (select 1 from public.foundation_claims where user_id = v_a)
     then 'PASS' else 'FAIL' end || ' 2 a subscription at the closing instant gets no place: ' || r::text;
@@ -63,14 +64,16 @@ begin
    order by g.n desc
    offset 1;
 
-  -- 5. The last place goes to a purchase made one second before closing.
-  r := public.claim_foundation_place(v_a, 'rehearsal_a', timestamptz '2026-12-05 23:59:59+10:30', 'monthly');
+  -- 5. The last place goes to a purchase made one second before closing,
+  --    at the end of 31 Dec 2026. A database still on the old close (the
+  --    end of 5 Dec) fails here: re-run schema-foundation.sql.
+  r := public.claim_foundation_place(v_a, 'rehearsal_a', timestamptz '2026-12-31 23:59:59+10:30', 'monthly');
   v_place := (r->>'place')::int;
   v_out := v_out || nl || case when (r->>'member')::boolean and v_place between 1 and 100 then 'PASS' else 'FAIL' end
     || ' 5 the last place is given: ' || r::text;
 
   -- 6. Asking again gives the same place, not another.
-  r := public.claim_foundation_place(v_a, 'rehearsal_a', timestamptz '2026-12-05 23:59:59+10:30', 'monthly');
+  r := public.claim_foundation_place(v_a, 'rehearsal_a', timestamptz '2026-12-31 23:59:59+10:30', 'monthly');
   v_out := v_out || nl || case when (r->>'place')::int = v_place and (r->>'already')::boolean then 'PASS' else 'FAIL' end
     || ' 6 a retry returns the same place: ' || r::text;
 
