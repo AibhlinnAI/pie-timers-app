@@ -2921,7 +2921,7 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   const TRY_AGAIN = 'Could not open checkout. Please try again.';
   const NOT_CHECKED = 'We could not check your account just now. Please try again.';
   const SIGN_IN = 'Please sign in first.';
-  const NO_SUCH_CODE = 'That discount code was not recognised. Check it, or leave it out, and try again.';
+  const NO_SUCH_CODE = 'Discount code not recognised.';
 
   const probe = await buy(IN_TRIAL, 'annual');
   const P = probe.paddle;

@@ -296,7 +296,7 @@
   var CHECKOUT_FAILED = 'Could not open checkout. Please try again.';
   var ACCOUNT_UNCHECKED = 'We could not check your account just now. Please try again.';
   var SIGN_IN_FIRST = 'Please sign in first.';
-  var DISCOUNT_NOT_FOUND = 'That discount code was not recognised. Check it, or leave it out, and try again.';
+  var DISCOUNT_NOT_FOUND = 'Discount code not recognised.';
 
   /* Asks the create-checkout function for a Paddle transaction for this
      account, and answers with the transaction's id. Only for an account

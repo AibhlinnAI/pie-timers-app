@@ -398,8 +398,8 @@ the field above the plan cards. Who judges the code depends on the path:
   `create-checkout`, which looks the code up in Paddle on the server before any
   checkout opens. A code that is mistyped, archived, past its end date, used as
   often as it allows, or kept to something other than this product is turned away
-  with "That discount code was not recognised. Check it, or leave it out, and try
-  again." and nothing opens. Paddle's overlay is not there to say so on this path:
+  with "Discount code not recognised." and nothing opens. The wording is short on
+  purpose: the owner offers few codes and does not want people invited to keep trying. Paddle's overlay is not there to say so on this path:
   Paddle lists a discount as "active" until it is archived, whatever its end date.
 
 **Keep a discount to the product, or to nothing. Never to a price.** On the trial

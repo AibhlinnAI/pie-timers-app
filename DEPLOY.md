@@ -1035,8 +1035,8 @@ for.
       Never keep one to a price. For someone in their free trial,
       `create-checkout` buys a copy of the plain price, which is a
       different price in Paddle, so a discount kept to a price id cannot
-      apply there. The function turns such a code away ("That discount
-      code was not recognised") and makes no transaction, and it does the
+      apply there. The function turns such a code away ("Discount code
+      not recognised.") and makes no transaction, and it does the
       same for a code that has reached its end date or its limit of uses.
       Paddle still lists all of those as "active": that word only means
       not archived (read on Paddle's list-discounts page, 23 Nov 2026).
