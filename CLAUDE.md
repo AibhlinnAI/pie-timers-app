@@ -94,6 +94,48 @@ arrived.
   purpose: that is a design choice to make, not a fault. `/nls26` was not
   checked. Port by hand against `main`; never merge that branch. Its commit
   message lists every item.
+- **Before the next event page goes live, decide the offline fallback.** The
+  branch `sw-offline-event-pages` (`da6fe3b`, 26 Sep 2026) holds a fix that
+  never reached `main`. As read against `main` on 24 Nov 2026 (not run): the
+  app's service worker also controls the event folders, and when a page
+  request fails offline with no saved copy it answers with the app's
+  `index.html` for any address. At an event address that page's relative
+  styles and scripts would miss. Saved pages are also keyed by the full
+  address, so `/nsw26/` saved online is not found offline as
+  `/nsw26/?live=1`. The branch limits the fallback to the app's own two
+  addresses and drops the query from the key. Its third change, not letting
+  an error page replace a good copy, is already on `main`. The diff no longer
+  applies: port about 15 lines by hand using `fromCache()`, not
+  `caches.match()`, with a fresh `CACHE` number. Test B10 in
+  `tools/check-sw.js` asserts today's behaviour, so choose first: fallback
+  only for the app's own addresses, as the branch does, or keep it for
+  root-level pages such as `pricing.html` and refuse it only in sub-folders.
+  Not known: whether this shows on a real device, or whether the Play app
+  uses this worker. Never merge that branch; its commit message has the
+  diagnosis and a test recipe.
+- **An event program as data, not a hand-built page, exists on a branch.**
+  `worktree-nwc26` (`0596a51`, 22 Sep 2026, 1,957 lines) adds a
+  `?preset=<id>` link that loads `app/presets/<id>.json` into the app as
+  appointments, one viewer page (`program.html`) for any event, a written
+  preset format, and removes the dead `AGENDA` seed from `app/app.js`. `main`
+  went the other way, with one hand-built page per event, and those pages are
+  now ahead of the branch's viewer in places (the real-clock live mode). It
+  is kept as a reference for the day copying a page per event stops scaling.
+  A port is medium work by hand: every `app/app.js` hunk has moved,
+  `tools/breaks-sim.js` and `tools/shift-alerts-sim.js` pull `AGENDA` and
+  `hasAgenda` out of `app/app.js` by name, the wording predates the "program"
+  spelling and the no-em-dash rule, and its README repeats the "leave nothing
+  behind" claim that `main` removed. Never merge that branch.
+- **Theory, not a confirmed fault: Copy a day's Undo after Restore defaults.**
+  From reading `main` on 24 Nov 2026, not run. `replaceState` in `app/app.js`
+  skips the rebuild when a pull brings nothing new (R21), comparing the
+  pulled copy with `state` as it stands. Restore defaults writes
+  `DEFAULT_SCHEDULE` days, which lack the `lunchHeadHome` and `endHeadHome`
+  keys that `normalise()` always adds. So a signed-in person who taps Restore
+  defaults and then Copy a day before the next pull, about a minute, may see
+  Undo disappear once. Confirm it in a browser before changing anything. If
+  real, the likely fix is small: have Restore defaults write normalised days,
+  or compare against `normalise(state)`.
 
 ## Working with Mal
 
