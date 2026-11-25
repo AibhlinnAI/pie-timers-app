@@ -46,6 +46,50 @@ the page with `{ permission, token }`, where `token` is the phone's Firebase
 device token or `null`. Rename the object, a method or that function on one
 side only and notifications stop with no error.
 
+**The widget bridge**, not yet in a release. The app gives the page an
+object called `PieTimersAndroidWidget` with one method, `set(json)`, and the
+page gives the app a function, `window.PieTimersWidgetRefresh`. See "The
+home screen widget" below. Rename either on one side only and the widget
+stops updating with no error.
+
+## The home screen widget (not yet in a release)
+
+Up to three pies on the phone's home screen, the same three as the
+Dashboard: the next break or lunch, the end of the day and the next
+appointment. Each has its name above and the time left below. The corner
+says "Pie Timers | AibhlínnAI".
+
+- **Sizes.** It starts four cells wide and two tall, which shows all three
+  pies. It can be dragged down to two by two, or made larger. A narrower
+  widget shows fewer pies: those still counting down first, soonest first.
+- **Tap a pie** to open the app. **Tap the name in the corner** to turn the
+  widget over to a QR code for the app's Google Play page, and tap again to
+  turn it back. A swipe was asked for and cannot be built: a home screen
+  keeps sideways swipes for moving between its own pages, so a widget never
+  sees one.
+- **The QR code** is the plain Play address with nothing added: no tag and
+  no referrer. It is a picture made once by `tools/make-widget-qr.js`.
+- **The app holds no timer maths.** A widget is drawn by Android while the
+  app is closed, so it cannot ask the page anything. The page works out the
+  next seven days (`widgetSnapshot` in `app/app.js`) and hands them to
+  `PieTimersAndroidWidget.set`; `PieWidget.java` only draws how far along
+  each pie is. `tools/widget-sim.js` checks the page's half against the
+  Dashboard's own functions.
+- **When it is handed over:** as the app leaves the screen, and once an
+  hour while it stays open. So the widget is seven days ahead of the last
+  time the app was on screen. After seven days without opening the app it
+  says "Open Pie Timers", and opening the app once brings it back. A
+  calendar event that arrives while the app is closed is not on the widget
+  until the app is next opened.
+- **Once a minute.** `PieWidget` keeps an alarm that never wakes a sleeping
+  phone and needs no permission. Android may run it a little late.
+- **Nothing leaves the phone.** The week is kept in the app's own private
+  storage, which is left out of backups like everything else here.
+- **Free.** It works on one device with no account, so it is not a Premium
+  feature.
+- **Not yet seen on a phone.** It compiles and passes lint. How it looks at
+  each size on a real home screen has not been checked.
+
 ## Phone notifications (release 7 on)
 
 - **While the app is running**, the page raises each alert and the app shows

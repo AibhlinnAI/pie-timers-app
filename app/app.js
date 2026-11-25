@@ -1346,6 +1346,8 @@
       // How long ago the target passed, by the wall clock; 0 until it has.
       overSec: Math.max(sinceStart - totalSec, 0),
       targetMin: targetMin,
+      // Where the pie starts, on nowSec's own clock. The widget reads it.
+      startSec: startSec,
       notStarted: sinceStart < 0,
       done: remainingSec <= 0,
       progress: totalSec > 0 ? elapsedSec / totalSec : 1
@@ -4857,6 +4859,8 @@
        milestone alerts firing when the focus window is the only one
        open — which is exactly when someone is relying on the view. */
     if (FOCUS) renderFocus(now);
+
+    if (hasWidget && now.getTime() - widgetSentAt > WIDGET_RESEND_MS) sendWidget();
   }
 
   /* Align the tick to the top of each second so the clock never visibly stalls. */
@@ -5807,6 +5811,165 @@
     document.addEventListener('fullscreenchange', sync);
     sync();
   }());
+
+  /* ─────────────────────────── Home screen widget ───────────────────────────
+     The Android app can put the three pies on the phone's home screen
+     (android/.../PieWidget.java). A widget is drawn by Android while the
+     app is closed, so it cannot ask this page anything. Instead the page
+     hands the app the next WIDGET_DAYS days, already worked out: for each
+     of the three pies, which pie is showing between which two instants,
+     with the instants the pie starts full and runs out. The app then only
+     has to draw "how far between these two instants are we", and holds no
+     copy of the timer maths.
+
+     Worked out by asking the real functions (workPies, breakPhase,
+     computeAppointmentTimer) what they show at every minute ahead, and
+     joining the minutes that agree. So the widget shows what the
+     Dashboard would, night shifts and breaks included, by construction.
+
+     Nothing here leaves the phone: the app keeps the answer in its own
+     private storage. Only an app with the bridge gets it; in a browser,
+     and in an older app, this does nothing at all. */
+  var widgetBridge = window.PieTimersAndroidWidget || null;
+  var hasWidget = !!(widgetBridge && typeof widgetBridge.set === 'function');
+  var WIDGET_DAYS = 7;
+  var WIDGET_RESEND_MS = 60 * 60 * 1000;
+  var WIDGET_LABEL_MAX = 40;
+  /* Working out seven days takes a fraction of a second, so the first
+     one waits until the app has been open ten seconds, not at startup. */
+  var widgetSentAt = Date.now() - WIDGET_RESEND_MS + 10000;
+
+  /* A clock time on the day `base` falls on, `sec` seconds after its
+     midnight. Built from the calendar date so a daylight saving change
+     lands where the wall clock puts it, as the pies do. */
+  function widgetInstant(base, sec) {
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, sec).getTime();
+  }
+
+  function widgetLabel(text) {
+    text = String(text || '').trim();
+    return text.length <= WIDGET_LABEL_MAX ? text : text.slice(0, WIDGET_LABEL_MAX - 1) + '…';
+  }
+
+  /* What the two work pies show at `now`: [break or lunch, end of day],
+     each { l: label, s: starts full, e: runs out, q: 1 when it never
+     turns urgent } or null for no pie. */
+  function widgetWorkPies(now) {
+    var pies = workPies(now);
+    var out = [null, null];
+    if (!pies.working) return out;
+
+    var shift = pies.shift;
+    var cfg = shift.cfg;
+    // Midnight on the day the shift started, which past midnight is yesterday.
+    var base = shift.sec >= 86400
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      : now;
+    /* offsetSec: the work pies count from midnight, the break pie from
+       the day's start (see breakPhase()). */
+    function span(timer, offsetSec, label, quiet) {
+      if (!timer || !timer.available) return null;
+      var from = offsetSec + timer.startSec;
+      return { l: widgetLabel(label), s: widgetInstant(base, from),
+               e: widgetInstant(base, from + timer.totalSec), q: quiet ? 1 : 0 };
+    }
+
+    var phase = breakPhase(pies, dayBreaks(cfg, shift.day));
+    if (phase.mode === 'classic') {
+      out[0] = span(pies.lunch, 0, lunchLabel(shift.day));
+    } else if (phase.mode === 'before' || phase.mode === 'reached') {
+      out[0] = span(phase.timer, cfg.start * 60, breakTitle(phase.brk, shift.day));
+    } else if (phase.mode === 'during') {
+      // A break running out is not urgent, same as on the dashboard.
+      out[0] = span(phase.timer, cfg.start * 60, phase.brk.name, true);
+    }
+    out[1] = span(pies.end, 0, endLabel(shift.day));
+    return out;
+  }
+
+  /* Every appointment still ahead, soonest first, from both sources, as
+     nextAppointment() would meet them. Sorted once, so the walk below
+     does not search the whole list at each minute. */
+  function widgetAppointments(fromMs) {
+    var list = [];
+    state.appointments.forEach(function (appointment) {
+      list.push({ title: appointment.title, at: appointmentDate(appointment).getTime() });
+    });
+    state.calendarEvents.forEach(function (event) {
+      if (!event.allDay) list.push({ title: event.title, at: event.at });
+    });
+    return list
+      .filter(function (item) { return isFinite(item.at) && item.at > fromMs; })
+      .map(function (item, i) { item.i = i; return item; })
+      .sort(function (a, b) { return a.at - b.at || a.i - b.i; });
+  }
+
+  function widgetSnapshot() {
+    var first = new Date();
+    first.setSeconds(0, 0);
+    var t0 = first.getTime();
+    var steps = WIDGET_DAYS * 1440;
+    var appointments = widgetAppointments(t0);
+    var next = 0;
+    var slots = [[], [], []];
+    var open = [null, null, null];
+
+    for (var i = 0; i <= steps; i++) {
+      var at = t0 + i * 60000;
+      var showing = [null, null, null];
+      if (i < steps) {
+        var now = new Date(at);
+        var work = widgetWorkPies(now);
+        showing[0] = work[0];
+        showing[1] = work[1];
+        while (next < appointments.length && appointments[next].at <= at) next++;
+        var appointment = appointments[next];
+        var timer = computeAppointmentTimer(now, appointment);
+        if (timer.available) {
+          showing[2] = { l: widgetLabel(appointment.title || 'Next appointment'),
+                         s: appointment.at - timer.scaleMin * 60000, e: appointment.at, q: 0 };
+        }
+      }
+      for (var k = 0; k < 3; k++) {
+        var was = open[k];
+        var is = showing[k];
+        if (was && is && was.l === is.l && was.s === is.s && was.e === is.e && was.q === is.q) continue;
+        if (was) { was.b = at; slots[k].push(was); }
+        open[k] = is ? { l: is.l, a: at, b: at, s: is.s, e: is.e, q: is.q } : null;
+      }
+    }
+
+    return {
+      v: 1,
+      made: Date.now(),
+      until: t0 + steps * 60000,
+      urgentMin: state.settings.urgentMinutes > 0 ? state.settings.urgentMinutes : 0,
+      names: [widgetLabel(state.settings.lunchLabel || 'Lunch'), 'End of Day', 'Appointment'],
+      slots: slots
+    };
+  }
+
+  /* Sent when the app leaves the screen, which is the moment before
+     anyone looks at the widget, and once an hour while it stays open.
+     The Android app also asks for one as it stops (MainActivity.onStop). */
+  function sendWidget() {
+    if (!hasWidget) return;
+    widgetSentAt = Date.now();
+    try {
+      widgetBridge.set(JSON.stringify(widgetSnapshot()));
+    } catch (e) {
+      // A widget that misses one update still has the last one.
+    }
+  }
+
+  if (hasWidget) {
+    window.PieTimersWidgetRefresh = function () {
+      if (Date.now() - widgetSentAt > 1000) sendWidget();
+    };
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) window.PieTimersWidgetRefresh();
+    });
+  }
 
   /* ─────────────────────────── Boot ─────────────────────────── */
 

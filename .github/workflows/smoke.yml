@@ -86,6 +86,12 @@ jobs:
       - name: Run the service worker checks
         run: node tools/check-sw.js
 
+      # The Android home screen widget draws from seven days the page
+      # works out ahead (widgetSnapshot in app/app.js). Checked against
+      # the Dashboard's own functions: same pie, same time left.
+      - name: Run the widget simulation
+        run: node tools/widget-sim.js
+
       # Background alerts: a device subscribes to push only while the
       # switch is on, sync.js follows the switch after each pull, and
       # notify-milestones sends only when Milestone alerts and Background

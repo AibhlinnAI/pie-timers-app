@@ -16,4 +16,18 @@
          Settings > Apps > Pie Timers > Notifications. -->
     <string name="channel_milestones">Milestone alerts</string>
     <string name="channel_milestones_about">30, 15, 10 and 5 minutes before lunch, a break or the end of your day, and when the time arrives.</string>
+
+    <!-- The home screen widget. Its name and description are what the
+         phone's widget picker shows. -->
+    <string name="widget_name">Pie Timers</string>
+    <string name="widget_about">Your pies on the home screen: your next break, the end of your day and your next appointment.</string>
+    <string name="widget_brand">Pie Timers | AibhlínnAI</string>
+    <string name="widget_open">Open Pie Timers</string>
+    <string name="widget_qr_caption">Scan to get Pie Timers</string>
+    <string name="widget_qr_about">QR code for Pie Timers on Google Play</string>
+    <!-- Under a pie: nothing running, and the time arrived. -->
+    <string name="widget_idle">–</string>
+    <string name="widget_reached">Done</string>
+    <!-- Read out by a screen reader: "Lunch, 1h 20m left". -->
+    <string name="widget_slot_spoken">%1$s, %2$s left</string>
 </resources>

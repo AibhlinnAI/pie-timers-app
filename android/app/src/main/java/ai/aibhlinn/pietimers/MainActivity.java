@@ -198,6 +198,7 @@ public class MainActivity extends ComponentActivity {
 
         web.addJavascriptInterface(new FileBridge(), "PieTimersAndroidFiles");
         web.addJavascriptInterface(new PushBridge(), "PieTimersAndroidPush");
+        web.addJavascriptInterface(new WidgetBridge(), "PieTimersAndroidWidget");
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
         web.setDownloadListener((url, userAgent, disposition, mimeType, length) -> {
@@ -525,6 +526,26 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    /* The home screen widget. The page works out the pies for the days
+       ahead and hands them over here, as it leaves the screen and once an
+       hour while it is open (app/app.js, widgetSnapshot); PieWidget keeps
+       them and draws from them while the app is closed. They stay in the
+       app's own storage and go nowhere else.
+
+       Like the bridge above, every frame can reach this, the sign-in bot
+       check's included. So it hands nothing back, takes a week only
+       while the site is the page showing, and PieWidget refuses one that
+       is not in its format or is far too long, and clips every name. */
+    private final class WidgetBridge {
+        @JavascriptInterface
+        public void set(String json) {
+            runOnUiThread(() -> {
+                if (!siteShowing()) return;
+                PieWidget.store(getApplicationContext(), json);
+            });
+        }
+    }
+
     private boolean siteShowing() {
         return web != null && isOurs(Uri.parse(String.valueOf(web.getUrl())));
     }
@@ -590,6 +611,14 @@ public class MainActivity extends ComponentActivity {
     @Override
     protected void onStop() {
         visible = false;
+        /* Leaving the app is the moment before anyone looks at the widget,
+           so the page is asked for a fresh week (app/app.js). The page
+           also sends one when it sees itself hidden; whichever comes
+           second does nothing. A page without the function ignores this. */
+        if (web != null && siteShowing()) {
+            web.evaluateJavascript(
+                    "window.PieTimersWidgetRefresh&&window.PieTimersWidgetRefresh();", null);
+        }
         if (web != null) web.onPause();
         super.onStop();
     }
