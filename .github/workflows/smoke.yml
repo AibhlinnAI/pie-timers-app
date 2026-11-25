@@ -129,3 +129,10 @@ jobs:
       # a well-formed answer. Checks the files. Nothing is deployed.
       - name: Run the Foundation cap tests
         run: node --experimental-strip-types tools/foundation-test.mjs
+
+      # Which sites may call signin and create-checkout: the answer names
+      # the calling site only when that site is on the list, and signin
+      # uses a redirect address only on an allowed site. Checks the files.
+      # Nothing is deployed.
+      - name: Run the allowed-sites tests
+        run: node --experimental-strip-types tools/origin-test.mjs

@@ -348,6 +348,15 @@ arrived.
     workflow in that repo, `.github/workflows/retire-offer.yml`, which
     holds the closing instant as `2026-12-31T13:30:00Z`: if the close
     moves, move it there too.
+  - Also outside this repo, AibhlínnAI Premium is sold on a site of its
+    own, https://premium.aibhlinn.ai (repo `AibhlinnAI/premium.aibhlinn.ai`,
+    Mal, 25 Nov 2026; Paddle would not approve checkout on aibhlinn.ai,
+    which also describes consulting). Its `index.html` and `premium.js`
+    carry the offer's wording and an `OFFER_CLOSES` of their own, and
+    must move with the rest. That site calls this repo's `signin` and
+    `create-checkout` functions, which is why both read a list of
+    allowed sites (`ALLOWED_ORIGINS`, with the older `ALLOWED_ORIGIN`
+    still counted; `tools/origin-test.mjs` pins the behaviour).
 
   `DEPLOY.md` was missing from this list until 20 Sep 2026, which is
   exactly why it went stale.

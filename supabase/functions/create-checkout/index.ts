@@ -136,13 +136,57 @@ const PADDLE_API_BASE = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "production") ===
   ? "https://sandbox-api.paddle.com"
   : "https://api.paddle.com";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
+/* Which sites may call this function from a browser.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+   ALLOWED_ORIGINS is a comma-separated list, for example
+   "https://pietimers.aibhlinn.ai,https://premium.aibhlinn.ai".
+   ALLOWED_ORIGIN, the older single setting, still counts: the two are
+   read together, so the site named there keeps working whatever the
+   new setting holds. With neither set, every site is allowed ("*"),
+   as before. A "*" beside real sites is ignored, so one stray entry
+   cannot open a list that names its sites.
+
+   A browser accepts one origin in Access-Control-Allow-Origin, never a
+   list. So the answer echoes the caller's own Origin when that origin
+   is on the list and carries no such header when not, and
+   "Vary: Origin" tells any cache the answer depends on who asked.
+
+   The same block is in signin and in create-checkout. Keep the two in
+   step. */
+const ALLOWED_ORIGINS: string[] = [
+  ...new Set(
+    `${Deno.env.get("ALLOWED_ORIGINS") ?? ""},${Deno.env.get("ALLOWED_ORIGIN") ?? ""}`
+      .split(",")
+      .map((entry) => entry.trim().replace(/\/+$/, ""))
+      .filter((entry) => entry !== "" && entry !== "*"),
+  ),
+];
+const ANY_ORIGIN = ALLOWED_ORIGINS.length === 0;
+
+function corsFor(request: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  if (ANY_ORIGIN) {
+    headers["Access-Control-Allow-Origin"] = "*";
+    return headers;
+  }
+  headers["Vary"] = "Origin";
+  const origin = request.headers.get("origin") ?? "";
+  if (ALLOWED_ORIGINS.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
+}
+
+/* Every answer leaves through here, so no path can forget the headers. */
+async function answered(request: Request, handle: (request: Request) => Promise<Response>) {
+  const cors = corsFor(request);
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  const response = await handle(request);
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(cors)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, headers });
+}
 
 /* The first-payment rule, repeated from paddle-webhook (see its long
    note for where each number comes from). LAUNCH_FIRST_CHARGE is the
@@ -173,7 +217,7 @@ const PLAIN_PRICE: Record<string, string> = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -255,10 +299,9 @@ async function paddle(method: string, path: string, body?: unknown): Promise<{ s
 
 const isText = (value: unknown): value is string => typeof value === "string" && value !== "";
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+Deno.serve((request) => answered(request, handle));
+
+async function handle(request: Request): Promise<Response> {
   if (request.method !== "POST") {
     return refuse(405, "method", "the request was not a POST.");
   }
@@ -540,4 +583,4 @@ Deno.serve(async (request) => {
     const kind = error instanceof Error ? error.name : "unknown";
     return refuse(500, "error", `an unexpected fault (${kind}).`);
   }
-});
+}

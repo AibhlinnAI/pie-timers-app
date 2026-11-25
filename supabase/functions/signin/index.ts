@@ -18,7 +18,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const TURNSTILE_SECRET = Deno.env.get("TURNSTILE_SECRET_KEY") ?? "";
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 
 /* The one account that is never emailed: see the check in the handler. */
 const REVIEW_EMAIL = (Deno.env.get("REVIEW_EMAIL") ?? "").trim().toLowerCase();
@@ -28,16 +27,62 @@ const REVIEW_EMAIL = (Deno.env.get("REVIEW_EMAIL") ?? "").trim().toLowerCase();
 const MAX_PER_EMAIL_PER_HOUR = 5;
 const MAX_PER_IP_PER_HOUR = 15;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+/* Which sites may call this function from a browser.
+
+   ALLOWED_ORIGINS is a comma-separated list, for example
+   "https://pietimers.aibhlinn.ai,https://premium.aibhlinn.ai".
+   ALLOWED_ORIGIN, the older single setting, still counts: the two are
+   read together, so the site named there keeps working whatever the
+   new setting holds. With neither set, every site is allowed ("*"),
+   as before. A "*" beside real sites is ignored, so one stray entry
+   cannot open a list that names its sites.
+
+   A browser accepts one origin in Access-Control-Allow-Origin, never a
+   list. So the answer echoes the caller's own Origin when that origin
+   is on the list and carries no such header when not, and
+   "Vary: Origin" tells any cache the answer depends on who asked.
+
+   The same block is in signin and in create-checkout. Keep the two in
+   step. */
+const ALLOWED_ORIGINS: string[] = [
+  ...new Set(
+    `${Deno.env.get("ALLOWED_ORIGINS") ?? ""},${Deno.env.get("ALLOWED_ORIGIN") ?? ""}`
+      .split(",")
+      .map((entry) => entry.trim().replace(/\/+$/, ""))
+      .filter((entry) => entry !== "" && entry !== "*"),
+  ),
+];
+const ANY_ORIGIN = ALLOWED_ORIGINS.length === 0;
+
+function corsFor(request: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  if (ANY_ORIGIN) {
+    headers["Access-Control-Allow-Origin"] = "*";
+    return headers;
+  }
+  headers["Vary"] = "Origin";
+  const origin = request.headers.get("origin") ?? "";
+  if (ALLOWED_ORIGINS.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
+}
+
+/* Every answer leaves through here, so no path can forget the headers. */
+async function answered(request: Request, handle: (request: Request) => Promise<Response>) {
+  const cors = corsFor(request);
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  const response = await handle(request);
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(cors)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, headers });
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -56,13 +101,13 @@ async function hash(value: string) {
    these two checks a token harvested from any other widget on the same
    sitekey is accepted here, which is most of the point of having one. */
 const TURNSTILE_ACTION = "signin";
-const TURNSTILE_HOSTNAME = (() => {
+const TURNSTILE_HOSTNAMES: string[] = ANY_ORIGIN ? [] : ALLOWED_ORIGINS.flatMap((origin) => {
   try {
-    return ALLOWED_ORIGIN === "*" ? "" : new URL(ALLOWED_ORIGIN).hostname;
+    return [new URL(origin).hostname];
   } catch {
-    return "";
+    return [];
   }
-})();
+});
 
 async function verifyTurnstile(token: string, ip: string) {
   if (!TURNSTILE_SECRET) return true; // not configured yet — fail open, see README
@@ -83,14 +128,14 @@ async function verifyTurnstile(token: string, ip: string) {
 
   // Both checks are skipped rather than failed when the token carries
   // no such field: older widgets omit action entirely, and a hostname
-  // cannot be compared against an ALLOWED_ORIGIN of "*". Failing there
+  // cannot be compared when every site is allowed ("*"). Failing there
   // would lock out sign-in on a misconfiguration, which is worse than
   // the check not running -- but say so in the logs either way.
   if (result.action && result.action !== TURNSTILE_ACTION) {
     console.warn(`Turnstile action mismatch: ${result.action}`);
     return false;
   }
-  if (TURNSTILE_HOSTNAME && result.hostname && result.hostname !== TURNSTILE_HOSTNAME) {
+  if (TURNSTILE_HOSTNAMES.length > 0 && result.hostname && !TURNSTILE_HOSTNAMES.includes(result.hostname)) {
     console.warn(`Turnstile hostname mismatch: ${result.hostname}`);
     return false;
   }
@@ -137,10 +182,34 @@ async function recordAttempt(emailHash: string, ipHash: string) {
   }).catch(() => {/* best effort */});
 }
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+/* Where the link in the email sends the person afterwards.
+
+   The page asks for an address (redirectTo). That address is used only
+   when the address is on one of the allowed sites, judged on the whole
+   origin and never on how the text starts: "https://site.example.evil"
+   starts with "https://site.example" and is a different site. Anything
+   else falls back to the site that asked, when that site is allowed,
+   and otherwise to the first site on the list. With every site allowed
+   ("*") nothing can be judged here, and the address goes through as
+   before; Supabase's own list of redirect addresses still applies. */
+function redirectFor(request: Request, asked: unknown): string {
+  if (ANY_ORIGIN) return (typeof asked === "string" && asked) || "*";
+  if (typeof asked === "string" && asked !== "") {
+    try {
+      /* The scheme is checked as well as the origin: "blob:https://site/x"
+         reports the site's origin and is not a page anyone can open. */
+      const address = new URL(asked);
+      const web = address.protocol === "https:" || address.protocol === "http:";
+      if (web && ALLOWED_ORIGINS.includes(address.origin)) return asked;
+    } catch { /* not an address at all */ }
   }
+  const origin = request.headers.get("origin") ?? "";
+  return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+}
+
+Deno.serve((request) => answered(request, handle));
+
+async function handle(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
   let body: { email?: string; turnstileToken?: string; redirectTo?: string };
@@ -193,7 +262,7 @@ Deno.serve(async (request) => {
     body: JSON.stringify({
       email,
       create_user: true,
-      options: { email_redirect_to: body.redirectTo || ALLOWED_ORIGIN },
+      options: { email_redirect_to: redirectFor(request, body.redirectTo) },
     }),
   });
 
@@ -206,4 +275,4 @@ Deno.serve(async (request) => {
   // Always the same response shape, so this cannot be used to test
   // whether a given address has an account.
   return json({ ok: true });
-});
+}
