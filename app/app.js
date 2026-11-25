@@ -4970,6 +4970,27 @@
     var panel = $('upgradePanel');
     if (panel) panel.hidden = !offering || IN_PLAY_APP;
 
+    /* Premium is sold on its own site (CT.premiumSiteUrl, set in
+       identity-bridge.js). While that is set, the panel offers one link
+       there and the old checkout is hidden: the plan cards, the price
+       hint and the discount code, which only ever applied at this
+       checkout. A private code is redeemed here and stays. An older
+       page under this script has none of these ids, hence the checks. */
+    var away = Boolean(CT.premiumSiteUrl);
+    var siteRow = $('premiumSiteRow');
+    if (siteRow) {
+      siteRow.hidden = !away;
+      if (away) $('premiumSiteBtn').href = CT.premiumSiteUrl;
+      if ($('planOptions')) $('planOptions').hidden = away;
+      if ($('planHint')) $('planHint').hidden = away;
+      var discountChoice = $('codeTypeDiscount');
+      if (discountChoice) {
+        discountChoice.hidden = away;
+        discountChoice.disabled = away;
+        if (away && $('codeType').value === 'discount') $('codeType').value = '';
+      }
+    }
+
     var playNote = $('playPremiumNote');
     if (playNote) playNote.hidden = !playOffering || !IN_PLAY_APP;
 

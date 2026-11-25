@@ -577,6 +577,11 @@ supabase functions deploy delete-account --no-verify-jwt
 Supabase automatically. Leaving `ALLOWED_ORIGIN` unset defaults to `*`, which is
 fine for testing but should be pinned to your site before launch.
 
+Since 25 Nov 2026 AibhlínnAI Premium is sold on https://premium.aibhlinn.ai. The
+plan cards, the discount field and `pricing.html` described in this file are
+hidden while `CT.premiumSiteUrl` is set in `identity-bridge.js`, and come back
+when that is emptied. See "hidden, not deleted" in `CLAUDE.md`.
+
 `signin` and `create-checkout` can be called from more than one site. For those
 two, set `ALLOWED_ORIGINS` to a comma-separated list
 (`https://one.example,https://two.example`). `ALLOWED_ORIGIN` is still read

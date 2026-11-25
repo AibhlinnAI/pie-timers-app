@@ -475,7 +475,7 @@
              one unambiguous button straight to the place that sells access,
              not a locked control sitting next to an explanation. Never in
              the Play app, and nor is the second one below (app.js). -->
-        <a class="btn-premium" id="apptCalendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
+        <a class="btn-premium" id="apptCalendarPremiumBtn" href="https://premium.aibhlinn.ai/" hidden>Premium Feature</a>
       </header>
 
       <form class="appt-form" id="apptForm" novalidate>
@@ -536,7 +536,7 @@
           own. Works with Google Calendar, Outlook, iCloud or any other iCal
           address. Access is read-only.</p>
         </div>
-        <a class="btn-premium" id="calendarPremiumBtn" href="pricing.html" hidden>Premium Feature</a>
+        <a class="btn-premium" id="calendarPremiumBtn" href="https://premium.aibhlinn.ai/" hidden>Premium Feature</a>
       </header>
 
       <!-- Shown when sync is unavailable for any reason -->
@@ -988,7 +988,16 @@
              twice in one glance. -->
         <div class="upgrade-signin" id="upgradeSignin"></div>
 
-        <div class="plan-options">
+        <!-- Premium is sold on premium.aibhlinn.ai (owner, 25 Nov 2026).
+             While CT.premiumSiteUrl is set (identity-bridge.js), app.js
+             shows this one link and hides the plan cards, the price hint
+             and the discount code below. Nothing is deleted: empty that
+             setting and the old checkout shows again. -->
+        <p id="premiumSiteRow" hidden>
+          <a class="btn-premium" id="premiumSiteBtn" href="https://premium.aibhlinn.ai/">Get AibhlínnAI Premium</a>
+        </p>
+
+        <div class="plan-options" id="planOptions">
           <button class="plan-card is-best" id="buyAnnual" type="button">
             <span class="plan-badge" id="annualSaving">Save A$15.80 a year</span>
             <span class="plan-name">Annual</span>
@@ -1002,7 +1011,7 @@
           </button>
         </div>
 
-        <p class="hint">Prices include any sales tax or GST.</p>
+        <p class="hint" id="planHint">Prices include any sales tax or GST.</p>
 
         <!-- Both code fields used to sit here permanently, ten lines apart,
              each asking for "a code" without saying which kind. Someone
@@ -1019,7 +1028,7 @@
             <span>Select code type</span>
             <select id="codeType">
               <option value="">Choose one…</option>
-              <option value="discount">Discount</option>
+              <option value="discount" id="codeTypeDiscount">Discount</option>
               <option value="private">Private</option>
             </select>
           </label>
@@ -1163,7 +1172,7 @@
   <!-- Pricing and Refund Policy are hidden in the Play app (app.js,
        data-hide-in-play). The terms stay, refunds section included. -->
   <div class="site-foot-links">
-    <a href="pricing.html" data-hide-in-play>Pricing</a>
+    <a href="https://premium.aibhlinn.ai/" data-hide-in-play>Pricing</a>
     <a href="terms.html" data-legal-link="terms">Terms of Service</a>
     <a href="privacy.html" data-legal-link="privacy">Privacy Policy</a>
     <a href="terms.html#refunds" data-legal-link="refunds" data-hide-in-play>Refund Policy</a>
@@ -1211,12 +1220,12 @@
 <script src="identity/identity-ui.js?v=138"></script>
 <script src="config.js"></script>
 <script src="visits.js?v=130"></script>
-<script src="identity-bridge.js?v=145"></script>
+<script src="identity-bridge.js?v=148"></script>
 <script src="supabase.js?v=117"></script>
 <script src="billing.js?v=146"></script>
 <script src="notify.js?v=144"></script>
 <script src="sync.js?v=143"></script>
 <script src="qrcode.js"></script>
-<script src="app.js?v=147"></script>
+<script src="app.js?v=148"></script>
 </body>
 </html>

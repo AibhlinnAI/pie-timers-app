@@ -62,7 +62,8 @@ arrived.
   it back. The one place the hook stands alone is the Get Premium button
   at the top of the app (`app/identity-bridge.js`, Mal, 25 Nov 2026). The
   button carries the hook only for an account whose own trial is running,
-  before `OFFER_CLOSES` in that file, and links to `pricing.html`, where
+  before `OFFER_CLOSES` in that file, and links to the Premium site
+  (`CT.premiumSiteUrl`; `pricing.html` only when that is emptied), where
   the condition is written. `OFFER_CLOSES` is a copy of
   `FOUNDATION_CLOSES` and moves with the other launch dates;
   `tools/foundation-test.mjs` (P6) fails if the two differ.
@@ -357,6 +358,23 @@ arrived.
     `create-checkout` functions, which is why both read a list of
     allowed sites (`ALLOWED_ORIGINS`, with the older `ALLOWED_ORIGIN`
     still counted; `tools/origin-test.mjs` pins the behaviour).
+- **The checkout on pietimers.aibhlinn.ai is hidden, not deleted** (Mal,
+  25 Nov 2026). Premium is bought on https://premium.aibhlinn.ai. Every
+  offer in the web app links there: the header button, both Premium
+  Feature buttons, the footer and page links named Pricing, and one
+  "Get AibhlínnAI Premium" link in Settings, which stands in for the plan
+  cards, the price hint and the discount code. `app/pricing.html` asks
+  search engines to leave the page out and sends a visit to the Premium
+  site, with a plain link at the top as the fallback. `pricing.html`,
+  `billing.js` and the Settings checkout are all still there and still
+  tested. To bring them back: empty `CT.premiumSiteUrl` in
+  `app/identity-bridge.js`, set `PREMIUM_SITE` to `''` in the head of
+  `app/pricing.html`, take out the robots line and the notice there, and
+  point the static links back at `pricing.html`. **The Play app links to
+  no place of sale, the Premium site included**: every one of those
+  links is either never drawn there or carries `data-hide-in-play`, and
+  the Play gate at the top of `pricing.html` runs before the redirect.
+  Its one plain line names the site in words only.
 
   `DEPLOY.md` was missing from this list until 20 Sep 2026, which is
   exactly why it went stale.

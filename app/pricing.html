@@ -35,6 +35,26 @@
     location.replace('index.html#in-app');
   }());
 </script>
+<!-- This page is hidden, not deleted (owner, 25 Nov 2026). AibhlínnAI
+     Premium is sold on https://premium.aibhlinn.ai, so a visit here is
+     sent there, and search engines are asked to leave the page out.
+     Everything below still works. To bring the page back: set
+     PREMIUM_SITE to '' here, take out the robots line and the notice at
+     the top of the body, and empty CT.premiumSiteUrl in
+     identity-bridge.js. The Play gate above runs first, so a Play visit
+     goes back to the app and is never sent to a place of sale. -->
+<meta name="robots" content="noindex">
+<script>
+  (function () {
+    var PREMIUM_SITE = 'https://premium.aibhlinn.ai/';
+    if (!PREMIUM_SITE || (window.CT && window.CT.inPlayApp)) return;
+    document.documentElement.style.display = 'none';
+    location.replace(PREMIUM_SITE);
+    /* If the browser will not leave, show the page after all: the
+       notice at the top carries a plain link. */
+    setTimeout(function () { document.documentElement.style.display = ''; }, 3000);
+  }());
+</script>
 <title>Pricing · Pie Timers</title>
 <!-- The description carries no offer and no date, on purpose. Nothing can
      take a description down when an offer ends, so it must stay true
@@ -122,6 +142,9 @@
 </header>
 
 <main class="legal">
+  <p class="notice notice--info" id="movedNotice">AibhlínnAI Premium is now sold at
+  <a href="https://premium.aibhlinn.ai/">premium.aibhlinn.ai</a>.</p>
+
   <p class="legal-meta">
     <a href="index.html">Open Pie Timers</a> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
@@ -223,7 +246,7 @@
 <script src="identity/entitlements.js"></script>
 <script src="identity/identity-ui.js"></script>
 <script src="config.js"></script>
-<script src="identity-bridge.js"></script>
+<script src="identity-bridge.js?v=148"></script>
 <script src="supabase.js"></script>
 <script src="billing.js?v=146"></script>
 <script>

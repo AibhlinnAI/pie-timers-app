@@ -1101,6 +1101,15 @@ real phone checks it against Google.
 
 ## 8. Paddle
 
+> **Since 25 Nov 2026 AibhlínnAI Premium is sold on
+> https://premium.aibhlinn.ai** (repo `AibhlinnAI/premium.aibhlinn.ai`),
+> not on this site. `pricing.html` and the checkout in Settings are
+> hidden, not deleted: the web app's offers link to the Premium site and
+> `pricing.html` sends a visit there. The steps below still describe the
+> checkout in this repo, which is kept working so the old route can be
+> switched back (see CLAUDE.md, "hidden, not deleted"). Tests A to E in
+> 8.4 were run against this site's checkout before the move.
+
 Paddle will ask for your terms and privacy URLs during seller verification:
 
 - https://pietimers.aibhlinn.ai/terms.html

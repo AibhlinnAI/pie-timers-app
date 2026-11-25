@@ -171,6 +171,36 @@
 
      Read from CT.billing, so the header cannot disagree with the panel
      further down the page. */
+  /* Where AibhlínnAI Premium is sold (owner, 25 Nov 2026): a site of its
+     own, https://premium.aibhlinn.ai (repo AibhlinnAI/premium.aibhlinn.ai).
+     Every offer in the web app leads there. The checkout that used to
+     live on pricing.html and in Settings is hidden, not deleted: empty
+     this string and both come back as they were. Set here and not in
+     config.js, because this file is asked for by version and so cannot
+     be served stale beside a newer app.js. The Play app draws none of
+     these links, as before. */
+  CT.premiumSiteUrl = 'https://premium.aibhlinn.ai/';
+
+  /* Whether this is the Google Play app, judged here and not only by
+     the flag app.js sets. app.js is the last script on the page: if
+     app.js fails to load, CT.inPlayApp is never set, and the header
+     would draw a button straight to a place of sale inside the Play
+     app. While the button led to pricing.html, that page turned a Play
+     visit back; a link to another site has no such second guard. The
+     same signals as IN_PLAY_APP in app.js and the gate at the top of
+     index.html. */
+  function inPlayApp() {
+    if (CT.inPlayApp) return true;
+    try {
+      if (/^android-app:\/\/ai\.aibhlinn\.pietimers(\/|$)/.test(document.referrer || '')) return true;
+      if (/(^|\s)PieTimersAndroid\/\d/.test(navigator.userAgent || '')) return true;
+      if ((location.hash || '').slice(1) === 'in-app') return true;
+      if (document.documentElement.classList.contains('play-app')) return true;
+      if (sessionStorage.getItem('countdown-timers/play-app') === '1') return true;
+    } catch (e) { /* storage blocked: the signals above are all there is */ }
+    return false;
+  }
+
   var TRIAL_DAYS = 14;
   /* The same instant as FOUNDATION_CLOSES on pricing.html: the end of
      31 December 2026 anywhere on Earth. If the offer's date moves, move
@@ -233,7 +263,7 @@
   function offerButton(withTagline) {
     var node = document.createElement('a');
     node.className = 'plan-chip plan-chip--offer';
-    node.href = 'pricing.html';
+    node.href = CT.premiumSiteUrl || 'pricing.html';
     var main = document.createElement('span');
     main.className = 'plan-chip-main';
     main.appendChild(document.createTextNode('Get '));
@@ -268,7 +298,7 @@
       node.className = 'plan-chip plan-chip--premium';
       node.appendChild(mark());
       node.appendChild(document.createTextNode('AibhlínnAI Premium'));
-    } else if (CT.inPlayApp) {
+    } else if (inPlayApp()) {
       /* The Play app is consumption-only (app.js, IN_PLAY_APP): the
          Premium badge above is status and stays, but the Free Trial
          badge and the Get Premium button are both steps toward paying
@@ -291,7 +321,7 @@
          one place to buy, everywhere the offer is made. On pricing.html
          a link there would point at the page already open, so the
          button is skipped; the whole page already is the offer. */
-      if (/(^|\/)pricing\.html$/.test(location.pathname)) {
+      if (!CT.premiumSiteUrl && /(^|\/)pricing\.html$/.test(location.pathname)) {
         /* An empty text node, as in the Play app above: the first draw
            comes before the entitlement is known, identity-ui keeps only
            a slot with something in it, and the day badge has to land
