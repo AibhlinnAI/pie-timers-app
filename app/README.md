@@ -577,6 +577,13 @@ supabase functions deploy delete-account --no-verify-jwt
 Supabase automatically. Leaving `ALLOWED_ORIGIN` unset defaults to `*`, which is
 fine for testing but should be pinned to your site before launch.
 
+`signin` and `create-checkout` can be called from more than one site. For those
+two, set `ALLOWED_ORIGINS` to a comma-separated list
+(`https://one.example,https://two.example`). `ALLOWED_ORIGIN` is still read
+beside the list, so the site named there keeps working. Each answer names the
+calling site only when that site is on the list. The other functions read
+`ALLOWED_ORIGIN` alone.
+
 **8 — Billing (Paddle).**
 
 1. Create a Paddle account and complete seller verification. Budget several days
