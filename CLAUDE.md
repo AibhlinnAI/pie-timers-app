@@ -59,7 +59,13 @@ arrived.
   your free trial is running and your first payment is taken from
   1 January 2027." The hook has **no subscribe-by date**. It had one for a
   few hours ("subscribe by 5 December") and Mal took it off: do not bring
-  it back.
+  it back. The one place the hook stands alone is the Get Premium button
+  at the top of the app (`app/identity-bridge.js`, Mal, 25 Nov 2026). The
+  button carries the hook only for an account whose own trial is running,
+  before `OFFER_CLOSES` in that file, and links to `pricing.html`, where
+  the condition is written. `OFFER_CLOSES` is a copy of
+  `FOUNDATION_CLOSES` and moves with the other launch dates;
+  `tools/foundation-test.mjs` (P6) fails if the two differ.
 - **Two dates end two different things. Do not mix them up.**
   - **The end of 31 Dec 2026** (the instant `2027-01-01T12:00Z`) ends
     the offer. Foundation closes then, or sooner if all 100 places go. The

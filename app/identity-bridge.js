@@ -151,23 +151,31 @@
   };
 
   /* ── Plan status in the header ───────────────────────────────────
-     Three states, because a signed-in person is in exactly one of them
-     and each wants something different said:
+     What a signed-in person sees, left to right (owner, 25 Nov 2026):
 
-       trial, more than NUDGE_DAYS left  →  a quiet badge. They are
-         living with the app; do not sell to them yet. This is the same
-         restraint app.js applies to the upgrade panel, which stays
-         hidden for the same window and for the same reason.
+       free trial running   →  a quiet badge, "Day 3 of 14", and to the
+         right of that badge the Get Premium button. While the launch
+         offer is open the button carries one more line, "Pay nothing
+         until 2027". Until 25 Nov 2026 the button stayed hidden until
+         four days were left; the launch offer rewards subscribing
+         during the trial, so hiding the button hid the offer.
 
-       trial ending, or ended            →  a button. Now is when asking
-         is useful, and the only state here that is an action.
+       trial ended          →  the Get Premium button alone, no extra
+         line: someone whose trial has ended pays on the day.
 
-       entitled                          →  a bordered badge. Status,
-         not an offer. Nothing to click.
+       entitled             →  a bordered badge. Status, not an offer.
+
+     The button and the entitled badge are always the last thing in the
+     slot, so neither changes place from one state to the next; the
+     trial badge is only ever added to the left.
 
      Read from CT.billing, so the header cannot disagree with the panel
      further down the page. */
-  var NUDGE_DAYS = 4;
+  var TRIAL_DAYS = 14;
+  /* The same instant as FOUNDATION_CLOSES on pricing.html: the end of
+     31 December 2026 anywhere on Earth. If the offer's date moves, move
+     this one too (CLAUDE.md lists the others). */
+  var OFFER_CLOSES = Date.UTC(2027, 0, 1, 12, 0);
 
   function daysLeft(ent) {
     if (!ent.currentPeriodEnd) return null;
@@ -197,6 +205,43 @@
      rebuilds its wrapper on every auth change, which orphans the old
      span without telling anyone. */
   var statusSlots = [];
+
+  /* "Day 3 of 14". Every trial is 14 days long, counted back from the
+     day the trial finishes, which also holds for the accounts whose
+     trial was restarted on 22 Nov 2026. Any other length (none exists
+     today) gets the plain words. */
+  function trialBadge(left) {
+    var node = document.createElement('span');
+    node.className = 'plan-chip plan-chip--trial';
+    /* One day over is a device clock running behind the server on a new
+       account, and is still day 1. */
+    var counted = left !== null && left >= 1 && left <= TRIAL_DAYS + 1;
+    node.textContent = counted
+      ? 'Day ' + Math.max(1, TRIAL_DAYS - left + 1) + ' of ' + TRIAL_DAYS
+      : 'Free Trial';
+    node.title = 'Free trial';
+    return node;
+  }
+
+  function offerButton(withTagline) {
+    var node = document.createElement('a');
+    node.className = 'plan-chip plan-chip--offer';
+    node.href = 'pricing.html';
+    var main = document.createElement('span');
+    main.className = 'plan-chip-main';
+    main.appendChild(document.createTextNode('Get '));
+    main.appendChild(mark());
+    main.appendChild(document.createTextNode('Premium'));
+    node.appendChild(main);
+    if (withTagline) {
+      node.className += ' plan-chip--tagged';
+      var tag = document.createElement('span');
+      tag.className = 'plan-chip-tag';
+      tag.textContent = 'Pay nothing until 2027';
+      node.appendChild(tag);
+    }
+    return node;
+  }
 
   function drawPlanStatus(container) {
     container.innerHTML = '';
@@ -229,24 +274,25 @@
          account's badge still has to land here when it arrives. */
       container.appendChild(document.createTextNode(''));
       return;
-    } else if (trialing && left !== null && left > NUDGE_DAYS) {
-      node = document.createElement('span');
-      node.className = 'plan-chip plan-chip--trial';
-      node.appendChild(mark());
-      node.appendChild(document.createTextNode('Free Trial'));
     } else {
-      /* Every premium touch-point in the app points at the same page
-         now, rather than some going to #account and others to
-         pricing.html -- one place to buy, everywhere the offer is
-         made. On pricing.html itself this would be a self-link, so the button
-         is skipped there; the whole page already is the offer. */
-      if (/(^|\/)pricing\.html$/.test(location.pathname)) return;
-      node = document.createElement('a');
-      node.className = 'plan-chip plan-chip--offer';
-      node.href = 'pricing.html';
-      node.appendChild(document.createTextNode('Get '));
-      node.appendChild(mark());
-      node.appendChild(document.createTextNode('Premium'));
+      /* A trial whose finish has passed on this device's clock, with the
+         server's answer not yet caught up, is drawn as ended: no badge
+         and no "Pay nothing" line for someone who would pay today. */
+      if (trialing && left === 0) trialing = false;
+      if (trialing) container.appendChild(trialBadge(left));
+      /* Every premium touch-point in the app points at the same page,
+         one place to buy, everywhere the offer is made. On pricing.html
+         a link there would point at the page already open, so the
+         button is skipped; the whole page already is the offer. */
+      if (/(^|\/)pricing\.html$/.test(location.pathname)) {
+        /* An empty text node, as in the Play app above: the first draw
+           comes before the entitlement is known, identity-ui keeps only
+           a slot with something in it, and the day badge has to land
+           here when the entitlement arrives. */
+        if (!container.childNodes.length) container.appendChild(document.createTextNode(''));
+        return;
+      }
+      node = offerButton(trialing && Date.now() < OFFER_CLOSES);
     }
 
     container.appendChild(node);

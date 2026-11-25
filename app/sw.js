@@ -26,7 +26,7 @@ var SHELL = [
      is deliberately absent: a cached health check is a lie. */
   'terms.html',
   'privacy.html',
-  'styles.css?v=138',
+  'styles.css?v=145',
   'styles.css',
   /* The self-hosted face. Precached because styles.css asks for these
      and nothing else fetches them offline — without both the app still

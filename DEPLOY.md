@@ -1679,10 +1679,10 @@ this is the one you must watch happen.
 
 Note that a fresh account is already entitled: `grant_trial` (in
 `schema-access-codes.sql`) gives every new user a trial (`public.trial_length()`:
-runs to the end of 5 Dec 2026 before 22 Nov 2026, 14 days from signup after), and the
-upgrade panel only reappears in
-the final 4 days. To reach checkout before then, call
-`CT.billing.openCheckout('monthly')` from the console rather than editing data.
+runs to the end of 5 Dec 2026 before 22 Nov 2026, 14 days from signup after). The
+plans in Settings and the Get Premium button at the top of the page show for
+the whole trial (since 25 Nov 2026), so the real Buy button is the way to reach
+checkout. The Play app shows neither.
 
 Reading a failure:
 

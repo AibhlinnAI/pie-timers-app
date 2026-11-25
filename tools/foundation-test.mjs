@@ -3620,6 +3620,9 @@ const AFTER = CLOSES + 1000;
 
 {
   const { ctx } = sandbox(json(null));
+  check('P6 OFFER_CLOSES for the header button (identity-bridge.js) is written as the same instant as FOUNDATION_CLOSES',
+    (fs.readFileSync(path.join(ROOT, 'app', 'identity-bridge.js'), 'utf8')
+      .match(/var OFFER_CLOSES = Date\.UTC\(([^)]*)\);/g) || []).join('|') === 'var OFFER_CLOSES = Date.UTC(2027, 0, 1, 12, 0);');
   check('P6 FOUNDATION_CLOSES is the end of 31 December 2026 in the last time zone, 2027-01-01T12:00Z',
     ctx.FOUNDATION_CLOSES === CLOSES && ctx.FOUNDATION_CLOSES === at('2027-01-01T12:00:00Z'), ctx.FOUNDATION_CLOSES);
   for (const [name, html] of Object.entries(PAGES)) {

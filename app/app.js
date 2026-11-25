@@ -4946,25 +4946,28 @@
     var trialing = isTrial(ent) && ent.entitled;
 
     var left = daysLeft(ent);
-    /* During a trial, stay out of the way until the trial is nearly over --
-       people should get to live with the app before being asked. Four
-       days matches the header chip, which switches from a quiet Free
-       Trial badge to a Get Premium button at the same moment. Two
-       different answers to "time to ask yet?" on one screen would
-       be worse than either. */
-    var nudging = trialing && left !== null && left <= 4;
-
+    /* The plans show for the whole trial and after (owner, 25 Nov 2026).
+       Until then they stayed hidden until four days were left, as the
+       header button did; the launch offer rewards subscribing during
+       the trial, so both now show from day one. */
     /* In the Play app the whole panel, prices, codes and all, gives way
        to the one plain line, at exactly the moments it would have shown. */
     var offering = CT.billing.enabled() &&
                    CT.auth.isSignedIn() &&
-                   (!CT.billing.isEntitled() || nudging);
+                   (!CT.billing.isEntitled() || trialing);
+    /* The Play app keeps the earlier rule: its one plain line shows once
+       the trial is nearly over or has ended, and its trial notice gives
+       way at the same moment. Nothing there changed on 25 Nov 2026. */
+    var lastDays = trialing && left !== null && left <= 4;
+    var playOffering = CT.billing.enabled() &&
+                       CT.auth.isSignedIn() &&
+                       (!CT.billing.isEntitled() || lastDays);
 
     var panel = $('upgradePanel');
     if (panel) panel.hidden = !offering || IN_PLAY_APP;
 
     var playNote = $('playPremiumNote');
-    if (playNote) playNote.hidden = !offering || !IN_PLAY_APP;
+    if (playNote) playNote.hidden = !playOffering || !IN_PLAY_APP;
 
     /* One heading, always. The heading used to swap between "Unlock" and "Keep"
        depending on how much trial was left -- a distinction that made
@@ -4974,8 +4977,12 @@
 
     var trialNotice = $('trialNotice');
     if (trialNotice) {
-      trialNotice.hidden = !trialing || nudging;
-      if (trialing && !nudging) {
+      /* No notice without a day count of at least one: a trial whose
+         finish has passed on this device is not "0 days left". */
+      var counting = trialing && left !== null && left >= 1 &&
+                     !(IN_PLAY_APP && lastDays);
+      trialNotice.hidden = !counting;
+      if (counting) {
         // The Play app says nothing about cards or paying.
         trialNotice.textContent =
           'You have ' + left + (left === 1 ? ' day' : ' days') +

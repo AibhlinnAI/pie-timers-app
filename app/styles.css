@@ -403,6 +403,13 @@ button{ font:inherit; }
    cluster drops to its own row under the brand — but Sign in and the
    clock never separate from each other within that row. */
 .topbar-right{ display:flex; align-items:center; gap:16px; flex-wrap:nowrap; }
+.topbar-right:has(.aib-signout-btn){ margin-left:auto; }
+.topbar-right:has(.aib-signout-btn) .now{ text-align:right; }
+/* Signed in, margin-left:auto keeps the cluster against the right edge when the
+   header wraps and the cluster takes a row of its own, which happens at
+   wider windows for an account in its trial (the day badge adds width).
+   The plan button then stays the same distance from the right edge in
+   every state (owner, 25 Nov 2026). */
 /* Up to 600px wide that holds only while the pair fits. Signed in, the
    slot is a plan badge and Sign out, and beside those the clock was
    squeezed until its time broke in two ("10:58 / AM") and its date ran to
@@ -439,6 +446,14 @@ button{ font:inherit; }
     display:flex !important; align-items:center; flex-wrap:wrap; width:100%;
   }
   .topbar-right:has(.aib-signout-btn) .aib-signout-btn{ margin-left:auto; margin-right:-14px; }
+  /* The plan badge or button sits against Sign out, not at the left edge
+     (owner, 25 Nov 2026): the trial's day badge is added to the left of
+     the button, and from the left edge that would push the button along.
+     Lines are packed to the right, so the button and the Premium badge
+     end at the same place in every state, and a Sign out that wraps on a
+     very narrow phone stays on the right. */
+  .topbar-right:has(.aib-signout-btn) .topbar-signin > .aib-signin{ justify-content:flex-end; }
+  .topbar-right:has(.aib-signout-btn) .aib-signin-status-slot ~ .aib-signout-btn{ margin-left:0; }
   .topbar-right:has(.aib-signout-btn) .now{
     flex:1 1 100%; margin-left:0;
     display:flex; flex-direction:row-reverse; flex-wrap:wrap; align-items:baseline;
@@ -1917,9 +1932,9 @@ body.is-focus{
 .setting--link:focus-visible{ outline:2px solid var(--orange); outline-offset:2px; border-radius:4px; }
 
 /* ── Plan chip (header) ─────────────────────────────────────────────
-   Three states, three weights. The trial badge is quiet on purpose:
-   during a trial the app has nothing to ask for yet. Only the offer is
-   a link, because only the offer is an action. */
+   Three weights. The trial badge is quiet on purpose and sits to the
+   left of the offer. Only the offer is a link, because only the offer
+   is an action. */
 .plan-chip{
   display:inline-flex; align-items:center; gap:7px;
   min-height:44px; padding:0 14px;
@@ -1949,8 +1964,18 @@ body.is-focus{
   background:var(--purple-tint);
   border:1px solid var(--purple);
 }
+/* The offer with a second, smaller line under the name. */
+.plan-chip--tagged{
+  flex-direction:column; justify-content:center; gap:1px;
+  padding:3px 14px; line-height:1.1;
+}
+.plan-chip-main{ display:inline-flex; align-items:center; gap:7px; }
+.plan-chip-tag{ font-size:.68rem; font-weight:500; }
+/* On a phone the day badge gives up its side padding, so badge, button
+   and Sign out share one row down to about 340px. */
+@media (max-width:600px){ .plan-chip--trial{ padding:0 8px; } }
 .plan-chip--offer:hover{
   background:var(--purple-mid);
   color:var(--ink);
 }
-.aib-signin-status-slot{ display:inline-flex; align-items:center; }
+.aib-signin-status-slot{ display:inline-flex; align-items:center; gap:6px; }
