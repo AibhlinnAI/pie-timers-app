@@ -4720,5 +4720,70 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     appReadme.replace(/ > /g, ' ').includes('`--no-verify-jwt` on every function here except `manage-subscription` and `create-checkout`.'));
 }
 
+/* ───────────── H: the old checkout is hidden, not deleted ─────────────
+   Premium is sold on premium.aibhlinn.ai (owner, 25 Nov 2026). The web
+   app's offers link there, pricing.html sends a visit there, and the
+   Play app still links to no place of sale. */
+{
+  const SITE = 'https://premium.aibhlinn.ai/';
+  const index = read('app/index.html');
+  const pricing = read('app/pricing.html');
+  const bridge = read('app/identity-bridge.js');
+  const appJs = read('app/app.js');
+  const linksIn = (html) => [...uncommentedPage(html).matchAll(/<a\b[^>]*\bhref="([^"]*)"[^>]*>/g)].map((m) => ({ tag: m[0], href: m[1] }));
+
+  for (const file of ['index.html', 'foundation.html', 'terms.html', 'privacy.html']) {
+    const html = read('app/' + file);
+    check('H1 ' + file + ': no link leads to pricing.html', linksIn(html).every((l) => !/pricing\.html/.test(l.href)), linksIn(html).filter((l) => /pricing\.html/.test(l.href)));
+    check('H1 ' + file + ': no script sets a link to pricing.html', !/\.href\s*=\s*['"]pricing\.html/.test(uncommentedPage(html)));
+  }
+  check('H1 the header button leads to the Premium site, set in the versioned file',
+    /CT\.premiumSiteUrl = 'https:\/\/premium\.aibhlinn\.ai\/';/.test(bridge) && /node\.href = CT\.premiumSiteUrl \|\| 'pricing\.html';/.test(bridge));
+  check('H1 Settings offers one link to the Premium site and app.js hides the old checkout behind that link',
+    index.includes('<a class="btn-premium" id="premiumSiteBtn" href="' + SITE + '">Get AibhlínnAI Premium</a>') &&
+    /var away = Boolean\(CT\.premiumSiteUrl\);/.test(appJs) && /\$\('planOptions'\)\.hidden = away;/.test(appJs) &&
+    /discountChoice\.hidden = away;\s*discountChoice\.disabled = away;/.test(appJs));
+  check('H1 the old checkout is still in the page: both plan cards and the discount field',
+    /id="buyAnnual"/.test(index) && /id="buyMonthly"/.test(index) && /id="discountCode"/.test(index) && /id="buyMonthly"/.test(pricing));
+
+  /* The Play app: every link to the Premium site is one the Play app never shows. */
+  const premiumLinks = linksIn(index).filter((l) => l.href.startsWith('https://premium.aibhlinn.ai'));
+  const playSafe = (l) => /data-hide-in-play/.test(l.tag) || /id="(apptCalendarPremiumBtn|calendarPremiumBtn|premiumSiteBtn)"/.test(l.tag);
+  check('H2 index.html: each link to the Premium site is hidden in the Play app, by data-hide-in-play or by app.js',
+    premiumLinks.length === 4 && premiumLinks.every(playSafe), premiumLinks.map((l) => l.tag));
+  check('H2 ...the two Premium Feature buttons are hidden there by app.js, and the Settings link sits inside the panel the Play app never shows',
+    /\$\('apptCalendarPremiumBtn'\)\.hidden = entitled \|\| IN_PLAY_APP;/.test(appJs) &&
+    /if \(panel\) panel\.hidden = !offering \|\| IN_PLAY_APP;/.test(appJs) &&
+    index.indexOf('id="premiumSiteRow"') > index.indexOf('<section class="upgrade" id="upgradePanel" hidden>') &&
+    index.indexOf('id="premiumSiteRow"') < index.indexOf('<section class="danger-zone">'));
+  check('H2 terms.html: the link to the Premium site is hidden in the Play app',
+    /<span data-hide-in-play><a href="https:\/\/premium\.aibhlinn\.ai\/">Pricing<\/a>/.test(read('app/terms.html')));
+  check('H2 the Play app\'s line names the site in words, never as a link',
+    index.includes('<p class="notice notice--info" id="playPremiumNote" hidden>Some features need an AibhlínnAI Premium subscription, available at premium.aibhlinn.ai.</p>'));
+  check('H2 the header draws nothing in the Play app before any link is made, judging Play for itself and not only by app.js\'s flag',
+    bridge.indexOf('} else if (inPlayApp()) {') > 0 && bridge.indexOf('} else if (inPlayApp()) {') < bridge.indexOf('node = offerButton(') &&
+    /function inPlayApp\(\) \{\s*if \(CT\.inPlayApp\) return true;/.test(bridge) &&
+    bridge.includes("/^android-app:\\/\\/ai\\.aibhlinn\\.pietimers(\\/|$)/.test(document.referrer || '')") &&
+    bridge.includes("/(^|\\s)PieTimersAndroid\\/\\d/.test(navigator.userAgent || '')") &&
+    bridge.includes("sessionStorage.getItem('countdown-timers/play-app') === '1'"));
+
+  /* pricing.html: left out of search, and a visit is sent on, after the Play gate. */
+  const gate = pricing.indexOf("location.replace('index.html#in-app');");
+  const send = pricing.indexOf('location.replace(PREMIUM_SITE);');
+  check('H3 pricing.html asks search engines to leave the page out', /<meta name="robots" content="noindex">/.test(pricing));
+  check('H3 pricing.html sends a visit to the Premium site, after the Play gate, and never a Play visit',
+    gate > 0 && send > gate && /var PREMIUM_SITE = 'https:\/\/premium\.aibhlinn\.ai\/';\s*if \(!PREMIUM_SITE \|\| \(window\.CT && window\.CT\.inPlayApp\)\) return;/.test(pricing));
+  check('H3 pricing.html carries a plain link as the fallback, and shows the page again if the browser will not leave',
+    /<p class="notice notice--info" id="movedNotice">AibhlínnAI Premium is now sold at\s*<a href="https:\/\/premium\.aibhlinn\.ai\/">premium\.aibhlinn\.ai<\/a>\.<\/p>/.test(pricing) &&
+    /setTimeout\(function \(\) \{ document\.documentElement\.style\.display = ''; \}, 3000\);/.test(pricing));
+  check('H3 the redirect carries nothing about the visitor: the address is fixed text', !/location\.replace\(PREMIUM_SITE\s*\+/.test(pricing));
+  check('H3 pricing.html asks for identity-bridge.js by the same version as index.html',
+    (index.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] === (pricing.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] &&
+    read('app/sw.js').includes("'identity-bridge.js" + (index.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] + "'"));
+  check('H4 the notes say the checkout is hidden, not deleted, and where Premium is sold',
+    /hidden, not deleted/.test(read('CLAUDE.md')) && /hidden, not deleted/.test(read('DEPLOY.md')) &&
+    read('DEPLOY.md').includes('https://premium.aibhlinn.ai') && read('DEPLOY.md').includes('AibhlinnAI/premium.aibhlinn.ai'));
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

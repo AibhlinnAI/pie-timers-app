@@ -6,7 +6,7 @@
 
 /* Bump this whenever a shell file changes, or installed copies keep
    serving the old one. */
-var CACHE = 'countdown-timers-v147';
+var CACHE = 'countdown-timers-v148';
 
 /* Versioned URLs: a file changed in a release is loaded by index.html as
    file.js?v=<release>, and listed here by EXACTLY that URL. The cache
@@ -36,7 +36,7 @@ var SHELL = [
   'fonts/instrument-sans-latin-ext.woff2',
   'config.js',
   'visits.js?v=130',
-  'identity-bridge.js?v=145',
+  'identity-bridge.js?v=148',
   'identity/identity.js?v=117',
   'identity/email-typos.js',
   'identity/entitlements.js',
@@ -49,7 +49,7 @@ var SHELL = [
   'notify.js?v=144',
   'sync.js?v=143',
   'qrcode.js',
-  'app.js?v=147',
+  'app.js?v=148',
   'icon.svg',
   'icon-512-any.png',
   'icon-512-maskable.png',
