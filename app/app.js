@@ -354,7 +354,7 @@
      browser that supports push. Read from the bridge, not from the
      version in the user agent: the bridge is the thing itself. */
   var NO_PHONE_NOTIFS = IN_WEBVIEW_APP && !(CT.notify && CT.notify.nativePush);
-  var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription, available at aibhlinn.ai.';
+  var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription, available at premium.aibhlinn.ai.';
 
   /* Markup that only ever belongs to an offer carries data-hide-in-play.
      Anything other code shows and hides checks IN_PLAY_APP where it
