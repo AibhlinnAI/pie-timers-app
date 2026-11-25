@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>New South Wales ADHD Conference 2026 | Pie Timers</title>
-<meta name="description" content="The New South Wales ADHD Conference 2026 program, Sunday 18 October at Castle Hill RSL, as pies you can watch run down. An unofficial demonstration of Pie Timers, on a simulated clock.">
+<meta name="description" content="The New South Wales ADHD Conference 2026 program, Sunday 18 October at Castle Hill RSL, online as a countdown visual timer. An unofficial demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -578,7 +578,7 @@ button,select{ font:inherit; }
    (a laptop at 150%, not in full screen) at 136. The list beside the hero
    already says the same thing, with the session on now lit up and the next
    one marked "next", so on those screens the line goes. Only while the day
-   is running: "Still to come", "Already over" and the sign-off are short,
+   is running: "Still to come", "Finished" and the sign-off are short,
    and they stay. */
 @media (max-height:1000px) and (max-width:1100px) and (orientation:landscape),
        (max-height:640px) and (orientation:landscape){
@@ -643,7 +643,7 @@ button,select{ font:inherit; }
       <div>
         <h1 id="evName">New South Wales ADHD Conference 2026</h1>
         <p id="evVenue">Castle Hill RSL, 77 Castle St, Castle Hill NSW</p>
-        <p class="strap">Pie Timers · A visual countdown to let you know where you are in your day.</p>
+        <p class="strap">Pie Timers · A countdown visual timer to let you know where you are in your day.</p>
       </div>
     </div>
     <div class="clock">
@@ -725,13 +725,14 @@ button,select{ font:inherit; }
 
   <section class="foot">
     <h2>What this is</h2>
-    <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at
-      a glance without anyone reading a number. This page is the New South Wales
+    <p>Pie Timers is a countdown visual timer shaped like a pie that gets eaten
+      as time passes. One glance tells you where you are in your day, without
+      doing the sums. This page is the New South Wales
       ADHD Conference 2026, Sunday 18 October at Castle Hill RSL, as one pie for
       the whole day, 8:30am to 4pm. While the day is running, a bar shows the
       time already spent against the time still to come. Each item
-      in the list has a small pie of its own: full before it starts, emptying
-      while it is on, empty once it is over, and grey on any other date.
+      in the list has a small pie of its own: full before it starts, being eaten
+      while it is on, eaten once it has finished, and grey on any other date.
       <!-- This clause is the only sentence on the page that describes the
            clock, so it has to change when the clock does. Left static it
            would tell a ?live=1 reader the time was simulated and to drag a
@@ -763,7 +764,7 @@ button,select{ font:inherit; }
       <li>The <strong>close at 3:50pm is shown as ten minutes</strong>, to reach
         the published 4pm finish. That is arithmetic, not a published figure, so
         it says (est.) too.</li>
-      <li>On the day, once an item is over it moves down to a
+      <li>On the day, once an item has finished it moves down to a
         <strong>Finished</strong> list, so whatever is on now is the first row
         of the list. Nothing is reordered.</li>
       <li>Times are Sydney time, <strong id="footZone">UTC+11:00</strong>. New South
@@ -783,8 +784,7 @@ button,select{ font:inherit; }
         Spirited Mind, and nothing on it is an official program. Speakers and
         session titles are reproduced from the published program. If this page
         and the published program ever disagree, <strong>the published program
-        is right</strong>. Pie Timers itself is in closed testing and has not
-        publicly launched.</p>
+        is right</strong>.</p>
     </div>
 
     <!-- This line used to end "closing the tab leaves no trace of your having
@@ -1191,7 +1191,7 @@ button,select{ font:inherit; }
 
     /* Left running, the clock would slide past the close, then past
        midnight, onto a date the program knows nothing about: the first
-       version of this page did exactly that and sat on "Already over"
+       version of this page did exactly that and sat on "Finished"
        for good about seven minutes after it opened. Loop it back to the
        run-up instead, on the conference day. */
     if (demo.running && !mode.live) {
@@ -1289,7 +1289,7 @@ button,select{ font:inherit; }
       meter(false);
       set('idle', dayWord(day), PRESET.name,
         longDate(day) + ' · ' + clock(day.start) + ' – ' + clock(day.end), '',
-        day.date > today ? 'Still to come.' : 'Already over.');
+        day.date > today ? 'Still to come.' : 'Finished.');
       dialSays('The conference is not running today');
       setPie(null, 0);
       return;

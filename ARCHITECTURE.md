@@ -192,8 +192,9 @@ privacy policy alone.
 Every file the app is made of comes from our own origin, and that is a
 consequence of section 3 rather than a separate rule. The only requests to
 anyone else are the services the app needs to do its job, each named in
-`privacy.html` section 6: Supabase for accounts, sync, the tester form and
-the first-open count; Cloudflare Turnstile, loaded when someone opens the
+`privacy.html` section 6: Supabase for accounts, sync, the tester form, the
+first-open count and the Foundation places count (`pricing.html` and
+`foundation.html` only, never in the Play app); Cloudflare Turnstile, loaded when someone opens the
 sign-in form and refreshing until the app is closed; Paddle's checkout,
 loaded only when someone goes to subscribe; Google, reached through
 Supabase, only when someone chooses Google sign-in or connects Google
@@ -254,7 +255,10 @@ fields, both Premium Feature buttons, the header plan chip's trial and offer
 states, the Manage button, the welcome panel's "needs no card", the footer
 Pricing and Refund Policy links, and the Android tester invite. The Settings
 row that leads to Account drops Premium and cancelling from its line. The one
-line left is "Some features need an AibhlínnAI Premium subscription." As a
+line left is "Some features need an AibhlínnAI Premium subscription, available at aibhlinn.ai." The
+address is plain text, never a link: Google's Payments policy lets a
+consumption-only app say where to buy only "without direct links" (owner,
+25 Nov 2026). As a
 backstop, `billing.js` refuses to open checkout or the portal there.
 `pricing.html` and `foundation.html` send a Play visit back to the app, and
 `privacy.html` and `terms.html` hide their links to pricing and refunds, each

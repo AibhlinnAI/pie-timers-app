@@ -485,7 +485,7 @@ function dueAlerts(
     ) {
       due.push({
         key: brk.key, label: brk.name, isoDate: shift.isoDate,
-        milestone: "finish", body: "Break over. Ease back in.",
+        milestone: "finish", body: "Break time done. Ease back in.",
       });
     }
     previous = brk;

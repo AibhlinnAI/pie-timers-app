@@ -36,11 +36,30 @@
   }());
 </script>
 <title>Pricing · Pie Timers</title>
-<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed.">
+<!-- The description carries no offer and no date, on purpose. Nothing can
+     take a description down when an offer ends, so it must stay true
+     without anyone touching it. The dated offer lives in #offerDates,
+     which the script below takes down. -->
+<meta name="description" content="AibhlínnAI Premium for Pie Timers: sync your schedule everywhere, connect a calendar for an automatic countdown, and get alerts even when the app is closed. Free forever on one device, and every new account starts with a 14-day free trial of Premium.">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="identity/identity-ui.css">
+<style>
+  /* The Black Friday Launch Offer panel. Kept here rather than in
+     styles.css, which the service worker serves cache-first; this page is
+     network-first. Every colour is a token from styles.css, so the light
+     and dark themes both follow. */
+  .offer{ margin:0 0 16px; padding:14px 16px; max-width:62ch;
+    border:1.5px solid var(--orange); border-radius:var(--radius-sm);
+    background:var(--card); }
+  .offer-name{ margin:0; font-size:.75rem; font-weight:700; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--ink-muted); }
+  .offer-hook{ margin:4px 0 0; font-size:1.35rem; line-height:1.2; font-weight:700;
+    color:var(--ink); }
+  .offer-terms{ margin:6px 0 0; font-size:.9rem; line-height:1.5; color:var(--ink); }
+  .offer-dates[hidden] + .hint{ margin-top:0; }
+</style>
 
 <!-- ============================================================
      Public pricing page. Two jobs, and both must be done:
@@ -65,7 +84,22 @@
      Prices are never hardcoded to a number. They render from
      CT.config.paddle at load and again on every billing.onChange, the
      same source app.js's own upgrade panel reads -- so this page and
-     the in-app one cannot quote different figures. ============================================================ -->
+     the in-app one cannot quote different figures.
+
+     The offer panel (#launchOffer) carries two separate things. The
+     Black Friday Launch Offer's hook is a date: subscribe while the
+     free trial is running and the first payment is taken from
+     1 January 2027. It has no subscribe-by date (Mal, 22 Nov 2026).
+     Foundation is 100 places with a price lock, counted by the
+     database (supabase/schema-foundation.sql). Both come down at the
+     end of 31 December 2026 in the last time zone (FOUNDATION_CLOSES). A full
+     Foundation does not end the hook, so "Pay nothing until 2027"
+     always sits outside #foundationLine and beside its "subscribe
+     while your free trial is running" wording, and no price figure
+     goes in #foundationLine. Foundation is never described by contrast
+     with paying nothing. The end of 5 December 2026 in the small print
+     is only the trial finish line of accounts made before 22 November.
+     ============================================================ -->
 </head>
 <body class="legal-page">
 
@@ -111,6 +145,17 @@
       <li>Pie Timer alerts reach you even when the app is closed</li>
     </ul>
 
+    <div class="offer" id="launchOffer">
+      <div class="offer-dates" id="offerDates">
+        <h4 class="offer-name">Black Friday Launch Offer</h4>
+        <p class="offer-hook">Pay nothing until 2027</p>
+        <p class="offer-terms">Subscribe while your free trial is running and
+        your first payment is taken from 1 January 2027. The offer runs to
+        the end of 31 December 2026.</p>
+      </div>
+      <p class="hint" id="foundationLine" role="status" aria-live="polite">Foundation has 100 places. Foundation closes at the end of 31 December 2026, or sooner if all 100 places are taken. Foundation members keep the price they subscribe at. <a href="foundation.html">How Foundation works</a>.</p>
+    </div>
+
     <div class="plan-options">
       <button class="plan-card is-best" id="buyAnnual" type="button">
         <span class="plan-badge" id="annualSaving">Save A$15.80 a year</span>
@@ -121,22 +166,24 @@
       <button class="plan-card" id="buyMonthly" type="button">
         <span class="plan-name">Monthly</span>
         <span class="plan-price"><b id="monthlyPrice">A$2.90</b><small id="monthlyPeriod">/month</small></span>
-        <span class="plan-note">Try before you pay, cancel any time</span>
+        <span class="plan-note">Cancel any time</span>
       </button>
     </div>
 
-    <p class="hint">Prices are shown in Australian dollars and include GST,
-    VAT or sales tax where it applies. Checkout shows the final price in your
-    currency. New accounts start on a free trial, and nothing is charged until
-    you choose a plan above. Make an account before 18 October 2026 (Adelaide
-    time) and the trial runs to 1 November however early you join; from
-    18 October it is the standard 14 days from the day you sign up. If you
-    subscribe before 1 November while your trial is still running, Premium
-    stays free until 30 November and your first charge lands on 1 December,
-    whichever plan you pick; subscribe after that and your first charge lands
-    30 days after you made your account. Checkout may show an earlier date; we
-    move it to the right one shortly after you subscribe. If your trial has
-    already ended, you are charged when you subscribe.</p>
+    <p class="hint">Prices are in Australian dollars and include GST or VAT.
+    In some countries, such as Canada, sales tax is added at checkout. Checkout
+    shows the final price, in Australian dollars. Every new account starts with a 14-day free trial. Subscribe
+    while the free trial is running and you get more free time before your
+    first payment: on a yearly plan you will get your first 30 days free from
+    the day you started your AibhlínnAI account, or 21 days for a monthly
+    plan. <span id="offerSentence">During the Black Friday Launch Offer,
+    first payments will not be charged before 1 January 2027 if you subscribe
+    while your free 14-day trial is running.</span> If you
+    subscribe after your trial has ended, you pay on the day you subscribe.
+    The trial needs no card, and nothing is charged until you choose a plan
+    above. If you made your account before 22 November 2026, your free trial
+    runs to the end of 5 December 2026, even if an earlier trial had
+    ended.</p>
 
     <p class="status-line" id="pricingStatus" role="status" aria-live="polite"></p>
   </section>
@@ -157,7 +204,14 @@
      first, and resolves CT.turnstile/CT.auth lazily (at click time,
      not at parse time) so that billing.js and supabase.js can load
      after that file, exactly as they do in the app itself. sync.js, notify.js
-     and app.js are not loaded -- there is no dashboard here to wire. -->
+     and app.js are not loaded -- there is no dashboard here to wire.
+
+     billing.js carries the same ?v= as in index.html, and must: that exact
+     URL is the one sw.js precaches fresh on every release. Asked for by
+     its plain name, the service worker would store whatever copy the
+     browser's own cache handed it, which just after a release can be the
+     OLD billing.js, and keep serving it. billing.js decides how checkout
+     opens, so an old copy here is an old checkout. Bump the two together. -->
 <script src="identity/identity.js"></script>
 <script src="identity/email-typos.js"></script>
 <script src="identity/entitlements.js"></script>
@@ -165,7 +219,7 @@
 <script src="config.js"></script>
 <script src="identity-bridge.js"></script>
 <script src="supabase.js"></script>
-<script src="billing.js"></script>
+<script src="billing.js?v=145"></script>
 <script>
 (function () {
   'use strict';
@@ -173,6 +227,100 @@
   // Leaving for the app (see the top of <head>): wire nothing, fetch nothing.
   if (CT.inPlayApp) return;
   var $ = function (id) { return document.getElementById(id); };
+
+  /* foundation-status:begin. The same block is in pricing.html and
+     foundation.html; tools/foundation-test.mjs fails if they differ.
+     One request, to the one function the public may call. It sends
+     nothing about the visitor and never a session. Anything but a
+     well-formed answer is null, and null never shows a number. */
+  var FOUNDATION_CLOSES = Date.UTC(2027, 0, 1, 12, 0); // end of 31 Dec 2026 at UTC-12
+  function readFoundation(waitMs) {
+    var cfg = (window.CT && window.CT.config) || {};
+    if (!cfg.isConfigured || !window.fetch) return Promise.resolve(null);
+    var abort = window.AbortController ? new AbortController() : null;
+    var timer = abort ? setTimeout(function () { abort.abort(); }, waitMs || 4000) : null;
+    return fetch(cfg.supabaseUrl + '/rest/v1/rpc/foundation_status', {
+      method: 'POST',
+      headers: {
+        apikey: cfg.supabaseAnonKey,
+        Authorization: 'Bearer ' + cfg.supabaseAnonKey,
+        'Content-Type': 'application/json'
+      },
+      body: '{}',
+      cache: 'no-store',
+      signal: abort ? abort.signal : undefined
+    }).then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (s) {
+        var n = s && s.places_left;
+        if (!s || typeof s.open !== 'boolean' || typeof n !== 'number' ||
+            n !== Math.floor(n) || n < 0 || n > 100) return null;
+        return { open: s.open, left: n };
+      })
+      .catch(function () { return null; })
+      .then(function (s) { if (timer) clearTimeout(timer); return s; });
+  }
+  /* 'open' | 'full' | 'closed' | 'unknown'. Zero left is never 'open',
+     and nothing is 'open' once this device's clock is past the closing
+     instant, whatever the server said. The clock can only close. */
+  function foundationState(s, now) {
+    if (!s) return now >= FOUNDATION_CLOSES ? 'closed' : 'unknown';
+    if (s.left === 0) return 'full';
+    if (!s.open || now >= FOUNDATION_CLOSES) return 'closed';
+    return 'open';
+  }
+  /* foundation-status:end */
+
+  var foundationShown = 'unknown';
+  var foundationReadAt = 0;
+
+  /* textContent and a created link. The page's markup is never built
+     from a string. */
+  function setFoundationLine(sentences) {
+    var el = $('foundationLine');
+    if (!el) return;
+    el.textContent = sentences + ' ';
+    var link = document.createElement('a');
+    link.href = 'foundation.html';
+    link.textContent = 'How Foundation works';
+    el.appendChild(link);
+    el.appendChild(document.createTextNode('.'));
+  }
+
+  /* The dated half of the panel (the offer's name, hook and condition)
+     comes down once this device's clock is past the end of 31 December
+     2026 in the last time zone. The offer and Foundation close on the same
+     instant, so FOUNDATION_CLOSES serves for both. Like the Foundation
+     line, the clock can only close it. A full Foundation does not: the
+     first-payment rule has nothing to do with Foundation's places, and
+     it carries on after the offer, as 30 days yearly and 21 monthly. */
+  function renderOfferDates() {
+    var dates = $('offerDates');
+    if (dates) dates.hidden = Date.now() >= FOUNDATION_CLOSES;
+    // The owner's sentence in the small print names the offer too.
+    var sentence = $('offerSentence');
+    if (sentence) sentence.hidden = Date.now() >= FOUNDATION_CLOSES;
+  }
+
+  function renderFoundation(s) {
+    var state = foundationState(s, Date.now());
+    foundationShown = state;
+    renderOfferDates();
+    if (state === 'open') {
+      setFoundationLine('Foundation: ' + s.left + ' of 100 places left. Subscribe by the end of 31 December 2026 while a place is left and you keep the price you subscribe at. Your place is confirmed when your subscription is recorded.');
+    } else if (state === 'full') {
+      setFoundationLine('Foundation is full. All 100 places have been taken. You can still subscribe at the same price, without the price lock.');
+    } else if (state === 'closed') {
+      setFoundationLine('Foundation has closed. It ran to the end of 31 December 2026.');
+    } else {
+      setFoundationLine('Foundation has 100 places. Foundation closes at the end of 31 December 2026, or sooner if all 100 places are taken. We could not check how many places are left just now.');
+    }
+    return state;
+  }
+
+  function refreshFoundation() {
+    foundationReadAt = Date.now();
+    return readFoundation().then(renderFoundation);
+  }
 
   /* Mirrors app.js's renderPlan() price fields exactly, on purpose --
      two copies of the same small block beat importing app.js wholesale,
@@ -205,7 +353,10 @@
     $('buyMonthly').disabled = !billingOn;
 
     var ent = CT.billing.get();
-    var trialing = (ent.status === 'trialing' || ent.plan === 'trial') && ent.entitled;
+    /* Plan 'trial' is the account's own free trial. Someone who has
+       subscribed and is waiting for their first payment is 'trialing'
+       in Paddle's words too, and is already on Premium. */
+    var trialing = ent.plan === 'trial' && ent.entitled;
     var status = $('pricingStatus');
     status.classList.remove('is-error');
 
@@ -240,8 +391,24 @@
     var status = $('pricingStatus');
     status.classList.remove('is-error');
     status.textContent = 'Opening checkout…';
-    CT.billing.openCheckout(cadence, '').then(function () {
-      status.textContent = '';
+    var before = foundationShown;
+    /* Ask again at the click. If the page was offering a place and the
+       fresh answer says there is none, say so and stop once; the next
+       click goes ahead. A count that cannot be read never blocks a
+       purchase, and no state ever disables a plan button. */
+    readFoundation(1500).then(function (s) {
+      var after = s ? renderFoundation(s) : before;
+      if (before === 'open' && (after === 'full' || after === 'closed')) {
+        status.classList.add('is-error');
+        status.textContent = (after === 'full'
+          ? 'The last Foundation place has just been taken.'
+          : 'Foundation has just closed.') +
+          ' You can still subscribe at the same price, without the price lock. Choose a plan again to go ahead.';
+        return;
+      }
+      return CT.billing.openCheckout(cadence, '').then(function () {
+        status.textContent = '';
+      });
     }).catch(function (err) {
       status.classList.add('is-error');
       status.textContent = err.message;
@@ -257,6 +424,11 @@
     CT.auth.onChange(function () { CT.billing.refresh(); });
     CT.billing.refresh();
     renderPricing();
+    renderOfferDates();
+    refreshFoundation();
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && Date.now() - foundationReadAt >= 60000) refreshFoundation();
+    });
   });
 })();
 </script>

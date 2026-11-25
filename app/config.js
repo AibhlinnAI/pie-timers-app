@@ -92,20 +92,35 @@ window.CT.config = {
     clientToken: 'live_f40ba5ce81b1aff0afd6ab1ff86',
     /* Price IDs from Paddle → Catalogue → Products.
 
-       Four, not two. Paddle puts the trial length on the price, so it
-       is the same for everyone who buys it -- and the two audiences
-       need different answers. Someone subscribing during their account
-       trial owes nothing yet, and their first charge is moved to day 30
-       by paddle-webhook. Someone subscribing after it expired owes
-       money today; giving them the trial price would hand them a second
-       free fortnight nobody promised.
+       Two prices are used: the plain pair, paid on the day. Someone
+       whose free trial has ended opens one of them from billing.js and
+       pays today, whatever the date; giving them a free period would
+       hand them free time nobody promised.
 
-       billing.js chooses. If the trial pair is left blank, everyone
-       gets the plain price and is charged on the spot. */
+       Someone subscribing while their own free trial is running owes
+       nothing yet. For them the create-checkout function makes the
+       transaction on the server, from the same plain price, with the
+       right number of free days for their account already on it: the
+       first whole day at or after 30 days from the day the account was
+       made on a yearly plan, or 21 days on a monthly plan, and never
+       before 1 January 2027. Checkout is then given that first-payment
+       day, so it can show it itself (what Paddle's overlay displays is
+       first seen in DEPLOY.md 8.4 Test A). The same two ids are
+       written in supabase/functions/create-checkout/index.ts, and
+       tools/foundation-test.mjs pins them equal. */
     annualPriceId: 'pri_01m1effmxgfb45pmtyfz1dnh77',
     monthlyPriceId: 'pri_01m1efkevnwpn0rj7g2kzjne0j',
 
-    /* The same two plans, with a 14-day trial set on the price. */
+    /* RETIRED. The same two plans with a trial set on the price in
+       Paddle. Nothing in billing.js reads them any more. They stay
+       here for one reason: a browser can pair an OLDER cached
+       billing.js with this file, and that older billing.js falls back
+       to the plain price when these are missing, which would charge
+       someone today whose free trial is still running. With them
+       present, the worst an old copy does is open the old trial price,
+       and paddle-webhook still moves that first payment to the right
+       date. Take them out in a later release, after both prices have
+       been archived in Paddle. */
     annualTrialPriceId: 'pri_01m1xrvghx8896bxbf9rgtmx0m',
     monthlyTrialPriceId: 'pri_01m1xrry3351rzzgjvr2aqk2vd',
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NWC26 program — Pie Timers</title>
-<meta name="description" content="The NWC26 conference program as pies you can watch run down. A demonstration of Pie Timers, on a simulated clock.">
+<meta name="description" content="The NWC26 conference program online as a countdown visual timer. A demonstration of Pie Timers, on a simulated clock.">
 <meta name="theme-color" content="#1C1024">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -456,10 +456,11 @@ html.live .days{ display:none; }
 
   <section class="foot">
     <h2>What this is</h2>
-    <p>Pie Timers shows time as a pie that shrinks, so how long is left reads at a
-      glance without anyone reading a number. This page is the NWC26 program
-      running through it. The clock is simulated so the whole thing can be watched
-      now rather than on the day — press <strong>Pause</strong> and drag the slider
+    <p>Pie Timers is a countdown visual timer shaped like a pie that gets eaten
+      as time passes. One glance tells you where you are in your day, without
+      doing the sums. This page is the NWC26 program
+      running through Pie Timers. The clock is simulated so the whole thing can be watched
+      now rather than on the day. Press <strong>Pause</strong> and drag the slider
       to land anywhere in a day.</p>
     <p>The two views are the same data. <strong>A delegate's phone</strong> is what
       someone in the room follows. <strong>The foyer screen</strong> is what a
@@ -816,7 +817,7 @@ html.live .days{ display:none; }
       set('idle', dayWord(day), day.items[0].title,
         'Starts ' + clock(day.items[0].time) + ' · ' + day.items.length +
         (day.items.length === 1 ? ' item' : ' items') + ' · runs to ' + clock(day.end),
-        '', day.date > today ? 'Still to come.' : 'Already over.');
+        '', day.date > today ? 'Still to come.' : 'Finished.');
       setPie(null, 0);
       return;
     }

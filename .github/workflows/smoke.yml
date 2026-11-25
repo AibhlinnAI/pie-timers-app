@@ -122,3 +122,10 @@ jobs:
       # are that nobody else's sign-in changed. Nothing is deployed.
       - name: Run the store-review sign-in tests
         run: node --experimental-strip-types tools/review-signin-test.mjs
+
+      # Foundation's 100 places: paddle-webhook claims one after the
+      # subscription row is written and a failed claim makes Paddle retry,
+      # the SQL file holds the cap, and both pages show a number only after
+      # a well-formed answer. Checks the files. Nothing is deployed.
+      - name: Run the Foundation cap tests
+        run: node --experimental-strip-types tools/foundation-test.mjs

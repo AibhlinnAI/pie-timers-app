@@ -88,7 +88,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>16 November 2026</strong> &middot;
+    Last updated: <strong>22 November 2026</strong> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <span data-hide-in-play><a href="terms.html#refunds">Refund Policy</a> &middot;</span>
     <a href="index.html">Back to the app</a>
@@ -140,6 +140,13 @@
     issued to, so it can't be used again. Ask and we will remove the email.</li>
     <li>An email left on the Android tester form is kept apart from your account.
     Ask and we will remove it, and it is deleted when testing ends.</li>
+    <li>If you subscribed while Foundation was open, the record of your place:
+    your number if you held one, your plan, Paddle's subscription number and the
+    dates, so the place is not given to anyone else. This record no longer
+    points to your account.<!-- public.foundation_claims (supabase/schema-foundation.sql):
+    user_id is set to null when the account is deleted and the row stays. A
+    row is kept for a subscriber who got no place as well, which is why this
+    does not say only "if you held a Foundation place". --></li>
     <li>The sign-in log our database provider keeps, with the email address and
     IP address of each sign-in, for 1<!-- Supabase Free plan: its auth log, as auth.audit_log_entries is empty (checked 10 Oct 2026). Change with sections 8 and 9 if the plan changes --> day.</li>
     <li>No backups. Our database plan includes none, so there is no backup copy
@@ -228,7 +235,9 @@
   your billing details under their own policy, also overseas. If you join the
   Android tester list, we add your email address to Google Play's testing list,
   which Google holds overseas. If you email us, Cloudflare receives your message
-  and passes it on to our mailbox with Google, which holds it overseas. The
+  and passes it on to our mailbox with Google, which holds it overseas. We use
+  an AI assistant, Claude, made by Anthropic, to help us sort our email, so
+  Anthropic processes that email overseas too. The
   services in section 6 that see only your IP address and browser are overseas
   too: GitHub, which serves the app's files, and Cloudflare's bot check. And if
   Background alerts is on, each alert passes through your browser's push
@@ -243,12 +252,13 @@
   <table class="legal-table">
     <thead><tr><th scope="col">Who</th><th scope="col">What they get</th><th scope="col">Why</th></tr></thead>
     <tbody>
-      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, and the one-off first-open count in section 9. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser. Its network provider, Cloudflare, carries every request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
+      <tr><td>Supabase</td><td>Everything in sections 3 and 4, your email if you join the Android tester list, the one-off first-open count in section 9, and the number of Foundation places left, which the Pricing and Foundation pages ask for without sending anything about you. Its standard request logs also record, for each request the app makes to it: the time, the address it was sent to, your IP address, the approximate location worked out from that address (such as the city or postcode), your network provider and your browser. Its network provider, Cloudflare, carries every request the app makes to it.</td><td>Database, sign-in, server functions and first-open totals</td></tr>
       <tr><td>Resend</td><td>Your email address, and any email we send you from an @aibhlinn.ai address, such as our replies</td><td>Sending your sign-in code and our email to you</td></tr>
       <tr><td>Paddle</td><td>Your account email and account ID, which we pass to checkout so your payment reaches your account, and the billing details you give them directly</td><td>They are the seller; we never see your card</td></tr>
       <tr><td>Google</td><td>What Google sign-in or Google Calendar needs, only if you use them. Any email you send us, and email we send you, because our mailbox is with Google</td><td>Authentication, reading your calendar, and holding our email</td></tr>
       <tr><td>Google (Play Console)</td><td>Your email, if you join the Android tester list</td><td>Adding you to the Android test</td></tr>
       <tr><td>Cloudflare</td><td>Your IP address and browser signals, from when you open the sign-in form until you close the app. Any email you send to an @aibhlinn.ai address, such as support@aibhlinn.ai</td><td>Checking that a person, not a bot, is using the sign-in form, and receiving email sent to us and passing it on to our mailbox</td></tr>
+      <tr><td>Anthropic (Claude, an AI assistant)</td><td>Any email you send us, when the assistant reads our mailbox</td><td>Helping us sort our email and draft replies. A person reads and sends every reply</td></tr>
       <tr><td>Your browser's push service (Google, Apple, Microsoft or Mozilla, depending on your browser)</td><td>An encrypted alert and when it is sent, only if you are signed in, have allowed notifications and have both Milestone alerts and Background alerts switched on</td><td>Delivering alerts while the app is closed</td></tr>
       <tr><td>Google (Firebase Cloud Messaging)</td><td>In the Android app only, and only if you are signed in, have allowed notifications and have both Milestone alerts and Background alerts switched on: a notification address for your phone, and each alert with when it is sent. The alert holds the name of the timer or break, how long is left or when you are due back, and the date</td><td>Delivering alerts to the Android app while it is closed</td></tr>
       <tr><td>GitHub (GitHub&nbsp;Pages)</td><td>Your IP address and browser, in standard web server logs</td><td>Serving the app files to your device</td></tr>

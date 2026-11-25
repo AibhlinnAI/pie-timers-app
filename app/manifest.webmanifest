@@ -1,7 +1,7 @@
 {
   "name": "Pie Timers",
   "short_name": "Pie Timers",
-  "description": "Watch your day as a pie. Some days you eat the pie. Some days the pie eats you.",
+  "description": "Pie Timers is a countdown visual timer shaped like a pie that gets eaten as time passes. One glance tells you where you are in your day, without doing the sums. Some days you eat the pie. Some days the pie eats you.",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",

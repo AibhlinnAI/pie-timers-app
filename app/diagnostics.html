@@ -622,6 +622,7 @@
           .then(function () { return checkTable('notification_log', 'schema.sql'); })
           .then(function () { return checkTable('subscriptions', 'schema-billing.sql'); })
           .then(function () { return checkTable('billing_events', 'schema-billing.sql'); })
+          .then(function () { return checkTable('foundation_claims', 'schema-foundation.sql'); })
           .then(function () { return checkTable('access_codes', 'schema-access-codes.sql'); })
           .then(function () { return checkTable('code_redemptions', 'schema-access-codes.sql'); })
           .then(function () { return checkTable('code_attempts', 'schema-access-codes.sql'); })

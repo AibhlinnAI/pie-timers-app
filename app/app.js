@@ -354,7 +354,7 @@
      browser that supports push. Read from the bridge, not from the
      version in the user agent: the bridge is the thing itself. */
   var NO_PHONE_NOTIFS = IN_WEBVIEW_APP && !(CT.notify && CT.notify.nativePush);
-  var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription.';
+  var PLAY_PREMIUM_NOTE = 'Some features need an AibhlínnAI Premium subscription, available at aibhlinn.ai.';
 
   /* Markup that only ever belongs to an offer carries data-hide-in-play.
      Anything other code shows and hides checks IN_PLAY_APP where it
@@ -1131,19 +1131,23 @@
     };
   }
 
-  /* ──────────────────── Android tester invite ────────────────────
+  /* ──────────────────── Android: the app is on Google Play ────────────────────
      The funnel behind the QR code printed on t-shirts, which points at
      the bare pietimers.aibhlinn.ai root and cannot be changed -- so this
      has to live on the first thing a cold, unauthenticated visit shows,
      not behind a route of its own.
 
-     Android only: Play closed testing is the only thing on offer, and
-     leading an iPhone toward a page it cannot use is worse than saying
-     nothing -- the web app already in front of them is the whole offer
-     for that visitor. Gone once onboarding finishes even if never
-     acted on, same as the welcome panel it sits above: a first-run
-     moment, not a standing pitch. Never inside the Play app, which is
-     the thing it invites people to test. */
+     Until 22 Nov 2026 this panel took an email address for the closed
+     test. Pie Timers is public on Google Play from that day, so it is
+     now a link to the listing. The ids keep their old "tester" names,
+     and so does settings.testerInviteDone, so nobody who dismissed the
+     old panel sees this one.
+
+     Android only: an iPhone cannot use the listing, and the web app
+     already in front of that visitor is the whole offer. Gone once
+     onboarding finishes even if never acted on, same as the welcome
+     panel it sits above: a first-run moment, not a standing pitch.
+     Never inside the Play app, which is the thing it points to. */
   function isAndroid() { return /android/i.test(navigator.userAgent || ''); }
 
   function renderTesterInvite() {
@@ -1161,34 +1165,9 @@
   }
 
   $('testerDismiss').addEventListener('click', dismissTesterInvite);
-
-  var testerTypoHolds = emailTypoGate('testerEmail', 'testerEmailTypo', 'testerSubmit');
-
-  $('testerInviteForm').addEventListener('submit', function (event) {
-    event.preventDefault();
-    var email = $('testerEmail').value.trim();
-    if (!email) return;
-    if (testerTypoHolds()) return;
-    var button = $('testerSubmit');
-    var status = $('testerStatus');
-    button.disabled = true;
-    button.textContent = 'Joining…';
-    status.classList.remove('is-error');
-    status.textContent = '';
-
-    CT.db.registerTester(email, 'android').then(function () {
-      $('testerInviteForm').hidden = true;
-      status.textContent = "You're on the list. We'll email the install " +
-        'link once you have been added, usually within a few days.';
-      state.settings.testerInviteDone = true;
-      save();
-    }).catch(function (err) {
-      button.disabled = false;
-      button.textContent = 'Join the list';
-      status.classList.add('is-error');
-      status.textContent = err.message || 'Could not join right now. Please try again.';
-    });
-  });
+  /* Following the link counts as acting on the panel, so it does not
+     come back on the next open. */
+  $('testerPlayLink').addEventListener('click', dismissTesterInvite);
 
   /* ─────────────────────── Screen reader announcements ───────────────────
      The dials update every second, but a live region that fired every
@@ -1502,7 +1481,7 @@
      until it ends or the next break starts; then the boundary moves to
      where the break ended. Past the last break, a break with no length
      leaves its "time reached" up, exactly as lunch always has, and one
-     with a length gives way to the quiet "No more breaks today".
+     with a length gives way to the quiet "Next stop - end of day!".
 
      Worked in seconds after the day's start rather than the wall clock:
      after midnight on a night shift a boundary like 1:30am is smaller
@@ -3730,9 +3709,23 @@
      is on the card whenever breaks are not in use. */
   var breakHeadingOwned = false;
 
+  /* What the card says once the day's breaks are done. Mal's wording,
+     22 Nov 2026: it looks forward to the next thing, and says nothing
+     about what has gone. After End of Day there is no next stop, so it
+     says only that the breaks are done. */
+  function breaksDoneLine(phase) {
+    return phase.dayReached ? 'Breaks done for today' : 'Next stop - end of day!';
+  }
+
   function paintBreakCard(pies, list) {
     var shift = pies.shift;
     var phase = breakPhase(pies, list);
+    /* Once the day's breaks are done the card looks ahead, to End of Day.
+       That is only true while End of Day is still to come, so the phase
+       says whether it has been reached. */
+    if (phase.mode === 'done') {
+      phase.dayReached = shift.sec - shift.cfg.start * 60 >= shiftLengthSec(shift.cfg);
+    }
     var card = $('cardLunch');
     var heading = $('lunchHeading');
     var setBreaks = $('breaksSet');
@@ -3791,12 +3784,12 @@
     $('lunchPie').setAttribute('d', '');
     renderNotchPair('lunch', 0);
     $('lunchBig').textContent = over ? 'Done' : 'None';
-    $('lunchSmall').textContent = over ? 'no more breaks today' : 'no breaks today';
+    $('lunchSmall').textContent = over ? breaksDoneLine(phase) : 'no breaks today';
     $('lunchBar').style.width = '0%';
     $('lunchTarget').textContent = '—';
     $('lunchElapsed').textContent = '0';
     $('lunchRemaining').textContent = '0';
-    $('lunchStatus').textContent = over ? 'No more breaks today' : 'No breaks today';
+    $('lunchStatus').textContent = over ? breaksDoneLine(phase) : 'No breaks today';
     return phase;
   }
 
@@ -3812,7 +3805,7 @@
     if (dialLabelShipped === null) dialLabelShipped = el.textContent;
     var text = phase.mode === 'during' ? 'Proportion of your break left'
       : phase.mode === 'before' || phase.mode === 'reached' ? 'Proportion of time remaining until ' + phase.brk.name
-      : phase.mode === 'done' ? 'No more breaks today'
+      : phase.mode === 'done' ? breaksDoneLine(phase)
       : phase.mode === 'none' ? 'No breaks today'
       : null;
     if (text === null) {
@@ -3963,7 +3956,7 @@
         if (brk.isLunch && firedAlerts[announcedKey]) tag += '|' + finish;
         var announced = announceReached(computeTimer(shift.sec, cfg.start, finish),
           todayKey + '|' + brk.key + '|finish' + suffix, brk.key + '|finish' + suffix,
-          brk.name, 'Break over. Ease back in.', tag);
+          brk.name, 'Break time done. Ease back in.', tag);
         // A finish hushed was never said, so it does not take the plain tag.
         if (announced && brk.isLunch && !hushing) firedAlerts[announcedKey] = true;
       }
@@ -4904,8 +4897,15 @@
     return ms <= 0 ? 0 : Math.ceil(ms / 86400000);
   }
 
+  /* The account's own free trial, and nothing else. Plan 'trial' is what
+     the grant_trial trigger writes. Status alone cannot say: Paddle also
+     reports 'trialing' for someone who HAS subscribed and is waiting for
+     their first payment (plan 'monthly' or 'annual'), and that is a
+     subscriber with a card on file, not a free trial. Telling them "no
+     card is needed, and nothing happens automatically" would be false,
+     and offering them the plans again invites a second subscription. */
   function isTrial(ent) {
-    return ent.status === 'trialing' || ent.plan === 'trial';
+    return ent.plan === 'trial';
   }
 
   function planLabel(ent) {
@@ -4927,6 +4927,11 @@
     if (ent.cancelAtPeriodEnd && ent.currentPeriodEnd) {
       return name + ', ends ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
     }
+    /* Subscribed during the trial and not yet charged: the period ends
+       on the date the first payment is taken. */
+    if (ent.status === 'trialing' && ent.currentPeriodEnd) {
+      return name + ', first payment from ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
+    }
     if (ent.currentPeriodEnd) {
       return name + ', renews ' + new Date(ent.currentPeriodEnd).toLocaleDateString(LOCALE);
     }
@@ -4941,25 +4946,28 @@
     var trialing = isTrial(ent) && ent.entitled;
 
     var left = daysLeft(ent);
-    /* During a trial, stay out of the way until the trial is nearly over --
-       people should get to live with the app before being asked. Four
-       days matches the header chip, which switches from a quiet Free
-       Trial badge to a Get Premium button at the same moment. Two
-       different answers to "time to ask yet?" on one screen would
-       be worse than either. */
-    var nudging = trialing && left !== null && left <= 4;
-
+    /* The plans show for the whole trial and after (owner, 25 Nov 2026).
+       Until then they stayed hidden until four days were left, as the
+       header button did; the launch offer rewards subscribing during
+       the trial, so both now show from day one. */
     /* In the Play app the whole panel, prices, codes and all, gives way
        to the one plain line, at exactly the moments it would have shown. */
     var offering = CT.billing.enabled() &&
                    CT.auth.isSignedIn() &&
-                   (!CT.billing.isEntitled() || nudging);
+                   (!CT.billing.isEntitled() || trialing);
+    /* The Play app keeps the earlier rule: its one plain line shows once
+       the trial is nearly over or has ended, and its trial notice gives
+       way at the same moment. Nothing there changed on 25 Nov 2026. */
+    var lastDays = trialing && left !== null && left <= 4;
+    var playOffering = CT.billing.enabled() &&
+                       CT.auth.isSignedIn() &&
+                       (!CT.billing.isEntitled() || lastDays);
 
     var panel = $('upgradePanel');
     if (panel) panel.hidden = !offering || IN_PLAY_APP;
 
     var playNote = $('playPremiumNote');
-    if (playNote) playNote.hidden = !offering || !IN_PLAY_APP;
+    if (playNote) playNote.hidden = !playOffering || !IN_PLAY_APP;
 
     /* One heading, always. The heading used to swap between "Unlock" and "Keep"
        depending on how much trial was left -- a distinction that made
@@ -4969,8 +4977,12 @@
 
     var trialNotice = $('trialNotice');
     if (trialNotice) {
-      trialNotice.hidden = !trialing || nudging;
-      if (trialing && !nudging) {
+      /* No notice without a day count of at least one: a trial whose
+         finish has passed on this device is not "0 days left". */
+      var counting = trialing && left !== null && left >= 1 &&
+                     !(IN_PLAY_APP && lastDays);
+      trialNotice.hidden = !counting;
+      if (counting) {
         // The Play app says nothing about cards or paying.
         trialNotice.textContent =
           'You have ' + left + (left === 1 ? ' day' : ' days') +

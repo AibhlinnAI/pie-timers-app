@@ -11,7 +11,7 @@
    asks for fullscreen, so an installed phone copy hides Android's status
    and navigation bars. v3: error pages are no longer stored. v4: the
    page title and the manifest name read "Stall 41 · Pie Timers". */
-var CACHE = 'stall41-v4';
+var CACHE = 'stall41-v5';
 
 var FILES = [
   './',

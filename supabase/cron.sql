@@ -66,6 +66,10 @@ select cron.schedule(
   $$
 );
 
+-- The job that cancels unpaid prepared purchases (countdown-expire-checkouts)
+-- is made by schema-expire-checkouts.sql, which copies the countdown-milestones
+-- job above. Whenever this file is run again, run that file again after it.
+
 -- Trim the delivery log nightly so it does not grow without bound.
 select cron.unschedule('countdown-prune-log')
 where exists (select 1 from cron.job where jobname = 'countdown-prune-log');
@@ -76,6 +80,13 @@ select cron.schedule(
   $$ select public.prune_notification_log(); $$
 );
 
--- Useful checks:
---   select * from cron.job;
---   select * from cron.job_run_details order by start_time desc limit 20;
+-- Useful checks. Name the columns, as these do. Two of the jobs above,
+-- and the one schema-expire-checkouts.sql makes from them, carry the
+-- cron secret in their command, and cron.job and
+-- cron.job_run_details both have a command column, so a "select *" on
+-- either one puts the secret on the screen. Never run one, and never
+-- select the command column.
+--   select jobname, schedule, active from cron.job order by jobname;
+--   select j.jobname, d.status, d.return_message, d.start_time
+--     from cron.job_run_details d join cron.job j using (jobid)
+--    order by d.start_time desc limit 20;

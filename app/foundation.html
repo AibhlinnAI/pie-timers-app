@@ -18,28 +18,41 @@
       stored = sessionStorage.getItem(KEY) === '1';
     } catch (e) { /* storage blocked: referrer and marker are all there is */ }
     if (!(fromApp || stored || marked)) return;
+    window.CT = window.CT || {};
+    window.CT.inPlayApp = true;
     document.documentElement.style.display = 'none';
     /* Carry the marker through, or a correct detection is discarded. */
     location.replace('index.html#in-app');
   }());
 </script>
 <title>Foundation Members · Pie Timers</title>
-<meta name="description" content="Foundation members lock the AibhlínnAI Premium price for as long as their subscription stays active and AibhlínnAI offers a Premium subscription. 100 places. Closes when all 100 are taken or at the start of 1 November 2026, Adelaide time.">
-<meta name="robots" content="noindex">
+<!-- The description carries no offer and no date, on purpose. Nothing can
+     take a description down when an offer ends, so it must stay true
+     without anyone touching it. The dated offer lives in the page, where
+     the scripts below take it down. -->
+<meta name="description" content="Foundation members of Pie Timers lock the price of AibhlínnAI Premium for as long as their subscription stays active. How the price lock works, who it is for, and when a first payment is taken.">
 <meta name="theme-color" content="#1C1024">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
 <style>
-  /* The October pie. Kept here rather than in styles.css, which the
-     service worker serves cache-first; this page is network-first. The
-     card and pie reuse the Appointment timer's classes and tokens, so both
-     themes come from styles.css as they do for that pie. */
+  /* The Black Friday Launch Offer card. Kept here rather than in
+     styles.css, which the service worker serves cache-first; this page is
+     network-first. The card and pie reuse the Appointment timer's classes
+     and tokens, so both themes come from styles.css as they do for that
+     pie. Sized to read on a 360px-wide phone: the hook scales with the
+     screen and wraps evenly when it must. */
   .launch{ margin:22px 0 6px; max-width:66ch; text-align:center; }
-  .oct-mark{ display:block; width:100%; max-width:360px; height:auto; margin:0 auto; overflow:visible; }
-  .oct-mark text{ font-family:var(--font); font-weight:700; fill:var(--ink); letter-spacing:-.012em; }
+  .legal .launch-name{ margin:0 0 14px; font-size:1.05rem; line-height:1.3; }
+  .launch-pie{ display:block; width:96px; height:96px; margin:0 auto; overflow:visible; }
+  .launch .launch-hook{ margin:14px 0 0; max-width:none; font-size:clamp(1.3rem, 6vw, 2rem);
+    line-height:1.15; font-weight:700; letter-spacing:-.012em; color:var(--ink);
+    text-wrap:balance; }
+  .launch .launch-terms{ margin:8px auto 0; max-width:44ch; font-size:.95rem;
+    line-height:1.5; color:var(--ink); }
   .launch-caption{ margin:12px 0 0; font-size:.95rem; font-weight:600; color:var(--accent); }
+  #foundationState{ font-weight:700; }
 </style>
-<!-- DRAFT. Not yet reviewed by a lawyer, and not linked from any page. Update "Last updated" if you change anything below. -->
+<!-- Not yet reviewed by a lawyer. Update "Last updated" if you change anything below. -->
 </head>
 <body class="legal-page">
 
@@ -58,7 +71,7 @@
 
 <main class="legal">
   <p class="legal-meta">
-    Last updated: <strong>26 October 2026</strong> &middot;
+    Last updated: <strong>22 November 2026</strong> &middot;
     <a href="pricing.html">Pricing</a> &middot;
     <a href="terms.html">Terms of Service</a> &middot;
     <a href="privacy.html">Privacy Policy</a> &middot;
@@ -66,15 +79,16 @@
   </p>
 
   <div class="launch timer-card timer-card--amber">
-    <svg class="oct-mark" viewBox="-40 -76 392 80" role="img" focusable="false" aria-label="October">
-      <g transform="translate(0 -36)">
-        <circle class="dial-base" r="37"/>
-        <path class="dial-pie" id="octPie" d="M 0 -37 A 37 37 0 1 1 0 37 A 37 37 0 1 1 0 -37 Z"/>
-        <circle class="dial-rim" r="37"/>
-      </g>
-      <text x="40" y="0" font-size="100">ctober</text>
+    <h2 class="launch-name">Black Friday Launch Offer</h2>
+    <svg class="launch-pie" viewBox="-40 -40 80 80" aria-hidden="true" focusable="false">
+      <circle class="dial-base" r="37"/>
+      <path class="dial-pie" id="launchPie" d="M 0 -37 A 37 37 0 1 1 0 37 A 37 37 0 1 1 0 -37 Z"/>
+      <circle class="dial-rim" r="37"/>
     </svg>
-    <p class="launch-caption" id="launchCaption">October is launch month.</p>
+    <p class="launch-hook" id="launchHook">Pay nothing until 2027</p>
+    <p class="launch-terms" id="launchTerms">Subscribe while your free trial
+    is running and your first payment is taken from 1 January 2027.</p>
+    <p class="launch-caption" id="launchCaption">The offer runs to the end of 31 December 2026.</p>
   </div>
 
   <h2>Your price is locked</h2>
@@ -82,11 +96,14 @@
   at <strong>A$2.90 a month</strong> or <strong>A$19 a year</strong>, for as
   long as their subscription stays active and AibhlínnAI offers a Premium
   subscription.</p>
-  <p>There are <strong>100 places</strong>. Foundation closes when all 100 are
-  taken or at the start of <strong>1 November 2026</strong> (Adelaide time),
-  whichever comes first.</p>
-  <p>Prices are in Australian dollars and include GST, VAT or sales tax where
-  it applies. Checkout shows the final price in your currency. Whichever plan
+  <p>There are <strong>100 Foundation places</strong> available to the first
+  100 subscribers, locking in their subscription costs at the current rates.
+  Foundation closes at the end of <strong>31 December 2026</strong>, or
+  sooner if all 100 places are taken.</p>
+  <p id="foundationState" role="status" aria-live="polite" hidden></p>
+  <p>Prices are in Australian dollars and include GST or VAT. In some countries,
+  such as Canada, sales tax is added at checkout. Checkout shows the final
+  price, in Australian dollars. Whichever plan
   you are on is the one that is locked. To switch between monthly and yearly
   and keep your price, write to us first.</p>
 
@@ -108,25 +125,33 @@
   </ul>
 
   <h2>Who can join</h2>
-  <p>The first 100 people to subscribe before 1 November.</p>
+  <p>AibhlínnAI's first 100 subscribers before the end of 31 December
+  2026.</p>
+  <p>A place is given when your subscription is recorded, in the order
+  subscriptions are recorded. The number of places shown on this page can be a
+  moment behind. If the last place goes while you are checking out, you still
+  subscribe at the same price, without the price lock.</p>
+  <p>There is one place for each account. If a member cancels, their place is
+  not given to anyone else.</p>
+  <p>Accounts that were given Premium free of charge do not take a place.
+  Accounts made for the paid testing service we used before launch do not take
+  a place either.</p>
 
   <h2>When your first payment is taken</h2>
-  <p>Make an account before <strong>18 October 2026</strong> (Adelaide time)
-  and you get Premium with everything on, free until <strong>1 November</strong>.
-  It is the same finish line whether you join on the first of the month or the
-  seventeenth. No card is needed. From 18 October the trial is the standard
-  14 days from the day you sign up, which for an account made on the 18th is
-  also 1 November. The app shows how long your own trial has left.</p>
-  <p><strong>If you subscribe before 1 November while your trial is still
-  running</strong>, Premium stays free until <strong>30 November</strong> and
-  your first payment is taken on <strong>1 December</strong>. Subscribing early
-  never costs you free time. If you subscribe after 1 November, your first
-  payment falls 30 days after the day you made your account. If you subscribe
-  once your trial has already ended, your first payment is taken on the day you
+  <p>Every new account starts with a <strong>14-day free trial</strong>.
+  Subscribe while the free trial is running and you get more free time before
+  your first payment: on a yearly plan you will get your first
+  <strong>30 days</strong> free from the day you started your AibhlínnAI
+  account, or <strong>21 days</strong> for a monthly plan. <span id="offerSentence">During
+  the Black Friday Launch Offer, first payments will not be charged before
+  <strong>1 January 2027</strong> if you subscribe while your free 14-day
+  trial is running.</span></p>
+  <p>If you subscribe after your trial has ended, you pay on the day you
   subscribe.</p>
-  <p>Checkout may show an earlier first-payment date. We move it to the right
-  date shortly after you subscribe. If the date in your Paddle account looks
-  wrong, write to us before paying anything and we will sort it out.</p>
+  <p>The trial needs no card, and the app shows how long your own trial has
+  left. If you made your account before 22 November 2026, your free trial
+  runs to the end of 5 December 2026, even if an earlier trial had already
+  ended.</p>
 
   <h2>Everything else</h2>
   <p>Our <a href="terms.html">Terms of Service</a> still apply, including
@@ -160,22 +185,32 @@
   })();
 </script>
 <script>
-  /* The October pie empties clockwise across launch month, the same way
-     app.js's wedgePath() draws the time left. The instants are fixed in
-     UTC, so the result does not depend on the phone's own time zone.
-     Adelaide moves from +09:30 to +10:30 at 02:00 on 4 October, which
-     makes launch month 743 hours long. Without this script the page
-     keeps the full pie and the caption written in the markup. The
-     captions say nothing about whether Foundation is open, which this
-     page cannot know. */
+  /* The launch pie empties clockwise across the Black Friday Launch
+     Offer, the same way app.js's wedgePath() draws the time left. The
+     offer was reset on 22 Nov 2026, the day Pie Timers went public on
+     Google Play: it runs from the start of 22 November 2026 to the end
+     of 31 December 2026, 40 days. (It first ran to the end of
+     5 December; Mal moved the close on 22 Nov 2026.) END is also the
+     instant Foundation closes, FOUNDATION_CLOSES in the next script.
+     The instants are fixed in UTC, so the result does not depend on the
+     phone's own time zone. START is Adelaide midnight (+10:30). END is
+     noon UTC on 1 January 2027, the end of 31 December in the last
+     time zone on Earth, so the page's dates carry no time zone.
+     Without this script the page keeps the full pie and the caption
+     written in the markup. Once the offer is over the hook and its
+     condition come down, so the card never invites anyone to an offer
+     that has ended. The captions are about the launch offer's dates
+     only. Whether Foundation is open, and how many places are left, is
+     the next script's job. */
   (function () {
-    var START = Date.UTC(2026, 8, 30, 14, 30);  // 1 Oct 2026 00:00 +09:30
-    var SHIFT = Date.UTC(2026, 9, 3, 16, 30);   // 4 Oct 2026 02:00 +09:30
-    var END = Date.UTC(2026, 9, 31, 13, 30);    // 1 Nov 2026 00:00 +10:30
+    var START = Date.UTC(2026, 10, 21, 13, 30); // 22 Nov 2026 00:00 +10:30
+    var END = Date.UTC(2027, 0, 1, 12, 0);      // end of 31 Dec 2026 at UTC-12
     var R = 37;
 
-    var pie = document.getElementById('octPie');
+    var pie = document.getElementById('launchPie');
     var caption = document.getElementById('launchCaption');
+    var hook = document.getElementById('launchHook');
+    var terms = document.getElementById('launchTerms');
     if (pie && caption) {
       render();
       setInterval(render, 60000);
@@ -196,29 +231,116 @@
              ' A ' + R + ' ' + R + ' 0 ' + (left > 0.5 ? 1 : 0) + ' 1 0 ' + -R + ' Z';
     }
 
-    // The date in Adelaide, read from a shifted UTC date.
-    function adelaideDate(t) {
-      var offsetMinutes = t < SHIFT ? 570 : 630;
-      return new Date(t + offsetMinutes * 60000).getUTCDate();
-    }
-
     function render() {
       var now = Date.now();
       var left, text;
       if (now < START) {
         left = 1;
-        text = 'Launch month starts 1 October.';
+        text = 'The offer starts on 22 November 2026.';
       } else if (now < END) {
         left = (END - now) / (END - START);
-        var days = 32 - adelaideDate(now);
-        text = days === 1 ? 'Last day of launch month.' : days + ' days left in launch month.';
+        // Whole or part days of 24 hours left to END.
+        var days = Math.ceil((END - now) / 86400000);
+        text = days === 1 ? 'Last day of the offer.' : days + ' days left in the offer.';
       } else {
         left = 0;
-        text = 'Launch month is over.';
+        text = 'The offer is over. It ran to the end of 31 December 2026.';
       }
       pie.setAttribute('d', wedge(left));
       caption.textContent = text;
+      if (hook) hook.hidden = now >= END;
+      if (terms) terms.hidden = now >= END;
+      // The owner's sentence names the offer, so it comes down with it.
+      var sentence = document.getElementById('offerSentence');
+      if (sentence) sentence.hidden = now >= END;
     }
+  })();
+</script>
+<script>
+  /* Whether Foundation is open and how many places are left, read from
+     the one function the public may call (supabase/schema-foundation.sql).
+     Never inside the Google Play app: the head script has already
+     started sending that visit back, and this returns before any request. */
+  (function () {
+    if (window.CT && window.CT.inPlayApp) return;
+    var line = document.getElementById('foundationState');
+    if (!line) return;
+
+    /* foundation-status:begin. The same block is in pricing.html and
+       foundation.html; tools/foundation-test.mjs fails if they differ.
+       One request, to the one function the public may call. It sends
+       nothing about the visitor and never a session. Anything but a
+       well-formed answer is null, and null never shows a number. */
+    var FOUNDATION_CLOSES = Date.UTC(2027, 0, 1, 12, 0); // end of 31 Dec 2026 at UTC-12
+    function readFoundation(waitMs) {
+      var cfg = (window.CT && window.CT.config) || {};
+      if (!cfg.isConfigured || !window.fetch) return Promise.resolve(null);
+      var abort = window.AbortController ? new AbortController() : null;
+      var timer = abort ? setTimeout(function () { abort.abort(); }, waitMs || 4000) : null;
+      return fetch(cfg.supabaseUrl + '/rest/v1/rpc/foundation_status', {
+        method: 'POST',
+        headers: {
+          apikey: cfg.supabaseAnonKey,
+          Authorization: 'Bearer ' + cfg.supabaseAnonKey,
+          'Content-Type': 'application/json'
+        },
+        body: '{}',
+        cache: 'no-store',
+        signal: abort ? abort.signal : undefined
+      }).then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (s) {
+          var n = s && s.places_left;
+          if (!s || typeof s.open !== 'boolean' || typeof n !== 'number' ||
+              n !== Math.floor(n) || n < 0 || n > 100) return null;
+          return { open: s.open, left: n };
+        })
+        .catch(function () { return null; })
+        .then(function (s) { if (timer) clearTimeout(timer); return s; });
+    }
+    /* 'open' | 'full' | 'closed' | 'unknown'. Zero left is never 'open',
+       and nothing is 'open' once this device's clock is past the closing
+       instant, whatever the server said. The clock can only close. */
+    function foundationState(s, now) {
+      if (!s) return now >= FOUNDATION_CLOSES ? 'closed' : 'unknown';
+      if (s.left === 0) return 'full';
+      if (!s.open || now >= FOUNDATION_CLOSES) return 'closed';
+      return 'open';
+    }
+    /* foundation-status:end */
+
+    var readAt = 0;
+
+    function show(text, withPricing) {
+      line.textContent = text;
+      if (withPricing) {
+        line.appendChild(document.createTextNode(' '));
+        var link = document.createElement('a');
+        link.href = 'pricing.html';
+        link.textContent = 'See pricing';
+        line.appendChild(link);
+        line.appendChild(document.createTextNode('.'));
+      }
+      line.hidden = false;
+    }
+
+    function render(s) {
+      var state = foundationState(s, Date.now());
+      if (state === 'open') {
+        show(s.left + ' of 100 places ' + (s.left === 1 ? 'is' : 'are') + ' left.');
+      } else if (state === 'full') {
+        show('Foundation is full. All 100 places have been taken. You can still subscribe at the same price, without the price lock.', true);
+      } else if (state === 'closed') {
+        show('Foundation has closed. It ran to the end of 31 December 2026.');
+      } else {
+        line.hidden = true;
+      }
+    }
+
+    function read() { readAt = Date.now(); readFoundation().then(render); }
+    read();
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && Date.now() - readAt >= 60000) read();
+    });
   })();
 </script>
 </body>
