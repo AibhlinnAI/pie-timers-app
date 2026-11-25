@@ -4501,12 +4501,16 @@
   /* ─────────────────────────── Toast ─────────────────────────── */
 
   var toastTimer;
-  function toast(message) {
+  function toast(message, ms) {
     var el = $('toast');
     el.textContent = message;
     el.classList.add('is-visible');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('is-visible'); }, 3200);
+    toastTimer = setTimeout(function () { el.classList.remove('is-visible'); }, ms || 3200);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    $('toast').classList.remove('is-visible');
   }
 
   /* ─────────────────────────── Agenda link ───────────────────────────
@@ -5244,7 +5248,10 @@
 
     function startCheckout(cadence) {
       var code = ($('discountCode').value || '').trim();
-      CT.billing.openCheckout(cadence, code).catch(function (err) {
+      // Said at the press, as pricing.html does, so a slow network is not silence.
+      // Held for as long as the press can take; the answer replaces it.
+      toast('Opening checkout…', 45000);
+      CT.billing.openCheckout(cadence, code).then(hideToast, function (err) {
         toast(err.message);
       });
     }
