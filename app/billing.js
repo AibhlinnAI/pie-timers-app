@@ -38,6 +38,19 @@
     return loaded[src];
   }
 
+  /* Drops a script that is still loading, so the next loadScript() asks
+     again. The stalled tag goes too, and its handlers with it. */
+  function forgetScript(src) {
+    loaded[src] = null;
+    var tags = document.head.getElementsByTagName('script');
+    for (var i = tags.length - 1; i >= 0; i--) {
+      if (tags[i].src === src) {
+        tags[i].onload = tags[i].onerror = null;
+        document.head.removeChild(tags[i]);
+      }
+    }
+  }
+
   /* ─────────────────────────── Turnstile ─────────────────────────── */
 
   var widgetId = null;
@@ -212,11 +225,13 @@
 
   var paddleReady = null;
 
+  var PADDLE_SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+
   function initPaddle() {
     if (!cfg.billingEnabled) return Promise.resolve(false);
     if (paddleReady) return paddleReady;
 
-    paddleReady = loadScript('https://cdn.paddle.com/paddle/v2/paddle.js')
+    paddleReady = loadScript(PADDLE_SCRIPT)
       .then(function () {
         if (!window.Paddle) return false;
         if (cfg.paddle.environment === 'sandbox') {
@@ -318,7 +333,7 @@
      own lookup, so a request that never answers does not leave the
      button waiting for ever. */
   function requestTrialCheckout(cadence, code) {
-    return CT.auth.validToken().catch(function () {
+    return within(CT.auth.validToken(), WAIT_MS).catch(function () {
       return undefined;
     }).then(function (token) {
       /* undefined: the session could not be read at all (no network,
@@ -382,7 +397,37 @@
     });
   }
 
+  /* How long a Buy press waits on any one step before saying so. Until
+     25 Nov 2026 the account read had no limit: on a network that drops
+     the request without an answer (a VPN did this to the owner, on the
+     live site) the press waited for ever and the page said nothing. */
+  var WAIT_MS = 10000;
+
+  /* The promise's own answer, or a rejection once the time is up.
+     Whatever arrives after that is ignored. */
+  function within(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error('timed out')); }, ms);
+      Promise.resolve(promise).then(
+        function (value) { clearTimeout(timer); resolve(value); },
+        function (err) { clearTimeout(timer); reject(err); });
+    });
+  }
+
+  /* One press at a time. A second press while the first is still on the
+     way gets the first one's answer, so a slow network cannot prepare
+     two purchases or open checkout twice. */
+  var opening = null;
+
   function openCheckout(cadence, discountCode) {
+    if (opening) return opening;
+    var settled = function () { opening = null; };
+    opening = openCheckoutOnce(cadence, discountCode);
+    opening.then(settled, settled);
+    return opening;
+  }
+
+  function openCheckoutOnce(cadence, discountCode) {
     if (inPlayAppNow()) return Promise.reject(new Error(PLAY_APP_REFUSAL));
     if (!cfg.billingEnabled) return Promise.reject(new Error('Billing is not configured.'));
 
@@ -423,8 +468,16 @@
        to the cached value. It never did: the cache had already been
        overwritten.) Nothing is lost by stopping, since checkout needs
        the network anyway. */
-    return refresh().catch(function () { return entitlement; }).then(function () {
-      if (entitlement.status === 'unknown') throw new Error(ACCOUNT_UNCHECKED);
+    /* An account read that does not answer in time stops here with the
+       same sentence as one that fails, and for the same reason: the
+       cached answer may be stale, and a stale answer can charge today
+       someone whose trial is running. */
+    return within(refresh(), WAIT_MS).then(function () {
+      return true;
+    }, function () {
+      return false;
+    }).then(function (answered) {
+      if (!answered || entitlement.status === 'unknown') throw new Error(ACCOUNT_UNCHECKED);
       if (alreadySubscribed()) throw new Error(ALREADY_SUBSCRIBED);
 
       /* The account's own free trial, still running: plan 'trial', the
@@ -441,7 +494,17 @@
       /* Paddle's script first, on both paths. On the free-trial path
          that means a script that will not load never leaves a
          transaction behind that nobody can open. */
-      return initPaddle().then(function (ok) {
+      return within(initPaddle(), WAIT_MS).catch(function () {
+        /* Only the time limit lands here; initPaddle itself never
+           rejects. A script request that neither loads nor fails would
+           otherwise be waited on again by every later press, so start
+           afresh next time. */
+        if (!window.Paddle) {
+          paddleReady = null;
+          forgetScript(PADDLE_SCRIPT);
+        }
+        return false;
+      }).then(function (ok) {
         return { ok: ok, inTrial: inTrial, priceId: priceId };
       });
     }).then(function (state) {

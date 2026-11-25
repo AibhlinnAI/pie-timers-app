@@ -59,6 +59,8 @@
     color:var(--ink); }
   .offer-terms{ margin:6px 0 0; font-size:.9rem; line-height:1.5; color:var(--ink); }
   .offer-dates[hidden] + .hint{ margin-top:0; }
+  /* The line under the plan cards: large enough to be seen after a press. */
+  #pricingStatus.status-line--buy{ margin:12px 0 0; font-size:1rem; text-align:center; }
 </style>
 
 <!-- ============================================================
@@ -170,6 +172,11 @@
       </button>
     </div>
 
+    <!-- Directly under the plan cards, where the eye is after a press.
+         Until 25 Nov 2026 this line sat below the long paragraph that
+         follows, and "try again" went unseen. -->
+    <p class="status-line status-line--buy" id="pricingStatus" role="status" aria-live="polite"></p>
+
     <p class="hint">Prices are in Australian dollars and include GST or VAT.
     In some countries, such as Canada, sales tax is added at checkout. Checkout
     shows the final price, in Australian dollars. Every new account starts with a 14-day free trial. Subscribe
@@ -185,7 +192,6 @@
     runs to the end of 5 December 2026, even if an earlier trial had
     ended.</p>
 
-    <p class="status-line" id="pricingStatus" role="status" aria-live="polite"></p>
   </section>
 </main>
 
@@ -219,7 +225,7 @@
 <script src="config.js"></script>
 <script src="identity-bridge.js"></script>
 <script src="supabase.js"></script>
-<script src="billing.js?v=145"></script>
+<script src="billing.js?v=146"></script>
 <script>
 (function () {
   'use strict';
@@ -357,12 +363,21 @@
        subscribed and is waiting for their first payment is 'trialing'
        in Paddle's words too, and is already on Premium. */
     var trialing = ent.plan === 'trial' && ent.entitled;
+    /* A press owns the line under the cards from the moment of the press:
+       "Opening checkout…", then nothing on success or the reason on
+       failure. An account answer that arrives meanwhile, or late, must
+       not wipe that or write over that, so nothing below runs until the
+       press has ended well. */
+    if (pressOwnsStatus) return;
     var status = $('pricingStatus');
     status.classList.remove('is-error');
 
+    /* Status 'unknown' is a read that failed. supabase.js answers such a
+       read as entitled, so nobody is locked out of their own data; that
+       is not a subscription, and must not be announced as one. */
     if (!billingOn) {
       status.textContent = '';
-    } else if (ent.entitled && !trialing) {
+    } else if (ent.entitled && !trialing && ent.status !== 'unknown') {
       status.textContent = "You're already on AibhlínnAI Premium. Manage or cancel from the app's Settings.";
     } else if (CT.auth.isSignedIn()) {
       status.textContent = '';
@@ -386,8 +401,11 @@
     }
   }
 
+  var pressOwnsStatus = false;
+
   function startCheckout(cadence) {
     if (!CT.auth.isSignedIn()) { promptSignIn(); return; }
+    pressOwnsStatus = true;
     var status = $('pricingStatus');
     status.classList.remove('is-error');
     status.textContent = 'Opening checkout…';
@@ -407,11 +425,13 @@
         return;
       }
       return CT.billing.openCheckout(cadence, '').then(function () {
-        status.textContent = '';
+        pressOwnsStatus = false;
+        renderPricing();
       });
     }).catch(function (err) {
       status.classList.add('is-error');
       status.textContent = err.message;
+      if (status.scrollIntoView) status.scrollIntoView({ block: 'nearest' });
     });
   }
 

@@ -4311,8 +4311,12 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('P22 billing.js no longer reads either catalogue trial price', !/TrialPriceId/.test(billingCode) && /function plainPriceFor\(cadence\) \{\s*var p = cfg\.paddle;\s*return cadence === 'monthly' \? p\.monthlyPriceId : p\.annualPriceId;\s*\}/.test(billingCode));
   check('P22 ...and config.js keeps both, for an older cached billing.js that falls back to the plain price without them',
     /annualTrialPriceId: 'pri_[a-z0-9]+'/.test(configCode) && /monthlyTrialPriceId: 'pri_[a-z0-9]+'/.test(configCode));
-  check('P22 Paddle\'s script is asked for before create-checkout is, on both paths',
-    /return initPaddle\(\)\.then\(function \(ok\) \{\s*return \{ ok: ok, inTrial: inTrial, priceId: priceId \};\s*\}\);\s*\}\)\.then\(function \(state\) \{\s*if \(!state\.ok\) throw new Error\(CHECKOUT_FAILED\);/.test(billingCode));
+  check('P22 Paddle\'s script is asked for before create-checkout is, on both paths, and no step of a Buy press waits without a limit',
+    /var WAIT_MS = 10000;/.test(billingCode) &&
+    /return within\(refresh\(\), WAIT_MS\)\.then\(function \(\) \{\s*return true;\s*\}, function \(\) \{\s*return false;\s*\}\)\.then\(function \(answered\) \{\s*if \(!answered \|\| entitlement\.status === 'unknown'\) throw new Error\(ACCOUNT_UNCHECKED\);/.test(billingCode) &&
+    /return within\(CT\.auth\.validToken\(\), WAIT_MS\)\.catch\(/.test(billingCode) &&
+    /function openCheckout\(cadence, discountCode\) \{\s*if \(opening\) return opening;/.test(billingCode) &&
+    /return within\(initPaddle\(\), WAIT_MS\)\.catch\(function \(\) \{\s*if \(!window\.Paddle\) \{\s*paddleReady = null;\s*forgetScript\(PADDLE_SCRIPT\);\s*\}\s*return false;\s*\}\)\.then\(function \(ok\) \{\s*return \{ ok: ok, inTrial: inTrial, priceId: priceId \};\s*\}\);\s*\}\)\.then\(function \(state\) \{\s*if \(!state\.ok\) throw new Error\(CHECKOUT_FAILED\);/.test(billingCode));
   /* What the customer is told, on every path. No sentence is negative
      about time passing and none pushes. */
   const told = [...billingCode.matchAll(/'((?:[^'\\\n]|\\.)*\s(?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*\s(?:[^"\\\n]|\\.)*)"/g)].map((m) => m[1] || m[2]).filter((t) => /^[A-Z]/.test(t));
