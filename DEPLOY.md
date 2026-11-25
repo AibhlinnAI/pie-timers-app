@@ -23,7 +23,7 @@ These must **never** be committed:
 | Supabase service-role key | Supabase → Edge Functions → Secrets |
 | VAPID **private** key | Supabase → Edge Functions → Secrets |
 | Paddle webhook secret | Supabase → Edge Functions → Secrets |
-| Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from three functions, and that one only opens a checkout in the browser. `manage-subscription` uses it to open the customer portal. `create-checkout` uses it to read a price, read discounts and make the transaction for someone who subscribes while their free trial is running (5.6), so the key must be allowed to read prices, read discounts and write transactions. `paddle-webhook` uses it only as the net, to move a first payment that still lands short of the rule's date, so the key must be allowed to change subscriptions as well [check label: the permission names on a Paddle API key were not read from Paddle]. With the key missing, or not allowed to make a transaction, checkout does not open for an account in its free trial: the page says to try again, nobody is charged, and `create-checkout` logs "Could not make checkout". |
+| Paddle API key (server, `pdl_live_apikey_…`) | Supabase → Edge Functions → Secrets, as `PADDLE_API_KEY`. Unrelated to the client-side token in `config.js` — this one calls Paddle's API from four functions, and that one only opens a checkout in the browser. `manage-subscription` uses it to open the customer portal. `create-checkout` uses it to read a price, read discounts and make the transaction for someone who subscribes while their free trial is running (5.6), so the key must be allowed to read prices, read discounts and write transactions. `expire-checkouts` uses it to list unpaid transactions and cancel the ones `create-checkout` made that nobody paid within about an hour (5.6), so the key must be allowed to read transactions as well. `paddle-webhook` uses it only as the net, to move a first payment that still lands short of the rule's date, so the key must be allowed to change subscriptions as well [check label: the permission names on a Paddle API key were not read from Paddle]. With the key missing, or not allowed to make a transaction, checkout does not open for an account in its free trial: the page says to try again, nobody is charged, and `create-checkout` logs "Could not make checkout". With a key that may not read transactions, nobody is charged either: `expire-checkouts` cancels nothing, unpaid prepared purchases stay open, and the function logs "Could not close checkouts" every ten minutes. |
 | Turnstile secret key | Supabase → Edge Functions → Secrets |
 | Google client secret | Supabase → Edge Functions → Secrets |
 | Store review address and code (`REVIEW_EMAIL`, `REVIEW_CODE`) | Supabase → Edge Functions → Secrets, and Play Console → Sign-in details. Nowhere else. See `app/README.md` step 4c. |
@@ -175,8 +175,15 @@ Each file is idempotent, so re-running one is safe. Tick them off as they go.
       `tester_signups` table. Without it every sign-up from the form fails.
 - [ ] `schema-visit-counts.sql` — the first-open totals and the tag list. Run it
       before `countFirstOpens` is turned on in `app/config.js` (see 5.5).
-- [ ] `cron.sql` — last, because the file schedules a job against edge functions that do
+- [ ] `cron.sql`, after all of the above, because the file schedules a job against edge functions that do
       not exist until 5.3.
+- [ ] `schema-expire-checkouts.sql`, last: after `cron.sql`, and after
+      `expire-checkouts` has been deployed (5.3). The file makes the
+      ten-minute job that cancels unpaid prepared purchases, as a copy of
+      a job `cron.sql` made. Nothing to edit. 5.6 has the tick, the row
+      to expect and what to do with a red message. Without this file the
+      function is deployed and never runs, and unpaid prepared purchases
+      are never cancelled.
 
 Then, on any project that existed before self-certified hardship was removed:
 
@@ -227,10 +234,11 @@ locked down.
 
 ### 5.3 Edge functions and URL configuration
 
-- [ ] Deploy the nine edge functions, each with `--no-verify-jwt` except
+- [ ] Deploy the ten edge functions, each with `--no-verify-jwt` except
       `manage-subscription` and `create-checkout`: signin, delete-account,
       paddle-webhook, manage-subscription, create-checkout,
-      notify-milestones, calendar-sync, google-connect, review-signin.
+      expire-checkouts, notify-milestones, calendar-sync, google-connect,
+      review-signin.
       (Those two are called with the signed-in user's own session token,
       so they are deployed bare. There is no `supabase/config.toml` to
       remember the setting, so the flag has to be right on every deploy.)
@@ -425,20 +433,30 @@ adds it (the Black Friday Launch Offer, 22 Nov 2026) the order is:
 2. a look at what the Paddle API key may do (the tick below);
 3. `supabase functions deploy paddle-webhook --no-verify-jwt`;
 4. `supabase functions deploy create-checkout` (no flag on this one);
-5. `supabase functions list` shows both;
-6. Test A in 8.4, run from the browser console on the live site;
-7. Test B in 8.4;
-8. Test C in 8.4: the old Buy button, which is the one time the net's date
+5. `supabase functions deploy expire-checkouts --no-verify-jwt`;
+6. `supabase functions list` shows all three;
+7. paste `supabase/schema-expire-checkouts.sql` into the SQL editor and
+   read its check row;
+8. Test A in 8.4, run from the browser console on the live site (it also
+   makes the spares that Test D looks at);
+9. Test B in 8.4;
+10. Test C in 8.4: the old Buy button, which is the one time the net's date
    move meets Paddle before a customer needs it;
-9. the merge to `main`, which is what sends out the pages and `billing.js`;
-10. a look at the real Buy button (8.4, "After the merge");
-11. the aibhlinn.ai advert, last.
+11. Test D in 8.4, at least 75 minutes after the spares were made: both
+   have been cancelled, the one never opened and the one opened and left;
+12. the merge to `main`, which is what sends out the pages and `billing.js`;
+13. a look at the real Buy button (8.4, "After the merge");
+14. the aibhlinn.ai advert, last.
 
-The SQL and the two functions are run by hand; the pages and `billing.js`
+The SQL and the three functions are run by hand; the pages and `billing.js`
 go out when the branch is merged. That order is safe because the new
 `paddle-webhook` works with the pages that are live now, and nothing calls
 `create-checkout` until the new `billing.js` is live: deploying it changes
-nothing for anyone until the merge. The one order that is not safe is the
+nothing for anyone until the merge. `expire-checkouts` is closed and idle
+until its job exists (step 7). The job made before the function is
+deployed would only collect 404s. From its first run the job cancels every
+unpaid transaction `create-checkout` has made that is over an hour old,
+ones made before today included, which is wanted. The one order that is not safe is the
 merge going out while the `paddle-webhook` that is live is still an older
 one ("If things are deployed in the wrong order", below). Merge only once Test A has shown, on a
 real throwaway purchase, a first payment on the first whole day at or after
@@ -551,7 +569,8 @@ and the function still uses the old rule, whatever the pages say. The end of
       the two trial prices yet (8.1 says when).
 - [ ] Check what the key behind `PADDLE_API_KEY` may do. `create-checkout`
       needs it to read prices, read discounts and write transactions.
-      `paddle-webhook` needs it to change subscriptions, and
+      `expire-checkouts` needs it to read transactions and write
+      transactions. `paddle-webhook` needs it to change subscriptions, and
       `manage-subscription` to make customer portal sessions [check label:
       Paddle's key permissions screen was not read, so the names there may
       differ]. A key that cannot write a transaction charges nobody: it
@@ -571,7 +590,30 @@ and the function still uses the old rule, whatever the pages say. The end of
       session token, like `manage-subscription`. It needs no new secret.
       Nothing calls it until the new `billing.js` is live, so deploying it
       changes nothing for anyone yet.
-- [ ] `supabase functions list` shows both, each updated just now.
+- [ ] Deploy the function that closes unpaid checkouts: `supabase functions deploy expire-checkouts --no-verify-jwt`.
+      The flag matters here too. The scheduled job calls this function
+      with the publishable key, which is not a session token, so without
+      the flag Supabase's gateway would turn every run away. The function
+      is closed by `CRON_SECRET` instead, the secret `notify-milestones`
+      already uses, and is closed when that secret is not set. It needs no
+      new secret. Nothing calls it until the tick after next is done.
+- [ ] `supabase functions list` shows all three, each updated just now.
+- [ ] Schedule it: paste the whole of `supabase/schema-expire-checkouts.sql` into the SQL editor and run it.
+      One paste, nothing to edit, safe to run again. Nobody types the
+      cron secret: the file copies the job `cron.sql` made for
+      `notify-milestones` and swaps the function's name. Expect one row:
+      `countdown-expire-checkouts`, then `3,13,23,33,43,53 * * * *`, then
+      `true` four times. If a red message says nothing was changed, stop
+      and bring the message back: nothing is scheduled. (One of the
+      messages is about 25 seconds: the milestones job in the database
+      does not wait 25 seconds for an answer as `cron.sql` sets, and
+      `expire-checkouts` plans each run around that wait.) Never paste or
+      print a job's command (no `select command from cron.job`, no
+      `select * from cron.job`, and no `select * from
+      cron.job_run_details`, which repeats the command for every run):
+      the command holds the secret. This SQL
+      was written against `cron.sql` as it stands in this repo and has
+      never been run. Your paste is its first run.
 - [ ] Run the catch-up statement at the end of `schema-foundation.sql`. On
       22 Nov 2026 it gives no new place, because nobody had subscribed.
 - [ ] Keep the paid testing service's accounts out. They do not qualify for
@@ -597,8 +639,14 @@ and the function still uses the old rule, whatever the pages say. The end of
       catalogue trial price. It takes no money. It is the only time the
       net's date move, and the key's permission to make it, are seen
       against Paddle. It can only be run this way before the merge.
-- [ ] Straight before the merge: `supabase functions list` shows
-      `paddle-webhook` and `create-checkout` both updated in this sitting,
+- [ ] Run Test D in 8.4, at least 75 minutes after Test A's spare was made.
+      It takes no money. Do not merge until both spares from Test A read
+      Canceled in Paddle and neither offers a purchase: the one that was
+      never opened, and the one that was opened and left. Every prepared
+      purchase a customer leaves behind is an opened one.
+- [ ] Straight before the merge: `supabase functions list` shows `paddle-webhook`, `create-checkout` and `expire-checkouts` all updated in this sitting,
+      the `expire-checkouts` log has a "checkouts closed:" line from the
+      last ten minutes or so,
       and "first charge: checkout's date stands" was seen in the
       `paddle-webhook` log in Test A. Only the new `paddle-webhook` writes
       that line. Without it, do not merge: an older `paddle-webhook` under
@@ -655,6 +703,19 @@ make checkout". Nobody is told unless a customer writes in, so it is a sale
 that waits, found only by reading the log. It is never a wrong charge: the
 page does not fall back to another price.
 
+**A fault in `expire-checkouts` charges nobody and cancels nothing.** It
+leaves unpaid prepared purchases open, which is how things stood before
+25 Nov 2026: one opened and paid after the account's own trial has ended
+still starts a free period. The function writes a log line starting "Could
+not close checkouts", and nobody is told. A run that leaves old unpaid ones
+open for any reason other than somebody paying writes that same line, so
+the search below finds it: Paddle refusing a cancel, a transaction that is
+still unpaid and does not pass the second read, or more waiting with none
+cancelled. `paddle-webhook`'s line "free
+period on an account whose own free trial was not running" is still how
+such a late payment is found. The same goes for any stretch when the
+function is not deployed or its job is not scheduled.
+
 Before going away for any stretch that covers late December or the first
 week of January:
 
@@ -675,8 +736,11 @@ week of January:
       on the day. Nobody was charged wrongly, and the function changed
       nothing, because it never moves a date earlier than checkout
       showed. It is one of three things: a transaction `create-checkout`
-      made during the trial and that was paid later (whether Paddle
-      allows that is what Test B's spare transaction finds out); a retired
+      made during the trial and that was paid later (Paddle does allow
+      that: found on 25 Nov 2026. `expire-checkouts` now cancels such a
+      transaction about an hour after it was made, so this should only
+      be one paid within that hour of the trial ending, or one from a
+      stretch when the job was not running); a retired
       catalogue trial price opened by hand; or, once in a while, someone
       whose trial ended in the minutes their checkout was open. Match the
       line to a subscription in Paddle by its time. What to do with that
@@ -686,7 +750,8 @@ week of January:
       or two is a checkout left open, and there is nothing to do. So is a
       trial you extended by hand. Many days, on an account whose trial
       you did not extend, is a transaction made on one day and paid on a
-      later one: its free days are counted from the day it was paid, so
+      later one (`expire-checkouts` should now prevent that, so read its
+      log as well): its free days are counted from the day it was paid, so
       that subscriber's first payment is later than someone else's with
       the same account day. Same as the line above: nobody was charged
       wrongly, and what to do is your call.
@@ -703,7 +768,32 @@ week of January:
       account calling in a loop could cause that for everyone. Nobody is
       charged by it. Many "checkout made" lines within minutes of each
       other, far more than there are new subscriptions, are the same
-      thing seen earlier.
+      thing seen earlier. Every one of those calls also leaves an unpaid
+      prepared purchase for `expire-checkouts` to cancel, 120 an hour at
+      most (the next tick).
+- [ ] Search the `expire-checkouts` function log for "Could not close checkouts".
+      Expect no line. One now and then that names a 429, says the list
+      could not be reached, or says Paddle refused 1, is a run that gave
+      way, and the next run ten minutes later is the retry. The same line
+      run after run means unpaid prepared purchases are being left open:
+      fix the cause before leaving (8.4, "Reading an answer from
+      `expire-checkouts`"). Then look for "checkouts closed:". That line
+      is written every ten minutes, so a gap in those lines means the job
+      has stopped, and the made versus paid gap is open again for as long
+      as the gap lasts. Then read the newest of those lines, not only
+      that one is there. "more waiting yes" on several runs in a row
+      means more are being made than the 120 an hour the function
+      cancels, so the hour is not being kept for anyone: look in the
+      `create-checkout` log for many "checkout made" lines (the tick
+      above), because one account can make that many by itself. "being
+      paid" above 0 on every run is a prepared purchase with a payment
+      attempt that never settled: the function leaves that one open for
+      good, and whether to cancel that one by hand in Paddle is your
+      call. "not ours" above 0 is an unpaid API-made transaction the
+      function does not recognise, which should not exist: bring the
+      line back.
+      No line names an account or a transaction: the cancelled ones are
+      in Paddle's Transactions list, by status and time.
 - [ ] In Paddle, list the subscriptions whose status is `trialing` [check
       label: the Subscriptions list and its status filter were not read
       from Paddle]. None may show a next payment before 1 Jan 2027, and
@@ -1126,6 +1216,9 @@ number of free days, so that purchase authorises the card and takes
 spot. Run both, in this order, on a throwaway account rather than your own.
 Then run Test C, on another throwaway account: it is the old Buy button,
 and the one time the net under all this is seen working against Paddle.
+Last, Test D: two spare transactions made in Test A and left unpaid, one
+never opened and one opened and left, have been cancelled about an hour
+later.
 
 Test A — still in trial, takes no money, and is the first real purchase
 through `create-checkout`. Everything about that function was read from
@@ -1149,10 +1242,48 @@ opens nothing:
 ```
 
 - [ ] Write down the spare's `transactionId` and the time. Do not open it
-      yet. It is looked at again at the end of Test B, after this
-      account's trial has been ended, to find out one thing nobody knows:
-      whether a transaction made earlier can still be opened later, and
-      from which day Paddle then counts its free days.
+      and do not pay it. It is looked at again in Test D, at least 75
+      minutes from now, to see that `expire-checkouts` has cancelled it.
+      (Until 25 Nov 2026 the spare was there to find out whether a
+      transaction made earlier can still be opened later, and from which
+      day Paddle then counts its free days. "What the spare found",
+      below, has the answer.)
+
+Then a second spare, opened and left. Every prepared purchase a customer
+leaves behind is one that was opened: `billing.js` opens the overlay with
+the customer's email straight after `create-checkout` answers. Whether
+Paddle changes anything on a transaction once a checkout has been opened on
+it (its origin, its custom data, how its payment attempts are listed) has
+not been seen, and `expire-checkouts` tests all three. So one spare must be
+opened. Paste the spare snippet above once more, write down the new id as
+"the opened spare", and paste this with that id in it:
+
+```js
+(async () => {
+  if (!window.Paddle) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  Paddle.Initialize({ token: CT.config.paddle.clientToken, checkout: { settings: { displayMode: 'overlay', theme: 'light' } } });
+  Paddle.Checkout.open({ transactionId: '<the opened spare transactionId>', customer: { email: CT.auth.getUser().email } });
+})();
+```
+
+- [ ] The overlay opens. Wait until the price shows and your email is
+      filled in. **Do not pay.** Close the overlay. Write down the opened
+      spare's id and the time. Test D looks at this one too.
+- [ ] Your call, about two minutes: a third spare, for a theory. Read in
+      Paddle's documentation on 25 Nov 2026 and never tried: the page
+      that holds a checkout may be able to replace the custom data on
+      that checkout's transaction, which is where `create-checkout`
+      writes `made_by`. `expire-checkouts` also knows a transaction by
+      the one-off price on it, so that this would not matter, and
+      whether Paddle's list carries that price's description has not
+      been seen either. To find out both: make one more spare, open it
+      with the snippet above, and with the overlay open run
+      `Paddle.Checkout.updateCheckout({ customData: { note: 'test' } })`
+      in the console. Write down what the console says (an error is an
+      answer too), close the overlay without paying, and write down the
+      id as "the changed spare". Test D reads the result.
+- [ ] Reload the page before going on, so the test itself starts with
+      nothing of Paddle's loaded.
 
 Then the test itself. Paste this. It sends exactly what the new
 `billing.js` sends.
@@ -1185,9 +1316,12 @@ Then the test itself. Paste this. It sends exactly what the new
       for a trial. If it shows neither a day nor a count, do not pay and
       do not merge yet ("If Test A fails", below).
 - [ ] Change the country in the overlay to one outside Australia and note
-      whether the price changes to that country's currency. The pages say
-      "Checkout shows the final price in your currency". If it does not
-      change, **stop and do not merge** ("If Test A fails", below).
+      the price. The pages say "Checkout shows the final price, in
+      Australian dollars", so the currency should stay A$ (seen on 25 Nov
+      2026: Paddle has no currency conversions switched on, on this path or
+      the old one). If another currency appears, somebody has switched
+      conversions on in Paddle: **stop and do not merge** until the pages
+      are read against what checkout now shows.
 - [ ] Pay. Nothing is taken. In Paddle the subscription is `trialing`, and
       `next_billed_at` must be that day: the purchase time plus
       `trialDays` days, the same day the overlay showed, at or after the
@@ -1296,8 +1430,8 @@ it was read there and never run):
   transaction;
 - that the API key may do what the function asks of it;
 - whether a transaction made earlier can still be opened later, and from
-  which day its free days are then counted (the spare, at the end of
-  Test B);
+  which day its free days are then counted (answered on 25 Nov 2026:
+  "What the spare found", below);
 - what Paddle does with a discount that is set on a transaction like this
   one.
 
@@ -1313,13 +1447,17 @@ If Test A fails:
   number of free days before checkout opens. `create-checkout` already
   answers with it, as `trialDays`.)
 
-- **The price does not change to the buyer's currency, or tax is not shown
-  as included.** Do not merge. There are two ways on, and both are the
-  owner's call: accept Australian dollars on this path and reword
-  "Checkout shows the final price in your currency" on `pricing.html`; or
-  change `create-checkout` to choose from a ladder of ordinary catalogue
-  prices, one for each trial length, in place of the price it makes. The
-  browser side, the webhook, the pages and the tests stay as built.
+- **The price is not in Australian dollars, or tax is not as the pages
+  say.** Do not merge. Decided by the owner on 25 Nov 2026: prices are in
+  Australian dollars everywhere, and `pricing.html` and `foundation.html`
+  say "Prices are in Australian dollars and include GST or VAT. In some
+  countries, such as Canada, sales tax is added at checkout. Checkout
+  shows the final price, in Australian dollars." That was read from
+  Paddle's price preview for the two catalogue prices (AU, NZ, GB and DE
+  with tax inside A$2.90; Canada A$3.04 with tax on top; the United
+  States with no tax when no ZIP code is given, not tried with one). If
+  checkout shows anything else, the sentence or Paddle's settings have
+  moved apart.
 - **`custom_data` is missing from `subscription.created`.** Do not merge.
   The webhook would answer "unattributed" and the subscriber would have no
   Premium. Cancel the test subscription in Paddle.
@@ -1350,52 +1488,56 @@ update public.subscriptions
 - [ ] Refund and cancel in Paddle. Cancel Test A's subscription as well:
       it is a separate subscription, and left alone it takes its own first
       payment on its own date.
-- [ ] Last, the spare from Test A. This account's trial has now ended,
-      so the terms give it no free period. Reload the page, open the
-      console, and paste this with the spare's id in it:
 
-      ```js
-      (async () => {
-        if (!window.Paddle) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
-        Paddle.Initialize({ token: CT.config.paddle.clientToken, checkout: { settings: { displayMode: 'overlay', theme: 'light' } } });
-        Paddle.Checkout.open({ transactionId: '<the spare transactionId>' });
-      })();
-      ```
-
-      **Do not pay.** Write down three things: whether the overlay opens
-      at all; whether it still offers the free days; and what
-      first-payment day it shows (counted from today, or from the day the
-      spare was made). Close it. If you can, do the same again the next
-      day.
-
-What the spare tells you. `create-checkout` fixes the free days on a
+What the spare found. `create-checkout` fixes the free days on a
 transaction when it makes it, and Paddle counts them from when it is paid.
-Nothing ties the two together, and Paddle's documentation does not say
-whether a transaction can be opened long after it was made (read
-23 Nov 2026).
+Nothing ties the two together.
 
-- **The overlay does not open, or opens with no free days.** A transaction
-  cannot be kept for later. Nothing more to do.
-- **It opens and still offers the free days.** Then a signed-in person who
-  saves transaction ids during their trial (the function gives one each
-  time it is asked, with no limit) can start a free period after the
-  trial has ended, where the terms say they pay on the day; can do it
-  again after cancelling; and inside the trial can push their first
-  payment out by up to the length of the trial. Nobody is charged
-  wrongly by any of that, and `paddle-webhook` cannot undo it, because it
-  never moves a date earlier than checkout showed. It writes "free period
-  on an account whose own free trial was not running" and "First payment
-  later than the rule" in its log (5.6), which is how it is found. The
-  same person can do the same today with one of the two retired
-  catalogue trial prices from the console, so this is not new in kind;
-  it is the route that would be left once those are archived. Whether
-  that matters at A$2.90 a month, and what to do about it, is your
-  decision to make before the merge. Nothing has been built for it. The
-  choices include: accept it and act on the log lines by hand; a limit
-  on how many transactions one account may be given (needs a small
-  table to count in, which is a new stored record about an account, so
-  `privacy.html` would need reading against it); or having `paddle-webhook`
-  end such a free period, which changes a date checkout showed.
+- **Found on 25 Nov 2026.** A prepared purchase left unpaid could still be
+  opened a day later, after the account's own trial had ended, and still
+  offered the full free period, counted from the day of payment. The
+  terms give that person no free period: they pay on the day.
+- **Paddle's documentation says nothing either way** about a transaction
+  being opened long after it was made, or closing by age (read 23 and
+  25 Nov 2026).
+- **The owner's decision, 25 Nov 2026.** Unpaid prepared purchases are now
+  cancelled about an hour after they are made. Cancelling a subscription
+  after payment was offered and declined, and is not built.
+- **How.** The `expire-checkouts` function runs every ten minutes (the
+  `countdown-expire-checkouts` job). It cancels every transaction that
+  `create-checkout` made, that nobody has paid, and that Paddle says was
+  made 60 minutes ago or more. So a prepared purchase stays open for
+  between 60 and about 70 minutes. It never cancels one that is billed,
+  paid, completed or past due, one that belongs to a subscription, one
+  made any other way (an invoice from the dashboard, a checkout opened
+  on a catalogue price), or one younger than 60 minutes.
+- **What is left.** The hour itself: someone whose trial ends inside the
+  hour can still pay and start the free period. A transaction carrying a
+  payment attempt that never settles is left alone. More than 120 an
+  hour wait for later runs. `create-checkout` has no limit on how often
+  one account may call it, so one account can make more than 120 an hour
+  by itself, on purpose. The hour is not a ceiling against that: every
+  unpaid one then waits longer, other people's included, and the log
+  says "more waiting yes" run after run (5.6 says what to look for). A
+  limit for each account needs a table to count in, which is your
+  decision, and is not built. Any stretch when the function or the job is
+  not running leaves them all open. And none of this is true until the
+  function is deployed AND the job is scheduled (5.6).
+- **A separate route, still open.** `expire-checkouts` only ever touches
+  transactions that `create-checkout` made. The same free period after a
+  trial has ended can be started today by opening one of the two retired
+  catalogue trial prices by hand: their ids are in `app/config.js`, and
+  the console line at the end of Test C does exactly that. Nothing
+  cancels a checkout opened that way. This route stays open until those
+  two prices are archived, and 8.1 says when. So never read this passage
+  as "a free period after a trial has ended is now only possible within
+  an hour". `paddle-webhook` still writes "free period on an account
+  whose own free trial was not running" and "First payment later than
+  the rule" in its log (5.6), which is how a late payment by either
+  route is found.
+- **Not yet seen.** Everything about `expire-checkouts` was read from
+  Paddle's documentation on 25 Nov 2026 and run against stubs. Test D,
+  below, is where it meets Paddle.
 
 Test C — the net. Takes no money, and can only be run this way before the
 merge. Until the merge the live Buy button is still the old one: it opens
@@ -1442,6 +1584,87 @@ monthly trial price directly:
 after the two lines of the Test A snippet that load Paddle and call
 `Paddle.Initialize`.
 
+Test D: the hour. Takes no money. Run it before the merge, at least 75
+minutes after the spares in Test A were made, and after
+`supabase/schema-expire-checkouts.sql` has been run (5.6). It is the first
+time `expire-checkouts` meets Paddle.
+
+- [ ] Have the ids and times of the two spares from Test A: the first
+      spare, never opened, and the opened spare, opened with your email
+      and closed without paying. About 75 minutes after the later of the
+      two, just before looking, make a fresh spare: sign in as a
+      throwaway account still in its free trial and paste the "First, a
+      spare" snippet from Test A again. Write down its id and the time.
+- [ ] In Paddle, open Transactions [check label: the Transactions list and
+      its status column were not read from Paddle]. The first spare reads
+      Canceled. The opened spare reads Canceled. The fresh spare is still
+      Draft.
+- [ ] Read the `expire-checkouts` function log. The runs after the two
+      spares' 60 minute marks have a line starting "checkouts closed:
+      closed 1, ..." for each, or one line with "closed 2" (higher
+      numbers if other unpaid ones were waiting). Between them the lines
+      count both spares as closed. There is no line starting "Could not
+      close checkouts".
+- [ ] Reload the page, open the console, and paste this with the FIRST
+      spare's id in it:
+
+      ```js
+      (async () => {
+        if (!window.Paddle) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+        Paddle.Initialize({ token: CT.config.paddle.clientToken, checkout: { settings: { displayMode: 'overlay', theme: 'light' } } });
+        Paddle.Checkout.open({ transactionId: '<the spare transactionId>' });
+      })();
+      ```
+
+      **Do not pay.** Write down exactly what the overlay does: whether
+      it opens at all, and what it says. Nobody has seen this. The test
+      passes when no purchase is offered. Close it. Then do the same
+      with the opened spare's id.
+- [ ] If the first spare or the opened spare is still Draft or Ready after 80 minutes, or
+      still opens and offers a purchase: **stop and do not merge.** If
+      only the opened spare is left, opening a checkout changes
+      something the function tests, and that is every real customer's
+      case. Read the newest lines in the log:
+      - "listed 0" means Paddle's list did not return the spare. The
+        list asks for origin `api` only, so a spare whose origin Paddle
+        reports as something else once a checkout has been opened on it
+        shows up here, and never as "not ours". The documentation does
+        not settle what Paddle does.
+      - "not ours 1" means the list returned the spare and the function
+        did not recognise it: its custom data did not come back in the
+        shape `create-checkout` wrote AND the list entry did not carry
+        the one-off price's description; or its `created_at` is in a
+        format the function does not read; or a subscription id, an
+        invoice number or a billed date is set on it; or its id is not
+        the shape of a transaction id.
+      - A line starting "Could not close checkouts" says why by itself
+        ("Reading an answer from `expire-checkouts`", below). With
+        "changed 1" and "still unpaid did not pass the second read",
+        the single read most likely did not list the spare's payment
+        attempts. With "refused 1", Paddle would not cancel, and the
+        line gives the status and Paddle's short code. With "failed 1",
+        Paddle could not be reached or answered with a fault.
+
+      Bring the line back; nothing has been cancelled that should not
+      be.
+- [ ] If you made the changed spare in Test A: open that transaction in
+      Paddle and read its custom data and its status. Custom data that
+      still has `made_by` means the page could not replace it, and the
+      theory is wrong for a transaction made through the API. Custom
+      data without `made_by` and a status of Canceled means the theory
+      is right and the price's own mark did its job. Custom data without
+      `made_by` and still Draft after 80 minutes means the function does
+      not recognise such a transaction, and anyone who knows the console
+      line can keep a prepared purchase open: **stop and do not merge**,
+      and bring back the newest log line.
+- [ ] Optional, and your call. Make one more spare, open it in the overlay
+      with the snippet above, and leave the overlay open past 75 minutes
+      without paying. Write down what the overlay shows then, and whether
+      it would still take a payment. **Do not pay.** This is what a
+      customer who leaves checkout open for over an hour would see, and
+      nobody has seen it. The page itself says nothing at that moment:
+      `billing.js` does not listen to the overlay.
+
 After the merge — the real button. Tests A and B ran before the new
 `billing.js` was live, so one look is left:
 
@@ -1477,6 +1700,76 @@ Reading a failure:
   the checkout was opened outside both `billing.js`, which attaches the id
   when it opens a plain price, and `create-checkout`, which writes it on
   the transaction it makes.
+
+Reading an answer from `expire-checkouts` (in `net._http_response`, or in
+the function log; `supabase/README.md` says how to read both). Every fault
+writes one log line starting "Could not close checkouts", with counts and
+no account or transaction id. None of them charges anybody, and a fault
+cancels nothing that should stand.
+
+- **403** with the text "Forbidden": the call did not carry the cron
+  secret, or `CRON_SECRET` is not set on the function. Run
+  `supabase/schema-expire-checkouts.sql` again; if `CRON_SECRET` was
+  changed, run `cron.sql` first.
+- **405**: the call was not a POST. The job always sends one.
+- **503**, error "not_configured": `PADDLE_API_KEY` is not set.
+- **502**, error "paddle": Paddle could not be reached, turned the run
+  away, or answered with something that could not be read. The word
+  after "stopped" in the line says which. "rate_limited" is a 429:
+  Paddle turned the run away for calling too often, and the next run is
+  the retry. "paddle_auth" is a 401 or 403: the key may not read or
+  write transactions (5.6). "list_failed" is the list of unpaid
+  transactions not arriving or not being readable; a status of 400 there
+  means Paddle did not accept the list request as written, which stubs
+  could not show. "paddle_failing" is three failures in a row, of reads
+  or of cancels. "clock" means this server's clock and the time on
+  Paddle's answer differ by more than a minute, so the run would not
+  judge anything's age. With "stopped no" and "failed" above 0, single
+  reads or cancels failed and the rest of the run went ahead.
+- **502**, error "left_open": Paddle answered, and old unpaid ones were
+  left open for a reason other than somebody paying. The line says
+  which.
+  - "Paddle refused N, and last a cancel answered 409 (...)": Paddle
+    would not cancel, and this is its status and short code for the
+    last one refused. Once in a while this is somebody paying in the
+    instant between the second read and the cancel. Run after run means
+    Paddle does not accept the cancel for some kind of transaction, and
+    none of that kind is being cancelled: nobody has seen what Paddle
+    answers here before Test D.
+  - "N still unpaid did not pass the second read": the single read of a
+    transaction came back unlike its entry on the list, most likely
+    without its payment attempts listed. Those are counted under
+    "changed" and are not cancelled.
+  - "more are waiting and this run cancelled none": with "stopped
+    pages", 120 or more old ones that the function cannot cancel are in
+    front of the rest: ones being paid, or unpaid API-made ones it does
+    not recognise ("not ours"). With "stopped reads", 40 in a row
+    turned out to be being paid or already paid. Nothing is stored
+    between runs, so the ones behind are not reached until the ones in
+    front are dealt with by hand in Paddle.
+- **200**, with "stopped cap", "stopped reads", "stopped pages" or
+  "stopped time": not a fault by itself. The run cancelled some, reached
+  its limit of 20 cancels sent, 40 second reads, 120 listed or 18
+  seconds, says "more waiting yes", and the next run carries on. "more
+  waiting yes" on several runs in a row means the hour is not being kept
+  (5.6, the going-away ticks).
+- **200**, the other counts. "changed" is one paid, billed or cancelled
+  between the list and the second read, which is as it should be. "being
+  paid" above 0 on every run is a payment attempt that never settled:
+  that prepared purchase stays open for good unless you cancel it in
+  Paddle. "not ours" above 0 is an unpaid API-made transaction with
+  neither of `create-checkout`'s marks, which should not exist.
+- **500**: something nobody planned for. The line names the kind of
+  error and nothing else.
+- **A 404, or a 401 that is not from the function**: the function is not
+  deployed, or was deployed without `--no-verify-jwt`.
+- **A row in `net._http_response` with no status and a time-out
+  message**: the run took longer than the 25 seconds the job waits. The
+  function starts no new transaction after 18 seconds and gives each
+  request 3, so a run should end inside 24 and this should not be seen.
+  Cancels already sent to Paddle stand. Whether Supabase lets the
+  function finish and write its log line once the caller has hung up is
+  not known.
 
 Reading a failure from `create-checkout` (the status the Test A snippet
 prints, or the browser's Network tab; the page itself only ever says to try

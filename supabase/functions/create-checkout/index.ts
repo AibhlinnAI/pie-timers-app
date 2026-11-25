@@ -40,20 +40,36 @@
    The free days are fixed on the transaction when it is MADE, and
    Paddle counts them from when it is PAID. The transaction's id goes
    back to the signed-in account's own browser, and whoever holds an
-   id can open it again later. Whether Paddle still opens a
-   transaction days or weeks after it was made is not in Paddle's
-   documentation and has not been tried (DEPLOY.md 8.4 has the ticks
-   that find out). If it does, a transaction made on day 1 of a trial
-   and paid on day 13 carries its free days from day 13, and one paid
-   after the trial has ended starts a free period the terms do not
-   give, at the amount copied on the day it was made. So the claim
+   id can open it again later. Found for real on 25 Nov 2026: Paddle
+   still opened a transaction a day after it was made, after the
+   account's own trial had ended, and still offered the full free
+   period counted from the day of payment. That is a free period the
+   terms do not give, at the amount copied when it was made. The
+   owner decided the same day that unpaid prepared purchases are
+   cancelled about an hour after they are made, and the
+   expire-checkouts function does that: every ten minutes it cancels
+   each unpaid transaction this function made that is 60 minutes old
+   or more. It knows them by made_by on custom_data, below. Do not
+   rename that text without changing MADE_BY in expire-checkouts (a
+   test pins them equal), or nothing is cancelled any more. It also
+   knows them by the end of the one-off price's description,
+   "(create-checkout)", which is PRICE_MARK there and pinned the same
+   way. That second mark is there because, in theory read from
+   Paddle's documentation and never tried, the page holding a checkout
+   can replace a transaction's custom data. What
+   remains is the hour: a transaction made in the last hour of a
+   trial can still be paid just after the trial has ended, and one
+   paid 50 minutes after it was made counts its free days from then.
+   It also remains for any stretch when expire-checkouts or its job
+   is not running. So the claim
    here is only about what this function MAKES, not about when a
    transaction it made is paid. paddle-webhook cannot undo it, because
    it never moves a date earlier than checkout showed, but it says so
    in its log: "free period on an account whose own free trial was not
    running", and "First payment later than the rule". For proportion:
    the same person can do the same today by opening one of the two
-   retired catalogue trial prices by hand. This would be the route
+   retired catalogue trial prices by hand, and expire-checkouts
+   never touches a checkout opened that way. This would be the route
    left once those two are archived.
 
    No limit on how often. Nothing is stored about a request and there
@@ -61,7 +77,9 @@
    often as it likes. That charges nobody wrongly. But each call makes
    two requests to Paddle (three with a discount code), leaves a draft
    transaction and a one-off price in the Paddle account, and is one
-   more id of the kind above. Paddle's documentation allows 240
+   more id of the kind above. A draft left behind is now cancelled
+   after about an hour by expire-checkouts; the one-off price stays.
+   Paddle's documentation allows 240
    requests a minute from one address and then answers 429 for 60
    seconds (read 23 Nov 2026). If Supabase's functions reach Paddle
    from a shared address, which is not known, one account calling in a
@@ -451,6 +469,9 @@ Deno.serve(async (request) => {
        is (read in Paddle's documentation, first seen for real in
        DEPLOY.md 8.4 Test A). custom_data is what paddle-webhook reads to
        know whose account to credit, and here the server writes it. */
+    /* The end of the description, "(create-checkout)", is one of the
+       two marks expire-checkouts knows this transaction by. Do not
+       change it here alone. */
     const price: Record<string, unknown> = {
       product_id: plain.product_id,
       description: `Premium ${cadence === "monthly" ? "monthly" : "yearly"}, first payment after ${days} days (create-checkout)`,

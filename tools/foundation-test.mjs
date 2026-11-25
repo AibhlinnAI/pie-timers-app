@@ -31,6 +31,15 @@
       never one for an account that is not in its own free trial.
       billing.js (P22) asks it only on that path, and never falls back
       to a catalogue price when it fails.
+   5. expire-checkouts (part E) cancels the prepared purchases that
+      create-checkout made and nobody paid for within an hour, and
+      nothing else: never one that is billed, paid or completed, never
+      one made any other way, never one younger than 60 minutes to the
+      second. It is closed without the cron secret, sends Paddle one
+      body only, and names no account or transaction in its log or its
+      answer. A run that leaves old unpaid ones open, for a reason
+      other than somebody paying, is a fault and never a healthy line.
+      supabase/schema-expire-checkouts.sql is read as text.
 
    Each index.ts runs for real under Node's type stripping, with Deno
    and fetch stubbed, the way tools/review-signin-test.mjs does it. The
@@ -79,6 +88,8 @@ const ENV = {
   SUPABASE_ANON_KEY: 'publishable-test-key',
   PADDLE_WEBHOOK_SECRET: WEBHOOK_SECRET,
   PADDLE_API_KEY: 'test-paddle-key',
+  /* Read by expire-checkouts alone (part E). */
+  CRON_SECRET: 'test-cron-secret',
 };
 
 const at = (iso) => Date.parse(iso);
@@ -150,7 +161,19 @@ const PADDLE_KEY = ENV.PADDLE_API_KEY;
 delete ENV.PADDLE_API_KEY;
 const webhookNoKey = startFunction('paddle-webhook', WEBHOOK_SOURCE);
 const checkoutNoKey = startFunction('create-checkout', CHECKOUT_SOURCE);
+const EXPIRE_SOURCE = read('supabase/functions/expire-checkouts/index.ts');
+const expireNoKey = startFunction('expire-checkouts', EXPIRE_SOURCE);
 ENV.PADDLE_API_KEY = PADDLE_KEY;
+/* expire-checkouts (part E): as deployed; with no CRON_SECRET among its
+   secrets; and with the sandbox switch on. */
+const expire = startFunction('expire-checkouts', EXPIRE_SOURCE);
+const CRON_KEPT = ENV.CRON_SECRET;
+delete ENV.CRON_SECRET;
+const expireNoSecret = startFunction('expire-checkouts', EXPIRE_SOURCE);
+ENV.CRON_SECRET = CRON_KEPT;
+ENV.PADDLE_ENVIRONMENT = 'sandbox';
+const expireSandbox = startFunction('expire-checkouts', EXPIRE_SOURCE);
+delete ENV.PADDLE_ENVIRONMENT;
 
 /* Paddle-Signature: ts=<seconds>;h1=<hex hmac of "ts:body">. Signed with
    the test secret, so the function's own signatureValid() runs. */
@@ -2187,6 +2210,1145 @@ function refusedWith(r, status, code) {
     (code.match(/await paddle\(/g) || []).length === 3 && /paddle\("GET", `\/prices\//.test(code) && /paddle\("GET", `\/discounts\?/.test(code) && /paddle\("POST", "\/transactions"/.test(code));
 }
 
+/* ───────────────── Part E: expire-checkouts, run for real ─────────────────
+   The function that cancels the prepared purchases create-checkout made
+   and nobody paid for within an hour. Paddle's list, its single read and
+   its cancel are all answered here. None of this has met Paddle: what
+   the stub does is what Paddle's documentation says (read 25 Nov 2026),
+   and DEPLOY.md 8.4 Test D is the first real look. */
+
+const E_NOW = at('2026-11-25T05:00:00Z');
+const CANCEL_TEXT = '{"status":"canceled"}';
+let txnCount = 0;
+/* A transaction as create-checkout leaves it: an unpaid draft, made
+   through the API, about two hours old at E_NOW. Ids rise in the order
+   they are made, as Paddle's do. */
+function txn(over = {}) {
+  txnCount++;
+  return {
+    id: 'txn_01e' + String(txnCount).padStart(6, '0'), status: 'draft', origin: 'api', collection_mode: 'automatic',
+    subscription_id: null, invoice_number: null, billed_at: null,
+    custom_data: { user_id: USER_ID, trial_days: 38, first_payment_from: '2027-01-01T12:00:00.000Z', made_by: 'create-checkout' },
+    customer_id: 'ctm_01test', created_at: '2026-11-25T03:00:00.123456Z', payments: [],
+    ...over,
+  };
+}
+
+/* A stub Paddle holding `store`. The list applies the filters it is
+   sent (unless ignoreFilters, where it hands back everything, so the
+   function's own test must hold alone), sorts by id, pages by `after`
+   30 at a time, and names a `next` address on a host nothing answers.
+   opts.list, opts.get and opts.patch can spoil one call each: they are
+   given the call, its count from 1, and the usual answer. */
+function paddleStub(store, opts = {}) {
+  const host = opts.host || 'api.paddle.com';
+  const seen = { list: 0, get: 0, patch: 0 };
+  route = async (c) => {
+    if (c.host !== host) return undefined;
+    if (c.method === 'GET' && c.path === '/transactions') {
+      seen.list++;
+      const q = new URL(c.url).searchParams;
+      let rows = store.slice();
+      if (!opts.ignoreFilters) {
+        const statuses = (q.get('status') || '').split(',');
+        const before = Date.parse(q.get('created_at[LTE]'));
+        rows = rows.filter((t) => statuses.includes(t.status) && t.origin === q.get('origin') &&
+          t.collection_mode === q.get('collection_mode') && typeof t.created_at === 'string' && Date.parse(t.created_at) <= before);
+      }
+      rows.sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1));
+      const after = q.get('after');
+      if (after) rows = rows.filter((t) => String(t.id) > after);
+      const page = rows.slice(0, 30);
+      const body = {
+        data: page,
+        meta: { pagination: { per_page: 30, next: 'https://next.paddle.test/transactions?after=' + (page.length ? page[page.length - 1].id : ''), has_more: rows.length > 30, estimated_total: rows.length } },
+      };
+      if (opts.list) {
+        const out = await opts.list(c, seen.list, body);
+        if (out instanceof Response) return out;
+      }
+      return reply(200, body);
+    }
+    const id = c.path.startsWith('/transactions/') ? c.path.slice('/transactions/'.length) : null;
+    const found = id === null ? undefined : store.find((t) => t.id === id);
+    if (c.method === 'GET' && id !== null) {
+      seen.get++;
+      const usual = () => (found ? reply(200, { data: found }) : reply(404, { error: { code: 'not_found' } }));
+      return opts.get ? opts.get(c, seen.get, usual, found) : usual();
+    }
+    if (c.method === 'PATCH' && id !== null) {
+      seen.patch++;
+      const usual = () => {
+        if (!found) return reply(404, { error: { code: 'not_found' } });
+        found.status = 'canceled';
+        return reply(200, { data: found });
+      };
+      return opts.patch ? opts.patch(c, seen.patch, usual, found) : usual();
+    }
+    return undefined;
+  };
+}
+
+/* Neither the answer nor the log names an account, an email, a
+   transaction or a Paddle customer. */
+const namesNobody = (r) => ![USER_ID, USER_EMAIL, 'txn_', 'ctm_'].some((secret) => r.text.includes(secret) || r.said.includes(secret));
+
+const E_COUNTS = ['changed', 'closed', 'failed', 'listed', 'more', 'notOurs', 'old', 'paying', 'refused', 'stopped', 'young'];
+const E_KEYS_OK = [...E_COUNTS, 'ok'].sort().join();
+const E_KEYS_FAULT = [...E_COUNTS, 'ok', 'error'].sort().join();
+/* Everything that must hold for EVERY run in part E is looked at inside
+   run() and anything wrong lands here. E10 and E11 expect it empty. */
+const eBroken = [];
+let eRuns = 0;
+let ePatches = 0;
+
+/* One request to expire-checkouts, with the clock held at `now` (or
+   read from `now` when it is a function). `secret: null` sends no
+   x-cron-secret header. */
+async function run(opts = {}) {
+  const now = opts.now ?? E_NOW;
+  const method = opts.method || 'POST';
+  const headers = { 'Content-Type': 'application/json' };
+  if (opts.secret !== null) headers['x-cron-secret'] = opts.secret ?? 'test-cron-secret';
+  const host = opts.host || 'api.paddle.com';
+  calls = [];
+  logs = [];
+  const inner = route;
+  const listedIds = new Set();
+  route = async (c) => {
+    const answer = inner && await inner(c);
+    if (answer && c.method === 'GET' && c.path === '/transactions') {
+      try { for (const t of (await answer.clone().json()).data || []) listedIds.add(t && t.id); } catch { /* not a list */ }
+    }
+    return answer;
+  };
+  const realNow = Date.now;
+  Date.now = typeof now === 'function' ? now : () => now;
+  let r;
+  try {
+    const response = await (opts.handler || expire)(new Request('https://proj.supabase.co/functions/v1/expire-checkouts',
+      { method, headers, body: method === 'POST' ? (opts.body ?? '{}') : undefined }));
+    const text = await response.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* the gate answers in plain text */ }
+    r = { status: response.status, json, text, said: logs.join('\n') };
+  } finally {
+    Date.now = realNow;
+    route = inner;
+  }
+
+  eRuns++;
+  const wrong = [];
+  if (r.status === 403) {
+    if (r.text !== 'Forbidden' || calls.length !== 0 || logs.length !== 0) wrong.push('the gate said or did something');
+  } else {
+    if (logs.length !== 1) wrong.push('log lines: ' + logs.length);
+    const keys = r.json ? Object.keys(r.json).sort().join() : '';
+    if (r.status === 200) {
+      if (keys !== E_KEYS_OK || r.json.ok !== true || !String(logs[0]).startsWith('checkouts closed: ')) wrong.push('the 200 answer or its line');
+    } else {
+      if (keys !== (r.status === 502 ? E_KEYS_FAULT : 'error,ok') || r.json.ok !== false || !String(logs[0]).startsWith('Could not close checkouts: ')) wrong.push('the fault answer or its line');
+    }
+  }
+  if (!namesNobody(r)) wrong.push('names somebody');
+  calls.forEach((c, i) => {
+    if (c.host !== host) wrong.push('a call to ' + c.host);
+    if (c.method !== 'GET' && c.method !== 'PATCH') wrong.push('a ' + c.method);
+    if (c.headers.Authorization !== 'Bearer test-paddle-key') wrong.push('the key was not sent as a bearer');
+    if (c.method === 'GET' && (c.body !== undefined || 'Content-Type' in c.headers)) wrong.push('a GET with a body');
+    if (c.method === 'PATCH') {
+      ePatches++;
+      if (c.body !== CANCEL_TEXT) wrong.push('a PATCH body: ' + c.body);
+      if (!/^\/transactions\/txn_[a-z0-9]+$/.test(c.path)) wrong.push('a PATCH path');
+      if (!listedIds.has(c.path.slice('/transactions/'.length))) wrong.push('a PATCH for an id the run did not list');
+      const prior = calls[i - 1];
+      if (!prior || prior.method !== 'GET' || prior.path !== c.path) wrong.push('a PATCH with no read straight before');
+    }
+  });
+  if (wrong.length) eBroken.push({ run: opts.label || eRuns, wrong });
+  return r;
+}
+
+const eLists = () => calls.filter((c) => c.method === 'GET' && c.path === '/transactions');
+const eReads = () => calls.filter((c) => c.method === 'GET' && c.path.startsWith('/transactions/'));
+const ePatched = () => calls.filter((c) => c.method === 'PATCH').map((c) => c.path.slice('/transactions/'.length));
+const eTouched = (id) => calls.some((c) => c.path === '/transactions/' + id);
+const eLine = (counts) => `closed ${counts.closed ?? 0}, listed ${counts.listed ?? 0}, old enough and ours ${counts.old ?? 0}, too young ${counts.young ?? 0}, ` +
+  `not ours ${counts.notOurs ?? 0}, being paid ${counts.paying ?? 0}, changed ${counts.changed ?? 0}, refused ${counts.refused ?? 0}, failed ${counts.failed ?? 0}, ` +
+  `more waiting ${counts.more ? 'yes' : 'no'}, stopped ${counts.stopped ?? 'no'}`;
+const EXPIRE_CODE = EXPIRE_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+{
+  /* E1. The gate. Closed without the cron secret, closed with the wrong
+     one, and closed when the function has no secret set at all. Nothing
+     is asked of Paddle and nothing is logged. */
+  const store = [txn()];
+  paddleStub(store);
+  for (const [name, opts] of Object.entries({
+    'no x-cron-secret header': { secret: null },
+    'the wrong secret': { secret: 'not-the-secret' },
+    'an empty secret': { secret: '' },
+    'the secret in capitals': { secret: 'TEST-CRON-SECRET' },
+    'the secret with more after it': { secret: 'test-cron-secret-and-more' },
+    'a GET with no secret': { secret: null, method: 'GET' },
+    'an OPTIONS with no secret': { secret: null, method: 'OPTIONS' },
+    'the right secret, when the function has none set': { handler: expireNoSecret },
+    'an empty secret, when the function has none set (fail closed)': { handler: expireNoSecret, secret: '' },
+    'no header, when the function has none set': { handler: expireNoSecret, secret: null },
+  })) {
+    const r = await run(opts);
+    check('E1 ' + name + ': 403 "Forbidden", nothing asked of Paddle, nothing logged',
+      r.status === 403 && r.text === 'Forbidden' && calls.length === 0 && logs.length === 0, { status: r.status, text: r.text, calls: calls.length, logs });
+  }
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const r = await run({ method });
+    check('E1 a ' + method + ' with the right secret: 405, nothing asked of Paddle',
+      r.status === 405 && r.json?.error === 'method' && calls.length === 0, { status: r.status, text: r.text });
+  }
+  check('E1 ...and after all of that the transaction is still a draft', store[0].status === 'draft');
+  const serve = EXPIRE_CODE.slice(EXPIRE_CODE.indexOf('Deno.serve(async (request) => {'));
+  const gateLine = 'if (!CRON_SECRET || request.headers.get("x-cron-secret") !== CRON_SECRET) {\n    return new Response("Forbidden", { status: 403 });\n  }';
+  check('E1 the gate is the same test notify-milestones makes, and is the first thing the handler does with the request',
+    serve.includes(gateLine) && serve.indexOf('request', 'Deno.serve(async (request) => {'.length) === serve.indexOf(gateLine) + 'if (!CRON_SECRET || '.length &&
+    read('supabase/functions/notify-milestones/index.ts').includes('if (!CRON_SECRET || request.headers.get("x-cron-secret") !== CRON_SECRET) {'));
+  check('E1 CRON_SECRET is read from the function\'s own secrets, with no value written in',
+    /const CRON_SECRET = Deno\.env\.get\("CRON_SECRET"\) \?\? "";/.test(EXPIRE_CODE));
+}
+
+{
+  /* E2. No Paddle key: nothing is asked of Paddle. */
+  const store = [txn()];
+  paddleStub(store);
+  const r = await run({ handler: expireNoKey });
+  check('E2 with no PADDLE_API_KEY: 503 not_configured, nothing asked of Paddle, one line to search for',
+    r.status === 503 && r.json?.error === 'not_configured' && calls.length === 0 &&
+    r.said === 'Could not close checkouts: PADDLE_API_KEY not set.' && store[0].status === 'draft', { status: r.status, said: r.said });
+  const closedFirst = await run({ handler: expireNoKey, secret: null });
+  check('E2 ...and without the secret that copy is still closed first', closedFirst.status === 403);
+}
+
+{
+  /* E3. The run when all is well: one draft and one that a checkout has
+     filled in (ready), both made by create-checkout over an hour ago. */
+  const a = txn();
+  const b = txn({ status: 'ready', address_id: 'add_01test', created_at: '2026-11-25T03:30:00.000001Z' });
+  const store = [b, a];
+  paddleStub(store);
+  const r = await run();
+  check('E3 both are cancelled: 200, closed 2', r.status === 200 && r.json.ok === true && r.json.closed === 2 && r.json.old === 2 &&
+    r.json.listed === 2 && r.json.more === false && r.json.stopped === null && a.status === 'canceled' && b.status === 'canceled', r.json);
+  check('E3 one list, then a read and a cancel for each, the older first',
+    same(calls.map((c) => c.method + ' ' + c.path), ['GET /transactions', 'GET /transactions/' + a.id, 'PATCH /transactions/' + a.id, 'GET /transactions/' + b.id, 'PATCH /transactions/' + b.id]),
+    calls.map((c) => c.method + ' ' + c.path));
+  const listUrl = eLists()[0].url;
+  const q = new URL(listUrl).searchParams;
+  check('E3 the list asks for unpaid, API-made, automatically collected transactions made over an hour ago, oldest first, 30 a page',
+    q.get('status') === 'draft,ready' && q.get('origin') === 'api' && q.get('collection_mode') === 'automatic' &&
+    q.get('created_at[LTE]') === '2026-11-25T04:00:00Z' && q.get('order_by') === 'id[ASC]' && q.get('per_page') === '30' && !q.has('after') &&
+    [...q.keys()].length === 6, listUrl);
+  check('E3 ...written as Paddle\'s own examples write them: square brackets and the comma as they are',
+    listUrl === 'https://api.paddle.com/transactions?status=draft,ready&origin=api&collection_mode=automatic&created_at[LTE]=2026-11-25T04:00:00Z&order_by=id[ASC]&per_page=30', listUrl);
+  check('E3 every call carries the key as a bearer, and only the cancel says what its body is',
+    calls.every((c) => c.headers.Authorization === 'Bearer test-paddle-key') &&
+    calls.filter((c) => c.method === 'PATCH').every((c) => c.headers['Content-Type'] === 'application/json' && c.body === CANCEL_TEXT));
+  check('E3 one log line, counts only', r.said === 'checkouts closed: ' + eLine({ closed: 2, listed: 2, old: 2 }), r.said);
+
+  /* The same run again finds nothing left to do. */
+  const again = await run();
+  check('E3 a second run finds nothing: 200, closed 0, one list and no more',
+    again.status === 200 && again.json.closed === 0 && again.json.listed === 0 && calls.length === 1 && again.said === 'checkouts closed: ' + eLine({}), again.json);
+
+  /* Sandbox. */
+  const s = [txn()];
+  paddleStub(s, { host: 'sandbox-api.paddle.com' });
+  const sand = await run({ handler: expireSandbox, host: 'sandbox-api.paddle.com' });
+  check('E3 with PADDLE_ENVIRONMENT sandbox every request goes to sandbox-api.paddle.com',
+    sand.status === 200 && sand.json.closed === 1 && calls.length === 3 && calls.every((c) => c.host === 'sandbox-api.paddle.com'), calls.map((c) => c.host));
+}
+
+{
+  /* E4. The filter. Each thing that must never be cancelled sits beside
+     one good transaction, and is run twice: with the stub applying the
+     list's filters, and with the stub ignoring them so the function's
+     own test is all there is. The good one is cancelled; the other gets
+     no cancel, and no second read either. */
+  const mine = { user_id: USER_ID, trial_days: 38, first_payment_from: '2027-01-01T12:00:00.000Z', made_by: 'create-checkout' };
+  const without = (key) => Object.fromEntries(Object.entries(mine).filter(([k]) => k !== key));
+  const EXCLUDED = {
+    'status billed': { status: 'billed' },
+    'status paid': { status: 'paid' },
+    'status completed': { status: 'completed' },
+    'status past_due': { status: 'past_due' },
+    'status canceled': { status: 'canceled' },
+    'a status nobody has heard of': { status: 'pending_review' },
+    'status "Draft" with a capital': { status: 'Draft' },
+    'status missing': { status: undefined },
+    'origin web (a checkout Paddle.js opened on a catalogue price)': { origin: 'web', custom_data: { user_id: USER_ID } },
+    'origin web with made_by forged by the browser': { origin: 'web' },
+    'origin subscription_recurring': { origin: 'subscription_recurring' },
+    'origin subscription_charge': { origin: 'subscription_charge' },
+    'origin subscription_update': { origin: 'subscription_update' },
+    'origin subscription_payment_method_change': { origin: 'subscription_payment_method_change' },
+    'origin subscription_import': { origin: 'subscription_import' },
+    'origin "API" in capitals': { origin: 'API' },
+    'origin missing': { origin: undefined },
+    'a subscription id on it, origin api': { subscription_id: 'sub_01test' },
+    'collection_mode manual (an invoice made in the dashboard)': { collection_mode: 'manual' },
+    'collection_mode missing': { collection_mode: undefined },
+    'an invoice number on it': { invoice_number: '325-10566' },
+    'a billed date on it': { billed_at: '2026-11-25T03:10:00Z' },
+    'custom_data null': { custom_data: null },
+    'custom_data missing': { custom_data: undefined },
+    'custom_data that is text': { custom_data: 'create-checkout' },
+    'custom_data with user_id only (the plain price path)': { custom_data: { user_id: USER_ID } },
+    'made_by someone-else': { custom_data: { ...mine, made_by: 'someone-else' } },
+    'made_by "Create-Checkout" (case)': { custom_data: { ...mine, made_by: 'Create-Checkout' } },
+    'made_by with a space after it': { custom_data: { ...mine, made_by: 'create-checkout ' } },
+    'made_by missing': { custom_data: without('made_by') },
+    'made_by right but no user_id': { custom_data: without('user_id') },
+    'made_by right but an empty user_id': { custom_data: { ...mine, user_id: '' } },
+    'made_by right but a user_id that is a number': { custom_data: { ...mine, user_id: 12345 } },
+    'made_by right but trial_days missing': { custom_data: without('trial_days') },
+    'made_by right but trial_days as text': { custom_data: { ...mine, trial_days: '38' } },
+    'made_by right but trial_days not whole': { custom_data: { ...mine, trial_days: 38.5 } },
+    'an id that is not the shape of a transaction id (capitals)': { id: 'txn_01E000BAD' },
+    'an id of another kind of thing': { id: 'sub_01e000bad' },
+    'an id with a path in it': { id: 'txn_01e/../customers' },
+    'an id that is a number': { id: 987654321 },
+    'created_at missing': { created_at: undefined },
+    'created_at null': { created_at: null },
+    'created_at that is not a date': { created_at: 'yesterday' },
+    'created_at the right shape but no such day': { created_at: '2026-13-45T03:00:00Z' },
+    'created_at with an offset in place of Z': { created_at: '2026-11-25T03:00:00+00:00' },
+    'created_at as a number': { created_at: at('2026-11-25T03:00:00Z') },
+    'created_at in the future': { created_at: '2026-11-25T05:00:01Z' },
+    'created_at 59 minutes ago': { created_at: '2026-11-25T04:01:00Z' },
+    'a payment that was captured, on the list': { payments: [{ status: 'captured' }] },
+    'payments that is not a list': { payments: 'none' },
+  };
+  for (const [name, over] of Object.entries(EXCLUDED)) {
+    for (const ignoreFilters of [false, true]) {
+      const other = txn(over);
+      const good = txn();
+      const store = [other, good];
+      const before = JSON.stringify(other);
+      paddleStub(store, { ignoreFilters });
+      const r = await run();
+      check('E4 ' + name + (ignoreFilters ? ' (the list ignores its filters)' : '') + ': left alone, with no read and no cancel, and the good one beside it is cancelled',
+        r.status === 200 && r.json.closed === 1 && good.status === 'canceled' && same(ePatched(), [good.id]) && eReads().length === 1 &&
+        !eTouched(other.id) && JSON.stringify(other) === before &&
+        (!ignoreFilters || (r.json.listed === 2 && r.json.notOurs + r.json.young + r.json.paying === 1)), r.json);
+    }
+  }
+  check('E4 that was every exclusion twice', Object.keys(EXCLUDED).length >= 40);
+
+  /* The second mark. THEORY, read in Paddle's documentation on
+     25 Nov 2026 and never tried: the page that holds a checkout can
+     replace the transaction's custom data, and made_by with it. The
+     one-off price carries the free days, so a transaction is also known
+     by that price: one item, a description ending "(create-checkout)",
+     a trial of a whole number of days. `replaced` is custom data as a
+     browser might leave it. */
+  const replaced = { note: 'test' };
+  const priced = (over = {}) => ({ items: [{ quantity: 1, price: { id: 'pri_01test', description: 'Premium monthly, first payment after 38 days (create-checkout)',
+    trial_period: { interval: 'day', frequency: 38 }, billing_cycle: { interval: 'month', frequency: 1 }, ...over } }] });
+  for (const [name, custom] of Object.entries({
+    'custom data replaced by the page': replaced,
+    'custom data with user_id only': { user_id: USER_ID },
+    'custom data null': null,
+    'made_by changed to other text': { ...mine, made_by: 'nobody' },
+  })) {
+    for (const ignoreFilters of [false, true]) {
+      const one = txn({ custom_data: custom, ...priced() });
+      paddleStub([one], { ignoreFilters });
+      const r = await run();
+      check('E4 ' + name + ', and the one-off price still on the transaction' + (ignoreFilters ? ' (the list ignores its filters)' : '') + ': known by the price, and cancelled',
+        r.status === 200 && r.json.closed === 1 && r.json.notOurs === 0 && one.status === 'canceled' && same(ePatched(), [one.id]), r.json);
+    }
+  }
+  const NOT_THE_PRICE = {
+    'a description that does not end with the mark': priced({ description: 'Premium monthly (create-checkout) and more' }),
+    'a description with the mark in capitals': priced({ description: 'Premium monthly (Create-Checkout)' }),
+    'a description that is the mark with no space before it': priced({ description: 'Premium(create-checkout)' }),
+    'no description': priced({ description: undefined }),
+    'a description that is not text': priced({ description: 38 }),
+    'the mark and no trial on the price': priced({ trial_period: null }),
+    'the mark and a trial counted in months': priced({ trial_period: { interval: 'month', frequency: 1 } }),
+    'the mark and a trial of 0 days': priced({ trial_period: { interval: 'day', frequency: 0 } }),
+    'the mark and a trial of 1.5 days': priced({ trial_period: { interval: 'day', frequency: 1.5 } }),
+    'two items, the first with the mark': { items: [priced().items[0], { quantity: 1, price: { description: 'Something else' } }] },
+    'no items': { items: [] },
+    'items that is not a list': { items: priced().items[0] },
+    'an item with no price': { items: [{ quantity: 1 }] },
+    'an item that is null': { items: [null] },
+    'a catalogue trial price with no mark': priced({ description: 'Premium monthly, 14 day trial' }),
+  };
+  for (const [name, over] of Object.entries(NOT_THE_PRICE)) {
+    const other = txn({ custom_data: replaced, ...over });
+    const good = txn();
+    paddleStub([other, good], { ignoreFilters: true });
+    const r = await run();
+    check('E4 no made_by, and ' + name + ': not known by the price, left alone with no read and no cancel',
+      r.status === 200 && r.json.closed === 1 && r.json.notOurs === 1 && other.status === 'draft' && !eTouched(other.id) && same(ePatched(), [good.id]), r.json);
+  }
+  for (const [name, over] of Object.entries({
+    'origin web': { origin: 'web' },
+    'status paid': { status: 'paid' },
+    'status past_due': { status: 'past_due' },
+    'a subscription id': { subscription_id: 'sub_01test' },
+    'collection_mode manual': { collection_mode: 'manual' },
+    'made 59 minutes ago': { created_at: '2026-11-25T04:01:00Z' },
+    'a payment captured': { payments: [{ status: 'captured' }] },
+  })) {
+    const other = txn({ custom_data: replaced, ...priced(), ...over });
+    const good = txn();
+    paddleStub([other, good], { ignoreFilters: true });
+    const before = JSON.stringify(other);
+    const r = await run();
+    check('E4 the price mark never widens what may be cancelled. With the mark and ' + name + ': left alone',
+      r.json.closed === 1 && JSON.stringify(other) === before && !eTouched(other.id) && same(ePatched(), [good.id]), r.json);
+  }
+  {
+    /* What is NOT covered, and is stated in the function's notes: a list
+       entry that carries no items. With made_by gone as well, nothing
+       marks the transaction, so the run leaves that one open and counts
+       "not ours". Whether Paddle's list carries the price is not known. */
+    const one = txn({ custom_data: replaced });
+    paddleStub([one]);
+    const r = await run();
+    check('E4 made_by gone and no items on the list entry: not recognised, left open, counted as not ours',
+      r.status === 200 && r.json.closed === 0 && r.json.notOurs === 1 && one.status === 'draft' && calls.length === 1, r.json);
+  }
+}
+
+{
+  /* E5. The 60 minutes, to the second. The list ignores its filters, so
+     this is the function's own arithmetic on Paddle's created_at. A
+     fraction of a second is rounded UP: never early, at most a second
+     late. Every instant is written out. */
+  const BOUNDARY = [
+    ['2026-11-25T03:00:00Z', '2026-11-25T03:59:59.999Z', false],
+    ['2026-11-25T03:00:00Z', '2026-11-25T04:00:00.000Z', true],
+    ['2026-11-25T03:00:00.610609Z', '2026-11-25T04:00:00.000Z', false],
+    ['2026-11-25T03:00:00.610609Z', '2026-11-25T04:00:00.610Z', false],
+    ['2026-11-25T03:00:00.610609Z', '2026-11-25T04:00:00.999Z', false],
+    ['2026-11-25T03:00:00.610609Z', '2026-11-25T04:00:01.000Z', true],
+    ['2026-11-25T03:00:00.000001Z', '2026-11-25T04:00:00.999Z', false],
+    ['2026-11-25T03:00:00.000001Z', '2026-11-25T04:00:01.000Z', true],
+    ['2026-11-25T03:00:00.000000Z', '2026-11-25T03:59:59.999Z', false],
+    ['2026-11-25T03:00:00.000000Z', '2026-11-25T04:00:00.000Z', true],
+    ['2026-11-25T03:00:00.0Z', '2026-11-25T04:00:00.000Z', true],
+    ['2026-11-25T03:00:00.999999Z', '2026-11-25T04:00:00.999Z', false],
+    ['2026-11-25T03:00:00.999999Z', '2026-11-25T04:00:01.000Z', true],
+  ];
+  for (const [created, now, closes] of BOUNDARY) {
+    const one = txn({ created_at: created });
+    paddleStub([one], { ignoreFilters: true });
+    const r = await run({ now: at(now) });
+    check('E5 made ' + created + ', run at ' + now + ': ' + (closes ? 'cancelled' : 'left alone as too young'),
+      r.status === 200 && r.json.closed === (closes ? 1 : 0) && r.json.young === (closes ? 0 : 1) && one.status === (closes ? 'canceled' : 'draft') &&
+      ePatched().length === (closes ? 1 : 0) && eReads().length === (closes ? 1 : 0), r.json);
+  }
+  /* Old enough on the list, and the second read says younger: the
+     second read wins. */
+  {
+    const one = txn({ created_at: '2026-11-25T03:00:00Z' });
+    paddleStub([one], { ignoreFilters: true, get: (_c, _n, _usual, t) => reply(200, { data: { ...t, created_at: '2026-11-25T04:30:00Z' } }) });
+    const r = await run();
+    check('E5 old enough on the list but under an hour on the second read: no cancel', r.json.closed === 0 && r.json.changed === 1 && ePatched().length === 0 && one.status === 'draft', r.json);
+  }
+  paddleStub([]);
+  await run({ now: at('2026-11-25T04:00:00.500Z') });
+  const sent = new URL(eLists()[0].url).searchParams.get('created_at[LTE]');
+  check('E5 the cutoff sent to the list for a run at 04:00:00.500Z is 2026-11-25T03:00:00Z: whole seconds, an hour back', sent === '2026-11-25T03:00:00Z', sent);
+  await run({ now: at('2026-11-25T04:00:00.000Z') });
+  check('E5 ...and the same for a run on the second', new URL(eLists()[0].url).searchParams.get('created_at[LTE]') === '2026-11-25T03:00:00Z');
+  /* The clock. The 60 minutes run from Paddle's created_at to a clock
+     here, so a server clock AHEAD of Paddle's would cancel early (found
+     in review, 25 Nov 2026: 5 minutes ahead cancelled at 55 minutes).
+     The list answer's Date header is Paddle's own time. Up to a minute
+     ahead, ages are worked out on Paddle's time. Over a minute apart,
+     either way, the run stops as a fault. */
+  const dated = (iso) => (_c, _n, body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json', Date: new Date(at(iso)).toUTCString() } });
+  for (const [name, server, paddleTime, created, want] of [
+    ['this server 30 s ahead, made 60:15 ago by this server and 59:45 by Paddle', '2026-11-25T05:00:00Z', '2026-11-25T04:59:30Z', '2026-11-25T03:59:45Z', 'young'],
+    ['this server 30 s ahead, made exactly 60:00 ago by Paddle', '2026-11-25T05:00:00Z', '2026-11-25T04:59:30Z', '2026-11-25T03:59:30Z', 'closed'],
+    ['this server 30 s ahead, made 59:59 ago by Paddle', '2026-11-25T05:00:00Z', '2026-11-25T04:59:30Z', '2026-11-25T03:59:31Z', 'young'],
+    ['this server exactly 60 s ahead, made 60:30 ago by this server', '2026-11-25T05:00:00Z', '2026-11-25T04:59:00Z', '2026-11-25T03:59:30Z', 'young'],
+    ['this server exactly 60 s ahead, made 60:00 ago by Paddle', '2026-11-25T05:00:00Z', '2026-11-25T04:59:00Z', '2026-11-25T03:59:00Z', 'closed'],
+    ['this server 30 s behind, made 59:45 ago by this server and 60:15 by Paddle (late, never early)', '2026-11-25T04:59:45Z', '2026-11-25T05:00:15Z', '2026-11-25T04:00:00Z', 'young'],
+    ['this server 30 s behind, made 60:00 ago by this server', '2026-11-25T05:00:00Z', '2026-11-25T05:00:30Z', '2026-11-25T04:00:00Z', 'closed'],
+    ['the two clocks the same', '2026-11-25T05:00:00Z', '2026-11-25T05:00:00Z', '2026-11-25T04:00:00Z', 'closed'],
+    ['this server 5 minutes ahead, made 55 minutes ago by Paddle (the case found in review)', '2026-11-25T05:00:00Z', '2026-11-25T04:55:00Z', '2026-11-25T04:00:00Z', 'clock'],
+    ['this server 61 s ahead', '2026-11-25T05:00:00Z', '2026-11-25T04:58:59Z', '2026-11-25T03:00:00Z', 'clock'],
+    ['this server 61 s behind', '2026-11-25T05:00:00Z', '2026-11-25T05:01:01Z', '2026-11-25T03:00:00Z', 'clock'],
+    ['this server a day behind', '2026-11-25T05:00:00Z', '2026-11-26T05:00:00Z', '2026-11-25T03:00:00Z', 'clock'],
+  ]) {
+    const one = txn({ created_at: created });
+    paddleStub([one], { ignoreFilters: true, list: dated(paddleTime) });
+    const r = await run({ now: at(server) });
+    if (want === 'clock') {
+      check('E5 ' + name + ': the run stops as "clock", a fault, with no read and no cancel',
+        r.status === 502 && r.json.error === 'paddle' && r.json.stopped === 'clock' && r.json.closed === 0 && calls.length === 1 && one.status === 'draft' &&
+        r.said === 'Could not close checkouts: this server\'s clock and Paddle\'s differ by more than a minute, so the run stopped. ' + eLine({ stopped: 'clock' }), r.said);
+    } else {
+      check('E5 ' + name + ': ' + (want === 'closed' ? 'cancelled' : 'left alone as too young'),
+        r.status === 200 && r.json.closed === (want === 'closed' ? 1 : 0) && r.json.young === (want === 'closed' ? 0 : 1) && one.status === (want === 'closed' ? 'canceled' : 'draft'), r.json);
+    }
+  }
+  {
+    /* The second read is judged on Paddle's time as well. */
+    const one = txn({ created_at: '2026-11-25T03:59:30Z' });
+    paddleStub([one], { ignoreFilters: true, list: dated('2026-11-25T04:59:30Z'), get: (_c, _n, _usual, t) => reply(200, { data: { ...t, created_at: '2026-11-25T03:59:31Z' } }) });
+    const r = await run();
+    check('E5 this server 30 s ahead, and the second read gives a created_at one second later: no cancel', r.json.closed === 0 && r.json.changed === 1 && ePatched().length === 0, r.json);
+  }
+  for (const [name, value] of [['that is not a date', 'soon'], ['that is empty', '']]) {
+    const one = txn({ created_at: '2026-11-25T04:00:00Z' });
+    paddleStub([one], { ignoreFilters: true, list: (_c, _n, body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json', Date: value } }) });
+    const r = await run();
+    check('E5 a Date header ' + name + ': judged on this server\'s clock alone, as an answer with no Date header is', r.status === 200 && r.json.closed === 1, r.json);
+  }
+  check('E5 the clocks may differ by a minute and no more, and only a clock that is ahead moves the age',
+    /const MAX_CLOCK_GAP_MS = 60 \* 1000;/.test(EXPIRE_CODE) && /if \(Math\.abs\(gap\) > MAX_CLOCK_GAP_MS\) \{/.test(EXPIRE_CODE) && /ahead = Math\.max\(0, gap\);/.test(EXPIRE_CODE));
+  check('E5 the hour is 60 minutes, and the test is "at least"',
+    /const MAX_AGE_MS = 60 \* 60 \* 1000;/.test(EXPIRE_CODE) && /if \(now - created < MAX_AGE_MS\) return "young";/.test(EXPIRE_CODE));
+}
+
+{
+  /* E6. Pages, and the cap of 20 cancels a run. */
+  const notOurs = () => txn({ custom_data: { user_id: USER_ID } });
+
+  /* 30 that are not ours fill page one; 5 of ours are on page two. */
+  {
+    const store = [...Array.from({ length: 30 }, notOurs), ...Array.from({ length: 5 }, () => txn())];
+    paddleStub(store, { ignoreFilters: true });
+    const r = await run();
+    const lists = eLists();
+    const first = new URL(lists[0].url).searchParams;
+    const second = lists[1] ? new URL(lists[1].url).searchParams : new URLSearchParams();
+    check('E6 a second page is asked for with after=<the last id on page one> and the same other parameters',
+      lists.length === 2 && second.get('after') === store[29].id && !first.has('after') &&
+      lists[1].url === lists[0].url + '&after=' + store[29].id, lists.map((c) => c.url));
+    check('E6 ...the 5 on page two are cancelled, and the address Paddle gave for the next page is never fetched',
+      r.status === 200 && r.json.closed === 5 && r.json.listed === 35 && r.json.notOurs === 30 && r.json.more === false && r.json.stopped === null &&
+      calls.every((c) => c.host === 'api.paddle.com') && !/meta\.pagination\.next|pagination\.next/.test(EXPIRE_CODE), r.json);
+  }
+
+  /* 65 of ours. Twenty a run, the oldest first. */
+  {
+    const store = Array.from({ length: 65 }, () => txn());
+    const ids = store.map((t) => t.id);
+    paddleStub(store);
+    const cancelled = () => store.filter((t) => t.status === 'canceled').map((t) => t.id);
+    const r1 = await run();
+    check('E6 65 waiting: the first run cancels the 20 oldest and stops at the cap, saying more are waiting',
+      r1.status === 200 && r1.json.closed === 20 && r1.json.stopped === 'cap' && r1.json.more === true && same(cancelled(), ids.slice(0, 20)) &&
+      same(ePatched(), ids.slice(0, 20)) && eLists().length === 1 && calls.length === 41, r1.json);
+    check('E6 ...and its line says so', r1.said === 'checkouts closed: ' + eLine({ closed: 20, listed: 30, old: 20, more: true, stopped: 'cap' }), r1.said);
+    const r2 = await run();
+    check('E6 the second run cancels the next 20', r2.json.closed === 20 && r2.json.stopped === 'cap' && same(cancelled(), ids.slice(0, 40)), r2.json);
+    const r3 = await run();
+    check('E6 the third run the next 20', r3.json.closed === 20 && r3.json.more === true && same(cancelled(), ids.slice(0, 60)), r3.json);
+    const r4 = await run();
+    check('E6 the fourth run the last 5, with no more waiting',
+      r4.status === 200 && r4.json.closed === 5 && r4.json.more === false && r4.json.stopped === null && cancelled().length === 65, r4.json);
+  }
+
+  /* Exactly 20 of ours is not "more waiting". */
+  {
+    const store = Array.from({ length: 20 }, () => txn());
+    paddleStub(store);
+    const r = await run();
+    check('E6 exactly 20 waiting: all cancelled, and the run does not claim more are waiting', r.json.closed === 20 && r.json.more === false && r.json.stopped === null, r.json);
+  }
+
+  /* 150 that are listed and are not ours. */
+  {
+    const store = Array.from({ length: 150 }, notOurs);
+    paddleStub(store);
+    const r = await run();
+    check('E6 150 on the list that are not ours: four list calls and no more, stopped at "pages", nothing read or cancelled',
+      eLists().length === 4 && calls.length === 4 && r.json.listed === 120 && r.json.notOurs === 120 &&
+      r.json.stopped === 'pages' && r.json.more === true && store.every((t) => t.status === 'draft'), r.json);
+    /* Changed on 25 Nov 2026 (review): this run answered 200 with the
+       healthy line, so 120 that cannot be cancelled could hide the ones
+       behind them for good with nothing to search for. */
+    check('E6 ...and that run is a fault, not a healthy line: more are waiting and none was cancelled',
+      r.status === 502 && r.json.error === 'left_open' &&
+      r.said === 'Could not close checkouts: more are waiting and this run cancelled none. ' + eLine({ listed: 120, notOurs: 120, more: true, stopped: 'pages' }), r.said);
+    /* The same with one of ours in front: something was cancelled, so
+       the run is a healthy one that says more are waiting. */
+    const mixed = [txn(), ...Array.from({ length: 150 }, notOurs)];
+    paddleStub(mixed);
+    const m = await run();
+    check('E6 one of ours in front of 150 that are not: cancelled, 200, stopped "pages" with more waiting',
+      m.status === 200 && m.json.closed === 1 && m.json.stopped === 'pages' && m.json.more === true && mixed[0].status === 'canceled', m.json);
+    const exact = Array.from({ length: 120 }, notOurs);
+    paddleStub(exact);
+    const e = await run();
+    check('E6 exactly 120 on the list: four list calls, and no claim that more are waiting', eLists().length === 4 && e.json.stopped === null && e.json.more === false, e.json);
+  }
+
+  /* What ends the paging. */
+  for (const [name, spoil] of Object.entries({
+    'has_more missing': (p) => { delete p.has_more; },
+    'has_more as the text "true"': (p) => { p.has_more = 'true'; },
+    'has_more 1': (p) => { p.has_more = 1; },
+  })) {
+    const store = Array.from({ length: 40 }, notOurs);
+    paddleStub(store, { list: (_c, _n, body) => { spoil(body.meta.pagination); } });
+    const r = await run();
+    check('E6 ' + name + ': treated as the last page', r.status === 200 && eLists().length === 1 && r.json.stopped === null && r.json.listed === 30, r.json);
+  }
+  for (const [name, spoil] of Object.entries({
+    'an empty page that says there is more': (body) => { body.data = []; body.meta.pagination.has_more = true; },
+    'a page whose last id is not the shape of an id, with more to come': (body) => { body.data = [...body.data.slice(0, 29), { ...body.data[29], id: 'page/2' }]; },
+    'a page whose last entry has no id, with more to come': (body) => { body.data = [...body.data.slice(0, 29), null]; },
+  })) {
+    const store = Array.from({ length: 40 }, notOurs);
+    paddleStub(store, { list: (_c, _n, body) => { spoil(body); } });
+    const r = await run();
+    check('E6 ' + name + ': the run stops as list_failed, 502, with one list call',
+      r.status === 502 && r.json.stopped === 'list_failed' && eLists().length === 1 && /^Could not close checkouts: the list could not be paged\. /.test(r.said), r.json);
+  }
+  {
+    /* Paddle ignores `after` and hands back page one again. */
+    const store = Array.from({ length: 40 }, notOurs);
+    let pageOne = null;
+    paddleStub(store, { list: (_c, n, body) => { if (n === 1) pageOne = JSON.stringify(body); else return reply(200, pageOne); } });
+    const r = await run();
+    check('E6 a second page that ends on the same id as the cursor: stopped as list_failed, two list calls and no third',
+      r.status === 502 && r.json.stopped === 'list_failed' && eLists().length === 2, r.json);
+  }
+  for (const [name, spoil] of Object.entries({
+    'no meta': (body) => { delete body.meta; },
+    'pagination null': (body) => { body.meta.pagination = null; },
+    'data that is not a list': (body) => { body.data = { 0: txn() }; },
+  })) {
+    const good = txn();
+    paddleStub([good], { list: (_c, _n, body) => { spoil(body); } });
+    const r = await run();
+    check('E6 a list answer with ' + name + ': nothing is read or cancelled, 502',
+      r.status === 502 && r.json.stopped === 'list_failed' && calls.length === 1 && good.status === 'draft' &&
+      /^Could not close checkouts: the list answered 200, or could not be read\. /.test(r.said), r.said);
+  }
+  check('E6 the limits are the ones the notes give: 30 a page, 4 pages, 40 second reads, 20 cancels sent, 3 failures in a row',
+    /const PER_PAGE = 30;/.test(EXPIRE_CODE) && /const MAX_PAGES = 4;/.test(EXPIRE_CODE) && /const MAX_READS = 40;/.test(EXPIRE_CODE) &&
+    /const MAX_CANCELS = 20;/.test(EXPIRE_CODE) && /const MAX_FAILS_IN_ROW = 3;/.test(EXPIRE_CODE) &&
+    /if \(sent >= MAX_CANCELS\) \{/.test(EXPIRE_CODE) && /if \(reads >= MAX_READS\) \{/.test(EXPIRE_CODE) && !/closed >= MAX/.test(EXPIRE_CODE));
+
+  /* The limits count requests MADE, not requests that went well. Found
+     in review on 25 Nov 2026: with only successes counted, 125 waiting
+     and every cancel refused or failing made 244 requests in one run,
+     over the 240 a minute Paddle allows one address. Every case here is
+     150 old ones of ours. */
+  for (const [name, opts, want] of [
+    ['every cancel answers 409', { patch: () => reply(409, { error: { code: 'transaction_not_cancelable' } }) },
+      { lists: 1, reads: 20, patches: 20, stopped: 'cap', refused: 20 }],
+    ['every cancel answers 422', { patch: () => reply(422, { error: { code: 'validation' } }) },
+      { lists: 1, reads: 20, patches: 20, stopped: 'cap', refused: 20 }],
+    ['every second read says somebody is paying', { get: (_c, _n, _usual, t) => reply(200, { data: { ...t, payments: [{ status: 'authorized' }] } }) },
+      { lists: 2, reads: 40, patches: 0, stopped: 'reads', paying: 40 }],
+    ['every second read leaves out the payments', { get: (_c, _n, _usual, t) => { const { payments: _p, ...rest } = t; return reply(200, { data: rest }); } },
+      { lists: 2, reads: 40, patches: 0, stopped: 'reads', changed: 40 }],
+    ['every second read answers 404', { get: () => reply(404, { error: { code: 'not_found' } }) },
+      { lists: 2, reads: 40, patches: 0, stopped: 'reads', refused: 40 }],
+  ]) {
+    const store = Array.from({ length: 150 }, () => txn());
+    paddleStub(store, opts);
+    const r = await run();
+    check('E6 150 waiting and ' + name + ': the run stops at "' + want.stopped + '" after ' + want.reads + ' reads and ' + want.patches + ' cancels, never more than 64 requests',
+      eLists().length === want.lists && eReads().length === want.reads && ePatched().length === want.patches && calls.length <= 64 &&
+      r.json.stopped === want.stopped && r.json.more === true && r.json.closed === 0 &&
+      (r.json.refused === (want.refused ?? 0)) && (r.json.paying === (want.paying ?? 0)) && (r.json.changed === (want.changed ?? 0)), [calls.length, r.json]);
+    check('E6 ...and that run (' + name + ') is a fault with one line to search for, never the healthy line',
+      r.status === 502 && r.json.ok === false && r.said.startsWith('Could not close checkouts: ') && store.every((t) => t.status === 'draft'), r.said);
+  }
+  {
+    /* Every cancel answers 500 while every read is good: three in a row
+       stop the run. Before, the good read between two cancels wiped the
+       count and the run went on to 120 of each. */
+    const store = Array.from({ length: 150 }, () => txn());
+    paddleStub(store, { patch: () => reply(500, {}) });
+    const r = await run();
+    check('E6 150 waiting and every cancel answers 500: stopped as paddle_failing after 3 reads and 3 cancels',
+      r.status === 502 && r.json.stopped === 'paddle_failing' && r.json.failed === 3 && eReads().length === 3 && ePatched().length === 3 && calls.length === 7, [calls.length, r.json]);
+  }
+  {
+    /* The most a run can ask of Paddle: cancels that fail two at a
+       time with a good one between, so nothing stops the run but the
+       limits. */
+    const store = Array.from({ length: 150 }, () => txn());
+    paddleStub(store, { patch: (_c, n, usual) => (n % 3 === 0 ? usual() : reply(503, {})) });
+    const r = await run();
+    check('E6 cancels failing two at a time with a good one between: the run stops at 20 cancels sent, successes or not',
+      calls.length <= 64 && ePatched().length === 20 && eReads().length === 20 && r.json.stopped === 'cap' && r.json.closed === 6 && r.json.failed === 14, [calls.length, r.json]);
+  }
+}
+
+{
+  /* E7. Paddle failing part of the way through. One failure does not
+     throw the rest of the run away. */
+  const five = () => Array.from({ length: 5 }, () => txn());
+  const statuses = (store) => store.map((t) => t.status).join();
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual, t) => (n === 2 ? reply(500, { error: { code: 'internal_error', detail: 'could not cancel ' + t.id } }) : usual()) });
+    const r = await run();
+    check('E7 the cancel for the 2nd answers 500: the other four are cancelled, failed 1, 502',
+      r.status === 502 && r.json.error === 'paddle' && r.json.closed === 4 && r.json.failed === 1 && r.json.stopped === null &&
+      statuses(store) === 'canceled,draft,canceled,canceled,canceled', r.json);
+    check('E7 ...and one line to search for, counts only',
+      r.said === 'Could not close checkouts: some reads or cancels failed. ' + eLine({ closed: 4, listed: 5, old: 5, failed: 1 }), r.said);
+  }
+  {
+    const store = five();
+    paddleStub(store, { get: (_c, n, usual) => { if (n === 2) throw new Error('network down for ' + store[1].id); return usual(); } });
+    const r = await run();
+    check('E7 the read for the 2nd cannot be reached: the same, and that one gets no cancel',
+      r.status === 502 && r.json.closed === 4 && r.json.failed === 1 && statuses(store) === 'canceled,draft,canceled,canceled,canceled' && !ePatched().includes(store[1].id), r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { get: (_c, n, usual) => (n >= 2 && n <= 4 ? reply(503, 'Service Unavailable') : usual()) });
+    const r = await run();
+    check('E7 three failures in a row: the run stops as paddle_failing and the 5th is never asked for',
+      r.status === 502 && r.json.stopped === 'paddle_failing' && r.json.closed === 1 && r.json.failed === 3 && !eTouched(store[4].id) &&
+      statuses(store) === 'canceled,draft,draft,draft,draft' && /^Could not close checkouts: Paddle failed 3 times in a row, so the run stopped\. /.test(r.said), r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { get: (_c, n, usual) => (n === 2 || n === 4 || n === 5 ? reply(500, {}) : usual()) });
+    const r = await run();
+    check('E7 three failures that are not in a row do not stop the run', r.status === 502 && r.json.stopped === null && r.json.closed === 2 && r.json.failed === 3 && eReads().length === 5, r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, {
+      patch: (_c, n, usual, t) => (n === 2
+        ? reply(409, { error: { type: 'request_error', code: 'transaction_not_cancelable', detail: `Transaction ${t.id} of ${USER_EMAIL} (${USER_ID}, ctm_01test) cannot be canceled` } })
+        : usual()),
+    });
+    const r = await run();
+    check('E7 the cancel for the 2nd is refused with 409 and a body that quotes the transaction and an email: refused 1, the rest cancelled',
+      r.json.closed === 4 && r.json.refused === 1 && r.json.failed === 0 && r.json.stopped === null && statuses(store) === 'canceled,draft,canceled,canceled,canceled', r.json);
+    /* Changed on 25 Nov 2026 (review): a refusal answered 200 with the
+       healthy line and Paddle's status and code were thrown away, so
+       cancelling could stop for good with nothing to search for. */
+    check('E7 ...and a refusal is a fault: 502 left_open, with the status and Paddle\'s short code and nothing else Paddle said',
+      r.status === 502 && r.json.error === 'left_open' && namesNobody(r) && !/cannot be|request_error|Transaction/.test(r.text + r.said) &&
+      r.said === 'Could not close checkouts: Paddle refused 1, and last a cancel answered 409 (transaction_not_cancelable). ' + eLine({ closed: 4, listed: 5, old: 5, refused: 1 }), r.said);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual) => (n === 2 ? reply(400, { error: { code: 'txn_01e000001 for ' + USER_EMAIL } }) : usual()) });
+    const r = await run();
+    check('E7 a refusal whose error code is not the shape of one: the status alone is logged',
+      r.status === 502 && r.said.startsWith('Could not close checkouts: Paddle refused 1, and last a cancel answered 400. ') && namesNobody(r), r.said);
+  }
+  {
+    /* Three failing CANCELS in a row, each after a good read. Found in
+       review on 25 Nov 2026: the good read wiped the count, so this
+       never stopped. */
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual) => (n >= 2 && n <= 4 ? reply(500, { error: { code: 'internal_error' } }) : usual()) });
+    const r = await run();
+    check('E7 three failing cancels in a row, each after a good read: the run stops as paddle_failing and the 5th is never asked for',
+      r.status === 502 && r.json.stopped === 'paddle_failing' && r.json.closed === 1 && r.json.failed === 3 && !eTouched(store[4].id) &&
+      statuses(store) === 'canceled,draft,draft,draft,draft' && /^Could not close checkouts: Paddle failed 3 times in a row, so the run stopped\. /.test(r.said), r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual) => { if (n >= 2 && n <= 4) throw new Error('timed out for ' + store[n - 1].id); return usual(); } });
+    const r = await run();
+    check('E7 three cancels in a row that cannot be reached: the same', r.status === 502 && r.json.stopped === 'paddle_failing' && r.json.failed === 3 && !eTouched(store[4].id), r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, {
+      get: (_c, n, usual) => (n === 3 ? reply(503, {}) : usual()),
+      patch: (_c, n, usual) => (n === 2 ? reply(500, {}) : n === 3 ? reply(200, { data: { id: 'txn_01e999999', status: 'draft' } }) : usual()),
+    });
+    const r = await run();
+    check('E7 a failed cancel, then a failed read, then a cancel answered 200 without a cancelled copy: three in a row, stopped',
+      r.status === 502 && r.json.stopped === 'paddle_failing' && r.json.closed === 1 && r.json.failed === 3 && !eTouched(store[4].id), r.json);
+  }
+  {
+    /* A transaction dealt with from start to finish ends the run of
+       failures: fail, fail, good, fail, fail does not stop. */
+    const store = Array.from({ length: 6 }, () => txn());
+    paddleStub(store, { patch: (_c, n, usual) => (n === 3 || n === 6 ? usual() : reply(500, {})) });
+    const r = await run();
+    check('E7 two failing cancels, a good one, two more failing, a good one: the run goes on to the end',
+      r.status === 502 && r.json.stopped === null && r.json.closed === 2 && r.json.failed === 4 && ePatched().length === 6, r.json);
+  }
+  {
+    /* ...and so does one that turned out to need no cancel. */
+    const store = five();
+    paddleStub(store, {
+      get: (_c, n, usual, t) => (n === 3 ? reply(200, { data: { ...t, status: 'completed' } }) : usual()),
+      patch: (_c, n, usual) => (n <= 3 ? reply(500, {}) : usual()),
+    });
+    const r = await run();
+    check('E7 two failing cancels, one paid in between, a third failing cancel: not three in a row',
+      r.json.stopped === null && r.json.failed === 3 && r.json.changed === 1 && r.json.closed === 1 && eReads().length === 5, r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual, t) => (n === 2 ? reply(200, { data: { ...t } }) : usual()) });
+    const r = await run();
+    check('E7 the cancel answers 200 but the copy is not cancelled: counted as failed, not as closed', r.status === 502 && r.json.closed === 4 && r.json.failed === 1, r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual, t) => (n === 2 ? reply(200, { data: { ...t, id: store[0].id, status: 'canceled' } }) : usual()) });
+    const r = await run();
+    check('E7 the cancel answers 200 with another transaction\'s copy: counted as failed', r.status === 502 && r.json.closed === 4 && r.json.failed === 1, r.json);
+  }
+  for (const [name, list, line] of [
+    ['answers 500', () => reply(500, { error: { code: 'internal_error', detail: 'txn_01secret' } }), 'the list answered 500 (internal_error), or could not be read'],
+    ['answers 500 with an error code that is not the shape of one', () => reply(500, { error: { code: 'txn_01e000001 for ' + USER_EMAIL } }), 'the list answered 500, or could not be read'],
+    ['answers 400', () => reply(400, { error: { code: 'bad_request' } }), 'the list answered 400 (bad_request), or could not be read'],
+    ['cannot be reached', () => { throw new Error('connect failed'); }, 'the list could not be reached'],
+    ['answers 200 with a body that is not JSON', () => reply(200, '<html>txn_01e000001</html>'), 'the list answered 200, or could not be read'],
+  ]) {
+    const store = five();
+    paddleStub(store, { list });
+    const r = await run();
+    check('E7 the first list ' + name + ': no read, no cancel, 502',
+      r.status === 502 && r.json.stopped === 'list_failed' && calls.length === 1 && statuses(store) === 'draft,draft,draft,draft,draft' &&
+      r.said === 'Could not close checkouts: ' + line + '. ' + eLine({ stopped: 'list_failed' }), r.said);
+  }
+  {
+    /* Something nobody planned for: the clock itself throws. */
+    paddleStub(five());
+    const r = await run({ now: () => { throw new TypeError('no clock for txn_01e000001'); } });
+    check('E7 an unplanned fault: 500, one line with the kind of error and none of its text',
+      r.status === 500 && r.json?.error === 'error' && r.said === 'Could not close checkouts: an unexpected fault (TypeError).', r.said);
+  }
+  {
+    /* A run that takes too long stops starting new work. The clock
+       moves three seconds every time it is read. */
+    const store = Array.from({ length: 30 }, () => txn());
+    paddleStub(store);
+    let t = E_NOW;
+    const r = await run({ now: () => (t += 3000) });
+    check('E7 a run past its 18 seconds stops as "time" with more waiting, and what it cancelled stands',
+      r.status === 200 && r.json.stopped === 'time' && r.json.more === true && r.json.closed >= 1 && r.json.closed < 20 &&
+      store.filter((x) => x.status === 'canceled').length === r.json.closed, r.json);
+  }
+  {
+    /* The time is looked at before a new page is asked for as well. The
+       first pass counts how often the clock is read before the second
+       list; the second pass moves the clock on at exactly that reading,
+       which is the look at the top of page two. */
+    const build = () => [txn(), ...Array.from({ length: 29 }, () => txn({ custom_data: { user_id: USER_ID } })), ...Array.from({ length: 5 }, () => txn())];
+    let readings = 0;
+    let atSecondList = 0;
+    paddleStub(build(), { ignoreFilters: true, list: (_c, n) => { if (n === 2) atSecondList = readings; } });
+    await run({ now: () => { readings++; return E_NOW; } });
+    const store = build();
+    paddleStub(store, { ignoreFilters: true });
+    let reading = 0;
+    const r = await run({ now: () => (++reading >= atSecondList ? E_NOW + 18001 : E_NOW) });
+    check('E7 a run already past its 18 seconds when page two is due: one list and no second, stopped "time", what it cancelled stands',
+      atSecondList > 30 && r.status === 200 && eLists().length === 1 && r.json.stopped === 'time' && r.json.more === true && r.json.closed === 1 &&
+      r.json.listed === 30 && store[0].status === 'canceled' && store.slice(30).every((t) => t.status === 'draft'), [atSecondList, r.json]);
+    const onTime = build();
+    paddleStub(onTime, { ignoreFilters: true });
+    let tick = 0;
+    const ok = await run({ now: () => (++tick >= atSecondList ? E_NOW + 18000 : E_NOW) });
+    check('E7 ...and at exactly 18 seconds page two is still asked for', eLists().length === 2 && ok.json.listed === 35, ok.json);
+  }
+}
+
+{
+  /* E8. A 429 stops the run at once: Paddle blocks the address for 60
+     seconds, and create-checkout shares it. Nothing is retried. */
+  const five = () => Array.from({ length: 5 }, () => txn());
+  {
+    const store = five();
+    paddleStub(store, { list: () => reply(429, { error: { code: 'too_many_requests' } }) });
+    const r = await run();
+    check('E8 429 on the list: no further request, stopped rate_limited, 502',
+      r.status === 502 && r.json.stopped === 'rate_limited' && calls.length === 1 && /^Could not close checkouts: the list answered 429: too many requests, so the run stopped\. /.test(r.said), r.said);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual) => (n === 3 ? reply(429, { error: { code: 'too_many_requests' } }) : usual()) });
+    const r = await run();
+    const last = calls[calls.length - 1];
+    check('E8 429 on the 3rd cancel: the first two stand, and there is no request of any kind after the 429',
+      r.status === 502 && r.json.stopped === 'rate_limited' && r.json.closed === 2 && calls.length === 7 && last.method === 'PATCH' && last.path === '/transactions/' + store[2].id &&
+      store.map((t) => t.status).join() === 'canceled,canceled,draft,draft,draft', r.json);
+  }
+  {
+    const store = five();
+    paddleStub(store, { get: (_c, n, usual) => (n === 2 ? reply(429, {}) : usual()) });
+    const r = await run();
+    check('E8 429 on the 2nd read: the first stands, nothing after', r.status === 502 && r.json.stopped === 'rate_limited' && r.json.closed === 1 && calls.length === 4 && calls[3].method === 'GET', r.json);
+  }
+  for (const status of [401, 403]) {
+    const store = five();
+    paddleStub(store, { list: () => reply(status, { error: { code: 'forbidden', detail: 'key apikey_01secret' } }) });
+    const r = await run();
+    check('E8 ' + status + ' on the list: stopped paddle_auth, one line saying the key may not read transactions',
+      r.status === 502 && r.json.stopped === 'paddle_auth' && calls.length === 1 &&
+      r.said === `Could not close checkouts: the list answered ${status}: the key may not read transactions. ` + eLine({ stopped: 'paddle_auth' }), r.said);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: () => reply(403, { error: { code: 'forbidden' } }) });
+    const r = await run();
+    check('E8 403 on the first cancel: the run stops, saying the key may not write transactions',
+      r.status === 502 && r.json.stopped === 'paddle_auth' && r.json.closed === 0 && calls.length === 3 && /a cancel answered 403: the key may not write transactions\. /.test(r.said), r.said);
+  }
+  for (const status of [401, 403]) {
+    const store = five();
+    paddleStub(store, { get: (_c, n, usual) => (n === 2 ? reply(status, { error: { code: 'forbidden', detail: 'key apikey_01secret' } }) : usual()) });
+    const r = await run();
+    check('E8 ' + status + ' on the 2nd read: the run stops as paddle_auth, the first stands, and nothing is asked after',
+      r.status === 502 && r.json.error === 'paddle' && r.json.stopped === 'paddle_auth' && r.json.closed === 1 && r.json.refused === 0 && calls.length === 4 &&
+      r.said === `Could not close checkouts: a read answered ${status}: the key may not read transactions. ` + eLine({ closed: 1, listed: 5, old: 2, stopped: 'paddle_auth' }), r.said);
+  }
+  {
+    const store = five();
+    paddleStub(store, { patch: (_c, n, usual) => (n === 2 ? reply(401, { error: { code: 'authentication_malformed' } }) : usual()) });
+    const r = await run();
+    check('E8 401 on the 2nd cancel: the run stops as paddle_auth, saying the key may not write transactions',
+      r.status === 502 && r.json.stopped === 'paddle_auth' && r.json.closed === 1 && r.json.refused === 0 && calls.length === 5 &&
+      r.said === 'Could not close checkouts: a cancel answered 401: the key may not write transactions. ' + eLine({ closed: 1, listed: 5, old: 2, stopped: 'paddle_auth' }), r.said);
+  }
+  check('E8 nothing in the function waits or tries again', !/setTimeout|sleep|Retry-After|retry/i.test(EXPIRE_CODE));
+}
+
+{
+  /* E9. The second look, straight before the cancel. The list is a
+     moment old: somebody may have paid since. */
+  /* The third entry says whether the run is a fault. Paid, billed or
+     cancelled since the list is as it should be. Still unpaid and not
+     passing is a prepared purchase left open for a reason nobody
+     planned, and is a fault (changed on 25 Nov 2026, review). */
+  const SECOND = {
+    'completed (paid in between)': [(t) => ({ ...t, status: 'completed' }), 'changed'],
+    'paid': [(t) => ({ ...t, status: 'paid' }), 'changed'],
+    'billed': [(t) => ({ ...t, status: 'billed', billed_at: '2026-11-25T04:59:59Z' }), 'changed'],
+    'already canceled': [(t) => ({ ...t, status: 'canceled' }), 'changed'],
+    'origin web': [(t) => ({ ...t, origin: 'web' }), 'changed', true],
+    'a subscription id': [(t) => ({ ...t, subscription_id: 'sub_01test' }), 'changed', true],
+    'made_by gone, and no price to know the transaction by': [(t) => ({ ...t, custom_data: { user_id: USER_ID } }), 'changed', true],
+    'no payments field': [(t) => { const { payments: _p, ...rest } = t; return rest; }, 'changed', true],
+    'payments null': [(t) => ({ ...t, payments: null }), 'changed', true],
+    'payments that is not a list': [(t) => ({ ...t, payments: {} }), 'changed', true],
+    'a different id': [(t) => ({ ...t, id: 'txn_01e999999' }), 'changed', true],
+    'a different id that is paid': [(t) => ({ ...t, id: 'txn_01e999999', status: 'paid' }), 'changed', true],
+    'no data': [() => null, 'changed', true],
+    'a payment with status captured': [(t) => ({ ...t, payments: [{ status: 'captured' }] }), 'paying'],
+    'a payment with status authorized': [(t) => ({ ...t, payments: [{ status: 'authorized' }] }), 'paying'],
+    'a payment with status authorized_flagged': [(t) => ({ ...t, payments: [{ status: 'authorized_flagged' }] }), 'paying'],
+    'a payment with status action_required': [(t) => ({ ...t, payments: [{ status: 'action_required' }] }), 'paying'],
+    'a payment with status pending_no_action_required': [(t) => ({ ...t, payments: [{ status: 'pending_no_action_required' }] }), 'paying'],
+    'a payment with status created': [(t) => ({ ...t, payments: [{ status: 'created' }] }), 'paying'],
+    'a payment with status unknown': [(t) => ({ ...t, payments: [{ status: 'unknown' }] }), 'paying'],
+    'a payment with a status nobody has seen': [(t) => ({ ...t, payments: [{ status: 'settling' }] }), 'paying'],
+    'a payment with no status': [(t) => ({ ...t, payments: [{}] }), 'paying'],
+    'a payment entry that is null': [(t) => ({ ...t, payments: [null] }), 'paying'],
+    'one failed payment and one captured': [(t) => ({ ...t, payments: [{ status: 'error' }, { status: 'captured' }] }), 'paying'],
+  };
+  for (const [name, [fresh, counted, fault]] of Object.entries(SECOND)) {
+    const one = txn();
+    const good = txn();
+    paddleStub([one, good], { get: (_c, n, usual, t) => (n === 1 ? reply(200, { data: fresh(t) }) : usual()) });
+    const r = await run();
+    check('E9 the list says draft and the second read says ' + name + ': no cancel, counted as ' + counted + ', and the next one is still cancelled',
+      r.json.closed === 1 && r.json[counted] === 1 && one.status === 'draft' && good.status === 'canceled' && same(ePatched(), [good.id]), r.json);
+    check('E9 ...' + name + ': ' + (fault ? 'a fault, 502 left_open, with a line that says one still unpaid did not pass' : 'not a fault, 200'),
+      fault
+        ? r.status === 502 && r.json.error === 'left_open' &&
+          r.said === 'Could not close checkouts: 1 still unpaid did not pass the second read. ' + eLine({ closed: 1, listed: 2, old: 2, changed: 1 })
+        : r.status === 200 && r.said === 'checkouts closed: ' + eLine({ closed: 1, listed: 2, old: 2, [counted]: 1 }), r.said);
+  }
+  {
+    /* Every one that was due turned out to be paid: nothing to cancel,
+       and nothing wrong. */
+    const store = [txn(), txn()];
+    paddleStub(store, { get: (_c, _n, _usual, t) => reply(200, { data: { ...t, status: 'completed' } }) });
+    const r = await run();
+    check('E9 both were paid between the list and the second read: 200, closed 0, changed 2, no cancel', r.status === 200 && r.json.closed === 0 && r.json.changed === 2 && ePatched().length === 0, r.json);
+  }
+  for (const status of ['error', 'canceled', 'dropped']) {
+    const one = txn({ payments: [{ status }, { status }] });
+    paddleStub([one]);
+    const r = await run();
+    check('E9 payment attempts that all ended as "' + status + '": nobody is paying, so cancelled', r.json.closed === 1 && one.status === 'canceled', r.json);
+  }
+  {
+    const one = txn();
+    paddleStub([one], { get: () => reply(404, { error: { code: 'not_found', detail: one.id } }) });
+    const r = await run();
+    check('E9 the second read answers 404: no cancel, refused 1, and a fault that gives the status and the short code',
+      r.status === 502 && r.json.error === 'left_open' && r.json.refused === 1 && r.json.closed === 0 && ePatched().length === 0 &&
+      r.said === 'Could not close checkouts: Paddle refused 1, and last a read answered 404 (not_found). ' + eLine({ listed: 1, old: 1, refused: 1 }), r.said);
+  }
+  {
+    /* The list leaves payments out (it may: not read either way); the
+       single read carries them. */
+    const one = txn();
+    paddleStub([one], { list: (_c, _n, body) => { body.data = body.data.map(({ payments: _p, ...rest }) => rest); } });
+    const r = await run();
+    check('E9 a list entry with no payments field is still read a second time, and cancelled when that read lists none', r.json.closed === 1 && one.status === 'canceled', r.json);
+  }
+  {
+    const price = { items: [{ quantity: 1, price: { description: 'Premium yearly, first payment after 30 days (create-checkout)', trial_period: { interval: 'day', frequency: 30 } } }] };
+    const one = txn(price);
+    paddleStub([one], { get: (_c, _n, _usual, t) => reply(200, { data: { ...t, custom_data: { note: 'test' } } }) });
+    const r = await run();
+    check('E9 made_by on the list and gone on the second read, with the one-off price still there: cancelled', r.status === 200 && r.json.closed === 1 && one.status === 'canceled', r.json);
+    const two = txn({ custom_data: { note: 'test' }, ...price });
+    paddleStub([two], { get: (_c, _n, _usual, t) => reply(200, { data: { ...t, items: [] } }) });
+    const r2 = await run();
+    check('E9 known by the price on the list, and neither mark on the second read: no cancel, and a fault',
+      r2.status === 502 && r2.json.error === 'left_open' && r2.json.changed === 1 && r2.json.closed === 0 && two.status === 'draft' && ePatched().length === 0, r2.json);
+  }
+  check('E9 the second read is tested with the same function as the list entry, and must list its payments',
+    /const first = ours\(item, Date\.now\(\) - ahead, false\);/.test(EXPIRE_CODE) && /const second = same \? ours\(fresh, Date\.now\(\) - ahead, true\) : "not_ours";/.test(EXPIRE_CODE) &&
+    /const FAILED_PAYMENT = \["error", "canceled", "dropped"\];/.test(EXPIRE_CODE));
+}
+
+{
+  /* E10. Only the one body, only two kinds of request, only Paddle.
+     run() looked at every call of every case above. */
+  check('E10 across every run in part E: only GET and PATCH, only to Paddle, no GET with a body, every PATCH body exactly {"status":"canceled"}, ' +
+    'and every PATCH for an id that run listed and read straight before', eBroken.length === 0 && eRuns >= 150 && ePatches >= 250, [eRuns, ePatches, ...eBroken.slice(0, 5)]);
+  check('E10 the body is a constant written once, and is the only thing ever sent',
+    (EXPIRE_SOURCE.split(CANCEL_TEXT).length - 1) === 1 && EXPIRE_CODE.includes("const CANCEL_BODY = '" + CANCEL_TEXT + "';") &&
+    !/JSON\.stringify\([^)]*status/.test(EXPIRE_CODE) && (EXPIRE_CODE.match(/CANCEL_BODY/g) || []).length === 2);
+  check('E10 three kinds of call to Paddle and no more: the list, one read, one cancel. Never a POST, never a DELETE',
+    (EXPIRE_CODE.match(/await paddle\(/g) || []).length === 3 && /paddle\(\s*"GET",\s*`\/transactions\?status=draft,ready&/.test(EXPIRE_CODE) &&
+    /paddle\("GET", `\/transactions\/\$\{id\}`\)/.test(EXPIRE_CODE) && /paddle\("PATCH", `\/transactions\/\$\{id\}`, CANCEL_BODY\)/.test(EXPIRE_CODE) &&
+    !/DELETE|PUT/.test(EXPIRE_CODE) && (EXPIRE_CODE.match(/"POST"/g) || []).length === 1 && /request\.method !== "POST"/.test(EXPIRE_CODE) &&
+    (EXPIRE_CODE.match(/\bfetch\(/g) || []).length === 1);
+  check('E10 it holds no export and no import, and reads nothing from Supabase',
+    !/^\s*export\b/m.test(EXPIRE_CODE) && !/^\s*import\b/m.test(EXPIRE_CODE) && !/SUPABASE|SERVICE_ROLE|ANON_KEY/.test(EXPIRE_CODE));
+  check('E10 it uses the same sandbox switch as create-checkout, not a host written in',
+    /Deno\.env\.get\("PADDLE_ENVIRONMENT"\) \?\? "production"\) === "sandbox"/.test(EXPIRE_CODE) && EXPIRE_CODE.includes('https://sandbox-api.paddle.com') && EXPIRE_CODE.includes('https://api.paddle.com'));
+  const madeByThere = (CHECKOUT_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').match(/made_by: "([^"]+)"/) || [])[1];
+  const madeByHere = (EXPIRE_CODE.match(/const MADE_BY = "([^"]+)";/) || [])[1];
+  check('E10 MADE_BY is the text create-checkout writes as made_by', Boolean(madeByThere) && madeByHere === madeByThere && madeByHere === 'create-checkout', { madeByHere, madeByThere });
+  /* The second mark: the end of the description create-checkout writes
+     on its one-off price, beside the trial that carries the free days. */
+  const checkoutCode = CHECKOUT_SOURCE.replace(/\/\*[\s\S]*?\*\//g, '');
+  const described = (checkoutCode.match(/description: `([^`]+)`/) || [])[1] || '';
+  const priceMark = (EXPIRE_CODE.match(/const PRICE_MARK = "([^"]+)";/) || [])[1];
+  check('E10 PRICE_MARK is how the description create-checkout writes on its one-off price ends, and that price carries the trial in days',
+    priceMark === ' (create-checkout)' && described.endsWith(priceMark) && (checkoutCode.match(/description: `/g) || []).length === 1 &&
+    /trial_period: \{ interval: "day", frequency: days \},/.test(checkoutCode) && /price\.description\.endsWith\(PRICE_MARK\)/.test(EXPIRE_CODE) &&
+    /if \(!markedByData\(txn\.custom_data\) && !markedByPrice\(txn\.items\)\) return "not_ours";/.test(EXPIRE_CODE), { priceMark, described });
+  check('E10 the id that reaches a Paddle address is tested for its shape first, and origin is an allow list of one',
+    /const TXN_ID = \/\^txn_\[a-z0-9\]\+\$\/;/.test(EXPIRE_CODE) && /!TXN_ID\.test\(txn\.id\)\) return "not_ours";/.test(EXPIRE_CODE) &&
+    /if \(txn\.origin !== "api"\) return "not_ours";/.test(EXPIRE_CODE) && /if \(!\(txn\.status === "draft" \|\| txn\.status === "ready"\)\) return "not_ours";/.test(EXPIRE_CODE));
+  check('E10 each request to Paddle has a time limit', /signal: AbortSignal\.timeout\(REQUEST_LIMIT_MS\)/.test(EXPIRE_CODE) && /const REQUEST_LIMIT_MS = 3000;/.test(EXPIRE_CODE) && /const RUN_BUDGET_MS = 18000;/.test(EXPIRE_CODE));
+  /* The job hangs up after 25 seconds. A run starts no new transaction
+     after RUN_BUDGET_MS, and one transaction is at most two requests,
+     so the longest run must still fit (review, 25 Nov 2026: at 20
+     seconds and 8 a request a run could last 36). */
+  check('E10 the longest a run can last is under the 25 seconds the job waits', 18000 + 2 * 3000 < 25000 &&
+    /timeout_milliseconds := 25000/.test(read('supabase/cron.sql')));
+}
+
+{
+  /* E11. Nothing names an account. run() also looked, for every case,
+     that there was exactly one log line and that the answer held the
+     documented keys and nothing else. */
+  check('E11 across every run in part E: one log line, and neither the answer nor the log holds an account id, an email, a transaction id or a customer id',
+    eBroken.every((b) => !b.wrong.some((w) => /names|log lines|answer/.test(w))) && eBroken.length === 0, eBroken.slice(0, 5));
+  /* A body sent to the function is never read. */
+  const young = txn({ created_at: '2026-11-25T04:30:00Z' });
+  const paid = txn({ status: 'completed' });
+  const store = [young, paid];
+  for (const ignoreFilters of [false, true]) {
+    paddleStub(store, { ignoreFilters });
+    const r = await run({ body: JSON.stringify({ id: young.id, transaction_id: paid.id, ids: [young.id, paid.id], status: 'draft', max_age_minutes: 0, after: paid.id }) });
+    check('E11 a request body naming transactions is never read' + (ignoreFilters ? ' (the list ignores its filters)' : '') + ': nothing changes and no request to Paddle carries those ids',
+      r.status === 200 && r.json.closed === 0 && young.status === 'draft' && paid.status === 'completed' && calls.length === 1 &&
+      !calls.some((c) => c.url.includes(young.id) || c.url.includes(paid.id)), r.json);
+  }
+  check('E11 the function reads nothing of the request but its method and the secret header',
+    !/request\.(json|text|body|url|formData|arrayBuffer|blob)\b/.test(EXPIRE_CODE) &&
+    same((EXPIRE_CODE.match(/request\.[a-zA-Z]+/g) || []).sort(), ['request.headers', 'request.method']), EXPIRE_CODE.match(/request\.[a-zA-Z]+/g));
+  check('E11 no log line is given an id, Paddle\'s words or an error\'s text',
+    [...EXPIRE_CODE.matchAll(/console\.(log|warn|error)\(([^;]*)\);/g)].every((m) => !/\bid\b|\.text|\.data|\.message|String\(error\)|\berror\)/.test(m[2])) &&
+    (EXPIRE_CODE.match(/console\.(log|warn|error)\(/g) || []).length === 5, EXPIRE_CODE.match(/console\.(log|warn|error)\([^;]*\);/g));
+}
+
+{
+  /* E12. supabase/schema-expire-checkouts.sql, read as text. STATIC
+     ONLY: nothing here runs SQL, and the file has never been run
+     anywhere. Its first run is the owner's paste. */
+  const raw = read('supabase/schema-expire-checkouts.sql');
+  const sql = raw.split('\n').map((line) => line.replace(/^\s*--.*$/, '')).join('\n');
+  check('E12 the new job is a copy of countdown-milestones with the function\'s path swapped, and nothing else is typed',
+    sql.includes("source_job     constant text := 'countdown-milestones';") && sql.includes("new_job        constant text := 'countdown-expire-checkouts';") &&
+    sql.includes("old_path       constant text := '/functions/v1/notify-milestones';") && sql.includes("new_path       constant text := '/functions/v1/expire-checkouts';") &&
+    sql.includes('new_command := replace(source_command, old_path, new_path);'));
+  check('E12 every ten minutes, off the minutes the other jobs use', sql.includes("perform cron.schedule(new_job, '3,13,23,33,43,53 * * * *', new_command);"));
+  check('E12 exactly one cron.schedule and one cron.unschedule, inside one DO block, the unschedule only when the job exists',
+    (sql.match(/cron\.schedule\(/g) || []).length === 1 && (sql.match(/cron\.unschedule\(/g) || []).length === 1 &&
+    (sql.match(/do \$do\$/g) || []).length === 1 && sql.indexOf('do $do$') < sql.indexOf('cron.unschedule(') && sql.indexOf('cron.schedule(') < sql.lastIndexOf('$do$;') &&
+    /if exists \(select 1 from cron\.job where jobname = new_job\) then\s+perform cron\.unschedule\(new_job\);\s+end if;/.test(sql));
+  check('E12 it stops, changing nothing, when the source job is missing, is not the shape cron.sql gives, or still holds a placeholder',
+    /if found_count <> 1 or source_command is null then\s+raise exception 'Nothing was changed\./.test(sql) &&
+    (sql.match(/raise exception 'Nothing was changed\. /g) || []).length === 5 &&
+    sql.indexOf('raise exception', sql.indexOf('new_command := replace(')) < sql.indexOf('cron.unschedule(') &&
+    ["position('<CRON_SECRET>' in source_command) > 0", "position('<PROJECT_REF>' in source_command) > 0", "position('<ANON_KEY>' in source_command) > 0",
+      "position('net.http_post' in source_command) = 0", "position('x-cron-secret' in source_command) = 0"].every((t) => sql.includes(t)));
+  check('E12 no secret is typed in: the placeholders appear only inside those tests',
+    (raw.match(/<CRON_SECRET>/g) || []).length === 1 && (raw.match(/<ANON_KEY>/g) || []).length === 1 && (raw.match(/<PROJECT_REF>/g) || []).length === 1 &&
+    !/x-cron-secret'\s*,\s*'[^'\s]/.test(sql.replace("'''x-cron-secret'',\\s*''[^'']+'''", '')) && !/Bearer/.test(sql));
+  /* The command holds the secret, so nothing may put one on the screen. */
+  const statements = sql.split(';');
+  check('E12 no statement returns a job\'s command: it is read once, into a variable, and the check query only tests it',
+    (sql.match(/min\(command\)\s+into found_count, source_command/g) || []).length === 1 &&
+    statements.filter((s) => /\bselect\b[\s\S]*\bcommand\b[\s\S]*from cron\.job/i.test(s)).length === 2 &&
+    !/select\s+(\*|command|j\.command|m\.command)\s*(,|from)/i.test(sql) && !/,\s*(j\.|m\.)?command\s*(,|from)/i.test(sql) && !/select \*/i.test(sql) && !/raise notice/i.test(sql));
+  const raises = sql.split('\n').filter((line) => /\braise\b/i.test(line));
+  check('E12 no RAISE prints a command, and none holds a percent sign', raises.length === 5 && raises.every((line) => !/source_command|new_command|%/.test(line)), raises);
+  const tail = raw.slice(raw.lastIndexOf('-- The check.'));
+  check('E12 it ends with the check query, and the comment gives the one row to expect',
+    raw.includes('-- The check. Expect exactly one row:\n--   countdown-expire-checkouts | 3,13,23,33,43,53 * * * * | true | true | true | true\n') &&
+    /^-- The check\.[^\n]*\n--[^\n]*\nselect j\.jobname,\s+j\.schedule,\s+j\.active,/.test(tail) && tail.trimEnd().endsWith("where j.jobname = 'countdown-expire-checkouts';") &&
+    raw.indexOf('-- The check.') > raw.lastIndexOf('$do$;'));
+  check('E12 it says: one paste, safe to run again, after cron.sql and after the deploy with its flag',
+    raw.includes('One paste, nothing to edit, safe to run again.') && raw.includes('supabase functions deploy expire-checkouts --no-verify-jwt') &&
+    raw.includes('Run AFTER cron.sql has been run for this project'));
+  /* What it copies really is the shape cron.sql gives. */
+  const cron = read('supabase/cron.sql');
+  /* The function plans a run to end inside the 25 seconds the copied
+     job waits, so the SQL refuses a source job that waits any other
+     time (review, 25 Nov 2026). The same pattern is tried here on
+     cron.sql's own text; the SQL itself has never been run. */
+  const waits = /timeout_milliseconds\s*:=\s*25000[^0-9]/;
+  check('E12 it stops, changing nothing, when the source job does not wait 25 seconds for an answer',
+    sql.includes("if source_command !~ 'timeout_milliseconds\\s*:=\\s*25000[^0-9]' then") &&
+    sql.indexOf("if source_command !~ 'timeout_milliseconds") < sql.indexOf('new_command := replace(') &&
+    waits.test((cron.match(/select cron\.schedule\(\s*'countdown-milestones',[\s\S]*?\$\$([\s\S]*?)\$\$/) || [])[1] || '') &&
+    !waits.test('timeout_milliseconds := 250000\n') && !waits.test('timeout_milliseconds := 5000\n') && !waits.test('body := \'{}\'::jsonb\n'));
+  /* cron.sql's own "Useful checks" told the reader to run select * on
+     cron.job and cron.job_run_details. Both have a command column, and
+     three commands hold the cron secret (review, 25 Nov 2026). */
+  check('E12 cron.sql no longer suggests a query that would put a job\'s command on the screen',
+    !/select\s+\*\s+from/i.test(cron) && !/select[^;\n]*\bcommand\b[^;\n]*from cron\./i.test(cron) &&
+    cron.includes('--   select jobname, schedule, active from cron.job order by jobname;') &&
+    /cron\.job_run_details both have a command column/.test(cron) && !/select\s+\*\s+from/i.test(raw));
+  const block = (cron.match(/select cron\.schedule\(\s*'countdown-milestones',[\s\S]*?\$\$([\s\S]*?)\$\$/) || [])[1] || '';
+  check('E12 cron.sql still gives countdown-milestones the shape this file looks for: one net.http_post to notify-milestones with an x-cron-secret header',
+    block.includes('net.http_post') && block.split('/functions/v1/notify-milestones').length === 2 && block.split('notify-milestones').length === 2 &&
+    /'https:\/\/<PROJECT_REF>\.supabase\.co\/functions\/v1\/notify-milestones'/.test(block) && /'x-cron-secret',\s*'[^']+'/.test(block) && !block.includes('expire-checkouts'), block);
+  check('E12 cron.sql points at this file, as a comment only',
+    /^-- is made by schema-expire-checkouts\.sql, which copies the countdown-milestones$/m.test(cron) && !cron.split('\n').some((line) => !/^\s*--/.test(line) && /expire-checkouts/.test(line)));
+}
+
 /* ───────────────── Part 2: schema-foundation.sql, read as text ───────────────── */
 
 const SQL_RAW = read('supabase/schema-foundation.sql');
@@ -3171,7 +4333,7 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
 
 {
   /* D1. The release notes the owner works from. DEPLOY.md no longer
-     asks for a 7-day trial on a price in Paddle; it deploys both
+     asks for a 7-day trial on a price in Paddle; it deploys the three
      functions, each with the right flag, before the test purchase; and
      Test A says what checkout itself must show. It still says a failed
      move is answered 500 and retried, not just logged. */
@@ -3193,18 +4355,20 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('D1 ...and nowhere tells the owner that a monthly checkout should show 7 days', !/7 days out|7-day trial on the price|7 days on the monthly/.test(deploy), deploy.match(/.{40}(7 days out|7-day trial on the price|7 days on the monthly).{40}/));
 
   const five3 = deploy.slice(deploy.indexOf('### 5.3 '), deploy.indexOf('### 5.4 '));
-  check('D1 5.3 names nine functions, create-checkout among them',
-    /Deploy the nine edge functions/.test(five3) &&
-    ['signin', 'delete-account', 'paddle-webhook', 'manage-subscription', 'create-checkout', 'notify-milestones', 'calendar-sync', 'google-connect', 'review-signin']
+  check('D1 5.3 names ten functions, create-checkout and expire-checkouts among them',
+    /Deploy the ten edge functions/.test(five3) &&
+    ['signin', 'delete-account', 'paddle-webhook', 'manage-subscription', 'create-checkout', 'expire-checkouts', 'notify-milestones', 'calendar-sync', 'google-connect', 'review-signin']
       .every((name) => five3.includes(name)) &&
-    fs.readdirSync(path.join(ROOT, 'supabase', 'functions'), { withFileTypes: true }).filter((e) => e.isDirectory()).length === 9, five3);
+    fs.readdirSync(path.join(ROOT, 'supabase', 'functions'), { withFileTypes: true }).filter((e) => e.isDirectory()).length === 10, five3);
   check('D1 ...with create-checkout beside manage-subscription as deployed without --no-verify-jwt',
     /each with `--no-verify-jwt` except `manage-subscription` and `create-checkout`/.test(five3), five3);
 
   const five6 = deploy.slice(deploy.indexOf('### 5.6 '), deploy.indexOf('## 6. '));
   const iHook = five6.indexOf('- [ ] Deploy the webhook: `supabase functions deploy paddle-webhook --no-verify-jwt`.');
   const iCheckout = five6.indexOf('- [ ] Deploy the checkout function: `supabase functions deploy create-checkout`.');
-  const iList = five6.indexOf('- [ ] `supabase functions list` shows both');
+  const iExpire = five6.indexOf('- [ ] Deploy the function that closes unpaid checkouts: `supabase functions deploy expire-checkouts --no-verify-jwt`.');
+  const iList = five6.indexOf('- [ ] `supabase functions list` shows all three');
+  const iSchedule = five6.indexOf('- [ ] Schedule it: paste the whole of `supabase/schema-expire-checkouts.sql` into the SQL editor and run it.');
   const iTestA = five6.indexOf('- [ ] Run Test A in 8.4');
   const iMerge = five6.indexOf('- [ ] Merge, which publishes the pages and `billing.js`.');
   check('D1 5.6 deploys paddle-webhook WITH --no-verify-jwt (Paddle sends a signature, not a Supabase token)', iHook > 0, iHook);
@@ -3212,14 +4376,37 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('D1 ...no deploy line for paddle-webhook is left without the flag',
     (deploy.match(/supabase functions deploy paddle-webhook/g) || []).length === (deploy.match(/supabase functions deploy paddle-webhook --no-verify-jwt/g) || []).length);
   check('D1 ...both before Test A, and Test A before the merge that sends out billing.js', iList > iCheckout && iTestA > iList && iMerge > iTestA, { iList, iTestA, iMerge });
+  /* Added on 25 Nov 2026 with expire-checkouts. It takes the flag: the
+     scheduled job sends the publishable key, not a session token. */
+  check('D1 5.6 deploys expire-checkouts WITH --no-verify-jwt, after create-checkout and before the list of all three',
+    iExpire > iCheckout && iList > iExpire && !five6.includes('shows both') &&
+    (deploy.match(/supabase functions deploy expire-checkouts/g) || []).length === (deploy.match(/supabase functions deploy expire-checkouts --no-verify-jwt/g) || []).length &&
+    /The function is closed by `CRON_SECRET` instead/.test(five6), { iCheckout, iExpire, iList });
+  check('D1 ...then the one paste that schedules it, with the row to expect and what to do with a red message, before Test A',
+    iSchedule > iList && iTestA > iSchedule &&
+    /Expect one row: `countdown-expire-checkouts`, then `3,13,23,33,43,53 \* \* \* \*`, then `true` four times\./.test(five6) &&
+    /If a red message says nothing was changed, stop and bring the message back: nothing is scheduled\./.test(five6) &&
+    /Nobody types the cron secret/.test(five6) && /Never paste or print a job's command/.test(five6) &&
+    /has never been run\. Your paste is its first run\./.test(five6), { iSchedule, iTestA });
+  check('D1 5.6 says why that order is safe',
+    /`expire-checkouts` is closed and idle until its job exists/.test(five6) && /would only collect 404s/.test(five6) &&
+    /From its first run the job cancels every unpaid transaction `create-checkout` has made that is over an hour old/.test(five6));
   check('D1 5.6 has a tick for what the Paddle API key may do, marked as not read from Paddle',
     /Check what the key behind `PADDLE_API_KEY` may do\. `create-checkout` needs it to read prices, read discounts and write transactions\./.test(five6) &&
+    /`expire-checkouts` needs it to read transactions and write transactions\./.test(five6) &&
     /\[check label: Paddle's key permissions screen was not read/.test(five6));
   check('D1 5.6 says what to search each log for',
     ['"Could not defer first charge"', '"first charge moved after checkout"', '"trial subscription on a catalogue price"', '"Could not make checkout"'].every((line) => five6.includes(line)) &&
     /Search the `create-checkout` function log for "Could not make checkout"/.test(five6));
   check('D1 ...and says plainly that a create-checkout fault charges nobody, and that nobody is told',
     /A fault in `create-checkout` charges nobody\./.test(five6) && /Nobody is told unless a customer writes in/.test(five6));
+  check('D1 ...and the same for expire-checkouts: a fault charges nobody and cancels nothing, and leaves unpaid prepared purchases open',
+    /\*\*A fault in `expire-checkouts` charges nobody and cancels nothing\.\*\*/.test(five6) &&
+    /leaves unpaid prepared purchases open, which is how things stood before 25 Nov 2026/.test(five6));
+  check('D1 5.6 says what to search the expire-checkouts log for, and that a gap in its ten-minute line means the job has stopped',
+    /Search the `expire-checkouts` function log for "Could not close checkouts"\./.test(five6) && five6.includes('"checkouts closed:"') &&
+    /a gap in those lines means the job has stopped, and the made versus paid gap is open again/.test(five6) &&
+    EXPIRE_CODE.includes('console.log(`checkouts closed: ${tail}`);') && EXPIRE_CODE.includes('`Could not close checkouts: ${'));
   check('D1 5.6 says what "21 days" becomes: the first whole day at or after it, never before',
     /between 21 and 22 days after the account was made \(30 and 31 yearly\), and never before it/.test(five6) &&
     /between `2027-01-01T12:00Z` and `2027-01-02T12:00Z`/.test(five6));
@@ -3250,7 +4437,8 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('D1 ...and that Test A does not exercise the date move or prove the key may change a subscription, and that Test C does',
     /`paddle-webhook` moves nothing in Test A/.test(eight4) && /is not exercised by it/.test(eight4) && /but not that it may change a subscription/.test(eight4) &&
     /Test C, below, is where the move meets Paddle: run it before the merge\./.test(eight4) && !/is now exercised only against stubs/.test(eight4));
-  const testC = eight4.slice(eight4.indexOf('Test C — the net.'), eight4.indexOf('After the merge — the real button.'));
+  const testC = eight4.slice(eight4.indexOf('Test C — the net.'), eight4.indexOf('Test D: the hour.'));
+  const testD = eight4.slice(eight4.indexOf('Test D: the hour.'), eight4.indexOf('After the merge — the real button.'));
   check('D1 8.4 has Test C: the old Buy button before the merge, which opens a catalogue trial price and makes the net move the date',
     eight4.indexOf('Test C — the net.') > eight4.indexOf('Test B — the money path.') && testC.length > 0 &&
     /can only be run this way before the merge/.test(testC) && /press the live Buy button/.test(testC) && /another throwaway account that is still in its free trial/.test(testC));
@@ -3260,11 +4448,14 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     /\*\*stop and do not merge\.\*\*/.test(testC) && /cancel this subscription in Paddle/.test(testC));
   const iTestB = five6.indexOf('- [ ] Run Test B in 8.4.');
   const iTestC = five6.indexOf('- [ ] Run Test C in 8.4');
-  const iBeforeMerge = five6.indexOf('- [ ] Straight before the merge: `supabase functions list` shows `paddle-webhook` and `create-checkout` both updated in this sitting');
-  check('D1 5.6 runs Test C after Test B and before the merge, in the ticks and in the numbered order',
-    iTestB > iTestA && iTestC > iTestB && iMerge > iTestC && /7\. Test B in 8\.4; 8\. Test C in 8\.4[^;]*; 9\. the merge to `main`/.test(five6), { iTestB, iTestC, iMerge });
-  check('D1 5.6 has a tick straight before the merge: both functions updated, and the new webhook\'s own log line seen',
-    iBeforeMerge > iTestC && iMerge > iBeforeMerge &&
+  const iTestD = five6.indexOf('- [ ] Run Test D in 8.4, at least 75 minutes after Test A\'s spare was made.');
+  const iBeforeMerge = five6.indexOf('- [ ] Straight before the merge: `supabase functions list` shows `paddle-webhook`, `create-checkout` and `expire-checkouts` all updated in this sitting');
+  check('D1 5.6 runs Test C after Test B, Test D after Test C, and both before the merge, in the ticks and in the numbered order',
+    iTestB > iTestA && iTestC > iTestB && iTestD > iTestC && iMerge > iTestD &&
+    /5\. `supabase functions deploy expire-checkouts --no-verify-jwt`; 6\. `supabase functions list` shows all three; 7\. paste `supabase\/schema-expire-checkouts\.sql`[^;]*; 8\. Test A in 8\.4[^;]*; 9\. Test B in 8\.4; 10\. Test C in 8\.4[^;]*; 11\. Test D in 8\.4[^;]*; 12\. the merge to `main`/.test(five6),
+    { iTestB, iTestC, iTestD, iMerge });
+  check('D1 5.6 has a tick straight before the merge: all three functions updated, and the new webhook\'s own log line seen',
+    iBeforeMerge > iTestD && iMerge > iBeforeMerge &&
     /"first charge: checkout's date stands" was seen in the `paddle-webhook` log in Test A\. Only the new `paddle-webhook` writes that line\. Without it, do not merge/.test(five6), iBeforeMerge);
   check('D1 5.6 names the dangerous wrong order: the merge over an older paddle-webhook, which can move a date earlier',
     /\*\*The merge before the new `paddle-webhook` is the dangerous order\.\*\*/.test(five6) && /a charge earlier than the customer was shown/.test(five6) &&
@@ -3276,16 +4467,114 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     WEBHOOK_SOURCE.includes('console.warn("' + OUTSIDE_LINE + '");') &&
     five6.includes('Search it for "' + OUTSIDE_LINE + '".') && eight4.includes('"' + OUTSIDE_LINE + '"') &&
     /Search it for "First payment later than the rule: by N hours"/.test(five6) && /is a transaction made on one day and paid on a later one/.test(five6) &&
+    /Paddle does allow that: found on 25 Nov 2026\. `expire-checkouts` now cancels such a transaction about an hour after it was made/.test(five6) &&
+    !/is what Test B's spare transaction finds out/.test(five6) &&
     !/or a trial extended by hand: nothing to do/.test(five6) && /What to do with that subscription[^.]*is your call\./.test(five6));
   check('D1 5.6 says create-checkout has no limit on calls, and what a run of 429s in its log is',
     /Many lines saying "answered 429"/.test(five6) && /has no limit on how often one signed-in account may call it/.test(five6));
-  check('D1 8.4 makes a spare transaction in Test A and looks at it after the trial has ended, without paying',
+  /* Changed on 25 Nov 2026. The spare was looked at after Test B, to
+     find out whether a transaction can be opened later. It can. The
+     owner decided what to do, so the passage is now what was found and
+     how the gap is closed, and the spare is looked at in Test D. */
+  check('D1 8.4 makes a spare transaction in Test A, and looks at it in Test D without paying',
     /First, a spare\./.test(eight4) && eight4.includes("console.log('spare', r.status, await r.json());") &&
-    eight4.indexOf('Last, the spare from Test A.') > eight4.indexOf('Test B — the money path.') &&
-    eight4.includes("Paddle.Checkout.open({ transactionId: '<the spare transactionId>' });") && /\*\*Do not pay\.\*\* Write down three things/.test(eight4) &&
+    !eight4.includes('Last, the spare from Test A.') && !/\*\*It opens and still offers the free days\.\*\*/.test(eight4) &&
+    !/is your decision to make before the merge\. Nothing has been built for it\./.test(eight4) &&
+    testD.includes("Paddle.Checkout.open({ transactionId: '<the spare transactionId>' });") && /\*\*Do not pay\.\*\* Write down exactly what the overlay does/.test(testD) &&
     /whether a transaction made earlier can still be opened later, and from which day its free days are then counted/.test(eight4));
-  check('D1 ...and says what it means if the spare still opens with its free days, as the owner\'s decision before the merge',
-    /\*\*It opens and still offers the free days\.\*\*/.test(eight4) && /is your decision to make before the merge\. Nothing has been built for it\./.test(eight4));
+  const found = eight4.slice(eight4.indexOf('What the spare found.'), eight4.indexOf('Test C — the net.'));
+  check('D1 ...and says what was found on 25 Nov 2026, the owner\'s decision, and what was declined',
+    found.length > 0 && eight4.indexOf('What the spare found.') > eight4.indexOf('Test B — the money path.') &&
+    /\*\*Found on 25 Nov 2026\.\*\* A prepared purchase left unpaid could still be opened a day later, after the account's own trial had ended, and still offered the full free period, counted from the day of payment\./.test(found) &&
+    /Unpaid prepared purchases are now cancelled about an hour after they are made\./.test(found) &&
+    /Cancelling a subscription after payment was offered and declined, and is not built\./.test(found) &&
+    /between 60 and about 70 minutes/.test(found), found.slice(0, 300));
+  check('D1 ...and what is left: the hour itself, a payment that never settles, more than 120 an hour, and any stretch when it is not running',
+    /someone whose trial ends inside the hour can still pay and start the free period/.test(found) &&
+    /A transaction carrying a payment attempt that never settles is left alone\./.test(found) && /More than 120 an hour wait for later runs\./.test(found) &&
+    /none of this is true until the function is deployed AND the job is scheduled/.test(found) && found.includes('"' + OUTSIDE_LINE + '"') &&
+    /Test D, below, is where it meets Paddle\./.test(found));
+  check('D1 8.4 has Test D after Test C and before the look at the real button: the first spare is cancelled, a second one made just now is not',
+    eight4.indexOf('Test D: the hour.') > eight4.indexOf('Test C — the net.') && testD.length > 0 && /Takes no money\./.test(testD) &&
+    /at least 75 minutes after the spares in Test A were made/.test(testD) &&
+    /The first spare reads Canceled\. The opened spare reads Canceled\. The fresh spare is still Draft\./.test(testD) &&
+    testD.includes('"checkouts closed: closed 1, ..."') && /There is no line starting "Could not close checkouts"\./.test(testD) &&
+    /The test passes when no purchase is offered\./.test(testD));
+  check('D1 ...Test D says when to stop, how to read the counts, and leaves the open-overlay look as the owner\'s call',
+    /still Draft or Ready after 80 minutes, or still opens and offers a purchase: \*\*stop and do not merge\.\*\*/.test(testD) &&
+    ['"not ours 1"', '"changed 1"', '"refused 1"', '"failed 1"', '"listed 0"'].every((t) => testD.includes(t)) &&
+    /Optional, and your call\./.test(testD) && /leave the overlay open past 75 minutes without paying/.test(testD));
+  /* Changed on 25 Nov 2026 (review). Test D only ever looked at a spare
+     that was never opened, while every prepared purchase a customer
+     leaves behind is an opened one, and what Paddle changes on a
+     transaction once a checkout has been opened on it has not been
+     seen. One spare is now opened in Test A, with an email, and must
+     read Canceled too. */
+  check('D1 8.4 Test A makes a second spare and opens it with an email, without paying, and Test D needs both cancelled before the merge',
+    /Then a second spare, opened and left\./.test(eight4) && eight4.indexOf('Then a second spare, opened and left.') < eight4.indexOf('Then the test itself.') &&
+    eight4.includes("Paddle.Checkout.open({ transactionId: '<the opened spare transactionId>', customer: { email: CT.auth.getUser().email } });") &&
+    /Wait until the price shows and your email is filled in\. \*\*Do not pay\.\*\* Close the overlay\./.test(eight4) &&
+    /Then do the same with the opened spare's id\./.test(testD) && /If only the opened spare is left, opening a checkout changes something the function tests/.test(testD) &&
+    /Do not merge until both spares from Test A read Canceled in Paddle and neither offers a purchase/.test(five6) &&
+    !/Do not merge until the spare reads Canceled/.test(five6));
+  check('D1 ...Test D no longer says a changed origin shows as "not ours": the list asks for origin api, so that shows as "listed 0"',
+    /"listed 0" means Paddle's list did not return the spare\. The list asks for origin `api` only/.test(testD) && /and never as "not ours"/.test(testD) &&
+    !/"not ours 1" means the function did not recognise the spare: most likely Paddle reports its origin/.test(testD) &&
+    /origin=api&/.test(EXPIRE_CODE));
+  check('D1 ...and the theory about custom data has a tick of its own, marked as the owner\'s call and as never tried',
+    /Your call, about two minutes: a third spare, for a theory\./.test(eight4) && /Read in Paddle's documentation on 25 Nov 2026 and never tried/.test(eight4) &&
+    /If you made the changed spare in Test A/.test(testD) && /Custom data without `made_by` and still Draft after 80 minutes/.test(testD));
+  /* The words Test D and "Reading an answer" tell the owner to look for
+     are the words the function writes. */
+  const fromExpire = eight4.slice(eight4.indexOf('Reading an answer from `expire-checkouts` (in'), eight4.indexOf('Reading a failure from `create-checkout`'));
+  check('D1 8.4 reads an answer from expire-checkouts, status by status, with every stop word the function has and no other',
+    fromExpire.length > 0 && ['**403**', '**405**', '**503**', '**502**', '**200**', '**500**'].every((t) => fromExpire.includes(t)) &&
+    same([...new Set([...EXPIRE_CODE.matchAll(/stopped = "([a-z_]+)"/g)].map((m) => m[1]))].sort(), ['cap', 'clock', 'list_failed', 'paddle_auth', 'paddle_failing', 'pages', 'rate_limited', 'reads', 'time']) &&
+    ['rate_limited', 'paddle_auth', 'list_failed', 'paddle_failing', 'clock', 'cap', 'reads', 'pages', 'time'].every((word) => new RegExp('"(stopped )?' + word + '"').test(fromExpire)) &&
+    fromExpire.includes('"not_configured"') && EXPIRE_CODE.includes('error: "not_configured"') &&
+    ['not ours ${notOurs}', 'changed ${changed}', 'refused ${refused}', 'failed ${failed}', 'listed ${listed}', 'more waiting ${'].every((t) => EXPIRE_CODE.includes(t)), fromExpire.slice(0, 200));
+  /* Changed on 25 Nov 2026 (review): a run that cancelled nothing while
+     old ones were due answered 200 with the healthy line, and the notes
+     told the owner that no fault line plus a healthy line every ten
+     minutes meant all was well. Such a run is now a fault, and the
+     notes read each kind. */
+  check('D1 8.4 reads the "left_open" fault and each of its three reasons, in the words the function writes',
+    fromExpire.includes('error "left_open"') && EXPIRE_CODE.includes('"left_open"') &&
+    fromExpire.includes('"Paddle refused N, and last a cancel answered 409 (...)"') && EXPIRE_CODE.includes('`Paddle refused ${refused}, and last ${lastRefusal}`') &&
+    EXPIRE_CODE.includes('lastRefusal = `a cancel answered ${cancel.status}${errorCode(cancel.data)}`;') &&
+    fromExpire.includes('"N still unpaid did not pass the second read"') && EXPIRE_CODE.includes('`${unpaidChanged} still unpaid did not pass the second read`') &&
+    fromExpire.includes('"more are waiting and this run cancelled none"') && EXPIRE_CODE.includes('"more are waiting and this run cancelled none"'));
+  check('D1 ...and gives the run\'s real limits, what the 200 counts mean, and a row that timed out',
+    /its limit of 20 cancels sent, 40 second reads, 120 listed or 18 seconds/.test(fromExpire) &&
+    /"being paid" above 0 on every run is a payment attempt that never settled/.test(fromExpire) &&
+    /"more waiting yes" on several runs in a row means the hour is not being kept/.test(fromExpire) &&
+    /A row in `net\._http_response` with no status and a time-out message/.test(fromExpire) && /"paddle_failing" is three failures in a row, of reads or of cancels/.test(fromExpire) &&
+    !/120 or more old unpaid transactions that are not `create-checkout`'s are in front of the ones that are/.test(fromExpire));
+  check('D1 5.6 tells the owner to read the newest healthy line, not only that one is there, and what a run of "more waiting yes" means',
+    /Then read the newest of those lines, not only that one is there\./.test(five6) &&
+    /"more waiting yes" on several runs in a row means more are being made than the 120 an hour the function cancels, so the hour is not being kept for anyone/.test(five6) &&
+    /because one account can make that many by itself/.test(five6) &&
+    /A run that leaves old unpaid ones open for any reason other than somebody paying writes that same line/.test(five6));
+  /* The rewrite of "What the spare found" dropped the catalogue trial
+     price route and so overstated what is closed (review, 25 Nov 2026). */
+  check('D1 8.4 says the retired catalogue trial prices are a separate route that is still open, and that one account can flood the hour',
+    /\*\*A separate route, still open\.\*\* `expire-checkouts` only ever touches transactions that `create-checkout` made\./.test(found) &&
+    /This route stays open until those two prices are archived, and 8\.1 says when\./.test(found) &&
+    /one account can make more than 120 an hour by itself, on purpose\. The hour is not a ceiling against that/.test(found) &&
+    /a retired catalogue trial price opened by hand/.test(five6));
+  const keyRow = deploy.slice(deploy.indexOf('| Paddle API key (server'), deploy.indexOf('## 1. Create the repo'));
+  check('D1 the keys table says four functions use the Paddle API key, and that expire-checkouts needs it to read transactions',
+    /calls Paddle's API from four functions/.test(keyRow) && !/from three functions/.test(deploy) &&
+    /`expire-checkouts` uses it to list unpaid transactions and cancel the ones `create-checkout` made/.test(keyRow) &&
+    /so the key must be allowed to read transactions as well/.test(keyRow) && /With a key that may not read transactions/.test(keyRow));
+  const five1 = deploy.slice(deploy.indexOf('### 5.1 '), deploy.indexOf('### 5.2 '));
+  check('D1 5.1 lists schema-expire-checkouts.sql after cron.sql, with a pointer to 5.6',
+    five1.indexOf('- [ ] `schema-expire-checkouts.sql`, last: after `cron.sql`') > five1.indexOf('- [ ] `cron.sql`') && five1.indexOf('- [ ] `cron.sql`') > 0 &&
+    /5\.6 has the tick, the row to expect and what to do with a red message\./.test(five1) && !/`cron\.sql` — last/.test(five1));
+  check('D1 the rule against printing a job\'s command names cron.job_run_details too, in all three places',
+    /no `select \* from cron\.job_run_details`, which repeats the command for every run/.test(five6) &&
+    /`select \*` on `cron\.job` or on `cron\.job_run_details`, which has a command column too/.test(squash(read('CLAUDE.md'))) &&
+    /Never run `select \* from cron\.job` or `select \* from cron\.job_run_details`/.test(squash(read('supabase/README.md'))));
   check('D1 8.4 has a branch for an overlay that shows neither a day nor a count, and the tick says to note which of the three',
     /\*\*The overlay shows neither a first-payment day nor a count of free days\.\*\* Do not merge until you have decided what to do\./.test(eight4) &&
     /Write down which of the three it is: a first-payment day, a count of free days, or neither\./.test(eight4));
@@ -3325,6 +4614,27 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     /never say "nobody can get a free period after their trial has ended"/.test(claude) &&
     claude.includes('"free period on an account whose own free trial was not running"') &&
     /has no limit on how often one account may call it/.test(claude));
+  /* Added on 25 Nov 2026: what was found, what was decided, and what
+     must not be built or claimed. */
+  check('D1 CLAUDE.md says what was found on 25 Nov 2026, and no longer that it has not been tried',
+    /Found for real on 25 Nov 2026: a transaction left unpaid could still be opened a day later/.test(claude) &&
+    !/has not been tried \(the spare transaction/.test(claude) && !/Mal's call; nothing is built for it\./.test(claude) &&
+    /which narrows this to that hour for transactions `create-checkout` made, and does not end it/.test(claude) &&
+    /One of the two retired catalogue trial prices opened by hand is a separate route to the same free period: nothing cancels that/.test(claude));
+  check('D1 CLAUDE.md has the rule: unpaid prepared purchases are cancelled about an hour after they are made, by which function and job',
+    claude.includes('**Unpaid prepared purchases are cancelled about an hour after they are made (Mal, 25 Nov 2026).**') &&
+    claude.includes('`expire-checkouts`') && claude.includes('`countdown-expire-checkouts`') && claude.includes('`supabase/schema-expire-checkouts.sql`') &&
+    /Cancelling a subscription AFTER payment was offered to Mal and declined: do not build it\./.test(claude));
+  check('D1 ...what is left, that it is only true once deployed AND scheduled, that it has not met Paddle, and never to print a job\'s command',
+    /someone whose trial ends inside the hour can still pay and start the free period/.test(claude) &&
+    /Only true once the function is deployed AND the job is scheduled: check `supabase functions list` and `select jobname from cron\.job` before saying so\./.test(claude) &&
+    /It first meets Paddle in `DEPLOY\.md` 8\.4 Test D\./.test(claude) && /the SQL has never been run/.test(claude) &&
+    /Never print a cron job's command/.test(claude) && !/which is now only possible within about an hour/.test(claude) &&
+    /which `expire-checkouts` is built to limit to about an hour \(the bullet on unpaid prepared purchases says when that is true and what is left\)/.test(claude));
+  check('D1 ...and the two marks, the flood, and that a run that leaves old ones open is a fault',
+    /It knows `create-checkout`'s transactions by either of two marks/.test(claude) && /in theory read from Paddle's documentation and never tried/.test(claude) &&
+    /one account can make that many by itself because `create-checkout` has no limit, so the hour is not a ceiling against a flood/.test(claude) &&
+    /is logged as that fault and never as a healthy "checkouts closed:" line/.test(claude));
   check('D1 ...and that the merge must not go out over an older paddle-webhook, and that Test C is the one time the move meets Paddle',
     /\*\*The merge must not go out over an older `paddle-webhook`\.\*\*/.test(claude) && /`DEPLOY\.md` 8\.4 Test C \(the old Buy button, before the merge\) is the one time it meets Paddle/.test(claude));
   check('D1 ...and does not state as fact that checkout shows the date, which nobody has seen',
@@ -3336,6 +4646,49 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
     !/So nobody can ask for a longer free period/.test(checkoutHeader) && !/neither would change what anybody is charged/.test(checkoutHeader) &&
     /What it cannot do: tie the transaction to the moment it is paid\./.test(checkoutHeader) &&
     /No limit on how often\./.test(checkoutHeader) && /It is not built\./.test(checkoutHeader), checkoutHeader.slice(0, 200));
+  check('D1 ...and says what was found on 25 Nov 2026, that expire-checkouts now cancels what is left unpaid, and that made_by must not be renamed alone',
+    /Found for real on 25 Nov 2026: Paddle still opened a transaction a day after it was made/.test(checkoutHeader) &&
+    !/has not been tried \(DEPLOY\.md 8\.4 has the ticks that find out\)/.test(checkoutHeader) &&
+    /Do not rename that text without changing MADE_BY in expire-checkouts/.test(checkoutHeader) && /What remains is the hour/.test(checkoutHeader) &&
+    /A draft left behind is now cancelled after about an hour by expire-checkouts; the one-off price stays\./.test(checkoutHeader) &&
+    /It also knows them by the end of the one-off price's description, "\(create-checkout\)", which is PRICE_MARK there/.test(checkoutHeader) &&
+    /expire-checkouts never touches a checkout opened that way/.test(checkoutHeader));
+  /* expire-checkouts' own header, and the wording rules for everything
+     new the owner reads: no dash punctuation, and nothing "expires" or
+     "runs out": a prepared purchase is cancelled or closed. The word
+     appears only inside the function's own name. */
+  const expireHeader = squash(EXPIRE_SOURCE.slice(0, EXPIRE_SOURCE.indexOf('const CRON_SECRET')).replace(/^\s+/gm, ''));
+  check('D1 expire-checkouts\' header says whose decision it is, what was declined, what "about an hour" means, and that it has not met Paddle',
+    /The owner decided the same day: unpaid prepared purchases are cancelled about an hour after they are made\./.test(expireHeader) &&
+    /He was offered cancelling a subscription after payment instead and declined\./.test(expireHeader) &&
+    /"About an hour" means between 60 and about 70 minutes/.test(expireHeader) && /What it cannot do\./.test(expireHeader) &&
+    /Nothing here has met Paddle until DEPLOY\.md 8\.4 Test D\./.test(expireHeader) && /Deployed WITH --no-verify-jwt/.test(expireHeader) &&
+    /A fault here charges nobody and cancels nothing/.test(expireHeader) && /stores nothing/.test(expireHeader));
+  check('D1 ...and the two marks as theory, the clock, the flood, the catalogue route, what counts as a fault, and the real limits of a run',
+    /The mark\. THEORY, never tried:/.test(expireHeader) && /The clock\./.test(expireHeader) && /Keep the hour against a flood\./.test(expireHeader) &&
+    /Touch a checkout opened on one of the two retired catalogue trial prices\./.test(expireHeader) && /What counts as a fault\./.test(expireHeader) &&
+    /At most 4 lists, 40 second reads and 20 cancels sent, whatever Paddle answers: 64 requests/.test(expireHeader) &&
+    /A good read does not wipe out a failed cancel/.test(expireHeader) && !/44 requests/.test(EXPIRE_SOURCE) &&
+    /\(Test D opens one spare for this reason\)/.test(expireHeader));
+  const newText = { 'expire-checkouts/index.ts': EXPIRE_SOURCE, 'schema-expire-checkouts.sql': read('supabase/schema-expire-checkouts.sql'), 'DEPLOY.md Test D': testD,
+    'DEPLOY.md "What the spare found"': found, 'DEPLOY.md "Reading an answer from expire-checkouts"': fromExpire };
+  for (const [name, text] of Object.entries(newText)) {
+    check('D1 ' + name + ': no dash punctuation, and nothing "expires", "runs out" or "shrinks" (the word is only in the function\'s own name)',
+      text.length > 0 && !/[–—]/.test(text) && !/expir|runs? out|ran out|shrink/i.test(text.replace(/expire[-_]checkouts/g, '')), text.match(/.{30}([–—]|expir(?!e-checkouts)|runs? out|shrink).{30}/i));
+  }
+
+  const supaReadme = squash(read('supabase/README.md'));
+  check('D1 supabase/README.md lists schema-expire-checkouts.sql as step 12, nothing to edit, and its job among those to expect',
+    supaReadme.includes('| 12 | `schema-expire-checkouts.sql` | the 10-minute job that cancels unpaid prepared purchases | After `cron.sql`, and after deploying `expire-checkouts`. Nothing to edit. |') &&
+    /Steps 1–10 and step 12 are plain copy-paste with nothing to edit\./.test(supaReadme) &&
+    /Expect `countdown-calendar-sync`, `countdown-expire-checkouts`, `countdown-milestones`,/.test(supaReadme));
+  /* The healthy answer the README shows is the answer the function gives. */
+  const healthy = '{"ok":true,"closed":0,"listed":0,"old":0,"young":0,"notOurs":0,"paying":0,"changed":0,"refused":0,"failed":0,"more":false,"stopped":null}';
+  paddleStub([]);
+  const quiet = await run();
+  check('D1 ...and shows the healthy answer exactly as the function gives it, and says never to select a job\'s command',
+    supaReadme.includes('`' + healthy + '`') && quiet.text === healthy &&
+    /never select a job's `command` onto the screen/.test(supaReadme) && /Never run `select \* from cron\.job`/.test(supaReadme));
 
   const appReadme = squash(read('app/README.md'));
   check('D1 app/README.md says who judges a discount code on each path, and to keep a discount to the product, never to a price',
@@ -3346,6 +4699,15 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('D1 app/README.md and config.js say the overlay\'s own display is first seen in Test A',
     /is first seen in `DEPLOY\.md` 8\.4 Test A/.test(appReadme) && /so that checkout can show the first-payment day itself \(first seen in `DEPLOY\.md` 8\.4 Test A\)/.test(appReadme) &&
     /first seen in DEPLOY\.md 8\.4 Test A/.test(squash(read('app/config.js').replace(/^\s+/gm, ''))) && !/Checkout then shows that first-payment day itself/.test(squash(read('app/config.js'))));
+  check('D1 app/README.md deploys expire-checkouts with the flag, says four functions use the key, and points at the SQL that schedules it',
+    /supabase functions deploy expire-checkouts --no-verify-jwt/.test(appReadme) && !/supabase functions deploy expire-checkouts(?! --no-verify-jwt)/.test(appReadme) &&
+    /The API key is used by four functions\./.test(appReadme) && !/used by three functions/.test(appReadme) &&
+    /`expire-checkouts` uses it to list unpaid transactions and cancel the ones `create-checkout` made that nobody paid within about an hour/.test(appReadme) &&
+    /Then run `supabase\/schema-expire-checkouts\.sql` in the SQL editor, after `cron\.sql`/.test(appReadme));
+  const rawAppReadme = read('app/README.md');
+  check('D1 app/README.md\'s list of files names the function, the SQL that schedules it, and create-checkout',
+    rawAppReadme.includes('  functions/expire-checkouts/\n    index.ts            cancels those left unpaid for about an hour\n') &&
+    rawAppReadme.includes('  functions/create-checkout/\n') && rawAppReadme.includes('  schema-expire-checkouts.sql\n'));
   check('D1 app/README.md deploys create-checkout with no flag, and says which two functions go without it',
     /supabase functions deploy create-checkout(?! --)/.test(appReadme) && !/deploy create-checkout --no-verify-jwt/.test(appReadme) &&
     appReadme.replace(/ > /g, ' ').includes('`--no-verify-jwt` on every function here except `manage-subscription` and `create-checkout`.'));

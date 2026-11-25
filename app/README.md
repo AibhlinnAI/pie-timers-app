@@ -590,7 +590,7 @@ fine for testing but should be pinned to your site before launch.
    two IDs in `PLAIN_PRICE` in `supabase/functions/create-checkout/index.ts`.
 5. Add a webhook pointing at `.../functions/v1/paddle-webhook`, subscribed to the
    `subscription.*` events, then set both secrets. The API key is used by
-   three functions. `create-checkout` uses it to read a price, read discounts
+   four functions. `create-checkout` uses it to read a price, read discounts
    and make the transaction for someone who subscribes while their free trial
    is running, with the right number of free days on it, so that checkout
    can show the first-payment day itself (first seen in `DEPLOY.md` 8.4
@@ -598,7 +598,10 @@ fine for testing but should be pinned to your site before launch.
    move a first payment that still lands short of the rule's date, and it
    answers 500 when such a move is needed and the key is missing or cannot
    change a subscription. `manage-subscription` uses it to open the customer
-   portal (`DEPLOY.md` 5.6 and 8.4).
+   portal (`DEPLOY.md` 5.6 and 8.4). `expire-checkouts` uses it to list
+   unpaid transactions and cancel the ones `create-checkout` made that
+   nobody paid within about an hour (the owner's decision, 25 Nov 2026;
+   first seen against Paddle in `DEPLOY.md` 8.4 Test D).
 
 ```bash
 supabase secrets set PADDLE_WEBHOOK_SECRET=...
@@ -612,6 +615,15 @@ supabase functions deploy paddle-webhook --no-verify-jwt
 ```bash
 supabase functions deploy create-checkout
 ```
+
+```bash
+supabase functions deploy expire-checkouts --no-verify-jwt
+```
+
+Then run `supabase/schema-expire-checkouts.sql` in the SQL editor, after
+`cron.sql` (step 6). That file makes the job that calls `expire-checkouts`
+every ten minutes. Until both are done, unpaid prepared purchases are not
+cancelled.
 
 Test with Paddle's sandbox first — set `paddle.environment` to `'sandbox'` in
 `config.js` and use sandbox keys. Verify a test purchase flips the Account tab to
@@ -681,6 +693,8 @@ supabase/
   schema-billing.sql    subscriptions, entitlement, webhook audit log
   schema-ratelimit.sql  sign-in throttle store (hashes only)
   cron.sql              pg_cron schedule for the push job
+  schema-expire-checkouts.sql
+                        pg_cron schedule for expire-checkouts (after cron.sql)
   functions/notify-milestones/
     index.ts            works out who to alert and when
     webpush.ts          VAPID signing + RFC 8291 encryption
@@ -691,6 +705,12 @@ supabase/
     index.ts            Turnstile-gated, throttled magic-link proxy
   functions/paddle-webhook/
     index.ts            keeps subscriptions in step with Paddle
+  functions/create-checkout/
+    index.ts            makes the Paddle transaction for a subscriber in trial
+  functions/expire-checkouts/
+    index.ts            cancels those left unpaid for about an hour
+  functions/manage-subscription/
+    index.ts            opens the Paddle customer portal
   functions/calendar-sync/
     index.ts            fetches feeds, guards against request forgery
     ical.js             iCalendar reader + recurrence expansion

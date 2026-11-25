@@ -118,23 +118,74 @@ arrived.
   `tools/foundation-test.mjs`), and `DEPLOY.md` 8.4 Test A is the first
   real purchase through it.
 - **The free days are fixed when the transaction is MADE and counted from
-  when it is PAID, and nothing ties the two together.** Whether Paddle
-  still opens a transaction days or weeks after it was made is not in
-  its documentation and has not been tried (the spare transaction in
-  `DEPLOY.md` 8.4 finds out). If it does, a signed-in person who saves
-  transaction ids during their trial can start a free period after the
+  when it is PAID, and nothing ties the two together.** Found for real
+  on 25 Nov 2026: a transaction left unpaid could still be opened a day
+  later, after the account's own trial had ended, and still offered the
+  full free period counted from the day of payment. Paddle's
+  documentation says nothing either way. So a signed-in person who saves
+  transaction ids during their trial could start a free period after the
   trial has ended, or push their first payment out by up to the length
-  of the trial. So never say "nobody can get a free period after their
+  of the trial. Unpaid transactions are now cancelled about an hour
+  after they are made (the next bullet), which narrows this to that
+  hour for transactions `create-checkout` made, and does not end it.
+  One of the two retired catalogue trial prices opened by hand is a
+  separate route to the same free period: nothing cancels that, and it
+  stays open until those two prices are archived (`DEPLOY.md` 8.1). So
+  never say "nobody can get a free period after their
   trial has ended": what is true is that `create-checkout` never MAKES a
   transaction for such an account. `paddle-webhook` cannot undo it (it
   never moves a date earlier than checkout showed). It reads the
   account's row before writing over it and logs "free period on an
   account whose own free trial was not running", and "First payment
   later than the rule: by N hours" for a date well past the rule. What
-  to do about such a subscription is Mal's call; nothing is built for
-  it. `create-checkout` also has no limit on how often one account may
+  to do about such a subscription once it is paid is Mal's call; the
+  next bullet is what is built for the late-payment route.
+  `create-checkout` also has no limit on how often one account may
   call it; a cap needs a table, which is a new stored record about an
   account and so Mal's decision too.
+- **Unpaid prepared purchases are cancelled about an hour after they are
+  made (Mal, 25 Nov 2026).** The `expire-checkouts` edge function does
+  it, run every ten minutes by the `countdown-expire-checkouts` job that
+  `supabase/schema-expire-checkouts.sql` makes. So a prepared purchase
+  stays open for between 60 and about 70 minutes, longer if a run
+  fails. It cancels only a transaction that is unpaid (status `draft` or
+  `ready`), was made through the API by `create-checkout`, belongs to no
+  subscription, and is 60 minutes old or more
+  by Paddle's own `created_at`. It knows `create-checkout`'s
+  transactions by either of two marks: `made_by` on `custom_data`, or
+  the one-off price whose description ends "(create-checkout)". Do not
+  rename either text in one file without the other (tests pin both).
+  Two marks because, in theory read from Paddle's documentation and
+  never tried, the page holding a checkout can replace a transaction's
+  custom data. It will never cancel one that is billed,
+  paid, completed or past due, one made any other way (a dashboard
+  invoice, a checkout opened on a catalogue price), one with a payment
+  attempt that might still be in progress, or one younger than 60
+  minutes. Cancelling a subscription AFTER payment was offered to Mal
+  and declined: do not build it. What is left: the hour itself (someone
+  whose trial ends inside the hour can still pay and start the free
+  period); a transaction carrying a payment attempt that never settles;
+  more than 120 an hour, which wait for later runs, and one account can
+  make that many by itself because `create-checkout` has no limit, so
+  the hour is not a ceiling against a flood; the two retired catalogue
+  trial prices opened by hand, which this never touches; and any
+  stretch when the function or the job is not running. A fault charges
+  nobody and cancels nothing: it leaves them open, and logs "Could not
+  close checkouts". A run that leaves old unpaid ones open for a reason
+  other than somebody paying (Paddle refusing a cancel, a still unpaid
+  one not passing the second read, more waiting and none cancelled) is
+  logged as that fault and never as a healthy "checkouts closed:" line. A customer who leaves Paddle's checkout open for over an
+  hour without paying has it cancelled, and what the overlay shows then
+  has not been seen. Only true once the function is deployed AND the job
+  is scheduled: check `supabase functions list` and `select jobname from
+  cron.job` before saying so. Read against Paddle's documentation on
+  25 Nov 2026 and run against stubs (part E of
+  `tools/foundation-test.mjs`); the SQL has never been run. It first
+  meets Paddle in `DEPLOY.md` 8.4 Test D. Never print a cron job's
+  command (`select command from cron.job`, or `select *` on `cron.job`
+  or on `cron.job_run_details`, which has a command column too): it
+  holds the cron secret, and Mal must never be asked to paste that
+  secret.
 - **A discount code typed by someone in their trial is checked on the
   server.** Paddle lists a discount as "active" until it is archived, so
   `create-checkout` also reads its end date, its limit of uses and what
@@ -195,9 +246,11 @@ arrived.
   in Paddle's catalogue has to be set for this, and `DEPLOY.md` 5.6 no
   longer asks for it. Only true once `create-checkout` is deployed: check
   before saying so. It is true of a checkout opened and paid in one go,
-  which is what the Buy button does. A transaction made on one day and
-  paid on a later one, if Paddle allows that, counts its days from the
-  day it was paid (the bullet on MADE and PAID, above). The
+  which is what the Buy button does. A transaction made at one time and
+  paid later, which `expire-checkouts` is built to limit to about an
+  hour (the bullet on unpaid prepared purchases says when that is true
+  and what is left), counts its days from the moment it was paid (the
+  bullet on MADE and PAID, above). The
   never-earlier rule stays in `paddle-webhook` as a safety net.
 - **The two catalogue trial price ids stay in `app/config.js` for now,
   and nothing opens them.** `pricing.html` and `index.html` can be paired

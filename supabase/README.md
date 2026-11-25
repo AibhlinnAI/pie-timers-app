@@ -21,10 +21,14 @@ contents in this order:
 | 9 | `schema-visit-counts.sql` | first-open totals, the tag list, and their nightly job | Always |
 | 10 | `schema-foundation.sql` | the 100 Foundation places and the public count | Always, before deploying paddle-webhook |
 | 11 | `cron.sql` | the scheduled jobs — **edit the placeholders first** | After deploying functions |
+| 12 | `schema-expire-checkouts.sql` | the 10-minute job that cancels unpaid prepared purchases | After `cron.sql`, and after deploying `expire-checkouts`. Nothing to edit. |
 
-Steps 1–10 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
+Steps 1–10 and step 12 are plain copy-paste with nothing to edit. **Only `cron.sql` needs
 editing**, and only after the edge functions are deployed, because the file points at
-their URLs.
+their URLs. Step 12 copies what it needs from the job `cron.sql` made, inside
+the database, so nobody types the cron secret a second time. It stops with
+a message, changing nothing, if that job is not there. Run it again
+whenever `cron.sql` is run again.
 
 Three of these are needed even if you skip the optional features:
 
@@ -80,24 +84,37 @@ made before 22 Nov 2026 and moved by `relaunch-2026-11.sql`,
 
 ## Scheduled jobs
 
-After running `cron.sql`:
+After running `cron.sql` and `schema-expire-checkouts.sql`:
 
 ```sql
 select jobname, schedule, active from cron.job order by jobname;
 ```
 
-Expect `countdown-calendar-sync`, `countdown-milestones`,
+Expect `countdown-calendar-sync`, `countdown-expire-checkouts`,
+`countdown-milestones`,
 `countdown-prune-calendar`, `countdown-prune-code-attempts`,
 `countdown-prune-log`, `countdown-prune-signins`,
 `countdown-settle-visit-counts`, `countdown-vacuum-visit-counts`. The last
-two come from `schema-visit-counts.sql`, not `cron.sql`.
+two come from `schema-visit-counts.sql`, and `countdown-expire-checkouts`
+from `schema-expire-checkouts.sql`, not `cron.sql`.
+
+Name the columns, as that query does. Never run `select * from cron.job`
+or `select * from cron.job_run_details`, and never select the `command`
+column of either: three of the commands hold the cron secret, both tables
+have a `command` column (`cron.job_run_details` repeats it for every run),
+and the SQL editor would put it on the screen.
 
 If something is not firing:
 
 ```sql
-select jobname, status, return_message, start_time
-  from cron.job_run_details order by start_time desc limit 20;
+select j.jobname, d.status, d.return_message, d.start_time
+  from cron.job_run_details d join cron.job j using (jobid)
+ order by d.start_time desc limit 20;
 ```
+
+(The job's name comes from `cron.job`: `cron.job_run_details` is read here
+as holding the job's id and not its name. Written from pg_cron's
+documentation, not run.)
 
 `succeeded` there only means the request was queued. What the function
 answered is in `net._http_response`, which keeps about six hours. On
@@ -113,6 +130,20 @@ A healthy calendar-sync run answers 200 with counts only, for example
 `{"ok":true,"due":8,"synced":8,"failed":0,"died":0,"deferred":0}`. `died` is
 a feed whose own worker was killed or timed out; that feed's row says so in
 `last_error`, which the person sees in the app.
+
+A healthy `expire-checkouts` run answers 200 with counts only, for example
+`{"ok":true,"closed":0,"listed":0,"old":0,"young":0,"notOurs":0,"paying":0,"changed":0,"refused":0,"failed":0,"more":false,"stopped":null}`.
+`closed` is how many unpaid prepared purchases that run cancelled. The
+answer and the function's log never hold a transaction id or an account
+id: the cancelled ones are in Paddle's Transactions list. A 502 is a
+fault: Paddle refusing or not answering, or a run that left old unpaid
+ones open for a reason other than somebody paying. The next run ten
+minutes later is the retry, and the same 502 run after run needs a look.
+A row there with no status and a time-out message is a run that took
+longer than the 25 seconds the job waits; the function is written to end
+inside 24, so that should not be seen. `DEPLOY.md` 8.4 reads each answer ("Reading an answer from
+`expire-checkouts`"). None of this has been seen against Paddle or a
+database yet: `DEPLOY.md` 8.4 Test D is the first look.
 
 ## Reading the first-open counts
 
@@ -208,3 +239,13 @@ now fail closed (reject every request) when unset, rather than
 silently accepting anything. Keep the filled-in copy of this file out of
 public source control regardless — the cron secret is still worth
 protecting, just not at "database password" severity.
+
+`schema-expire-checkouts.sql` has no placeholder and holds no secret. The
+job it makes, `countdown-expire-checkouts`, is a copy of the
+`countdown-milestones` job, so its command holds the same secret, and the
+`expire-checkouts` function is closed without it in the same way. So never
+select a job's `command` onto the screen, from `cron.job` or from
+`cron.job_run_details`, and never paste one into a
+chat, an issue or this repo. If `CRON_SECRET` is ever changed, run
+`cron.sql` again with the new value and then `schema-expire-checkouts.sql`
+again, in that order.
