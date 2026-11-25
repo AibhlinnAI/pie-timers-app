@@ -255,7 +255,10 @@ fields, both Premium Feature buttons, the header plan chip's trial and offer
 states, the Manage button, the welcome panel's "needs no card", the footer
 Pricing and Refund Policy links, and the Android tester invite. The Settings
 row that leads to Account drops Premium and cancelling from its line. The one
-line left is "Some features need an AibhlínnAI Premium subscription." As a
+line left is "Some features need an AibhlínnAI Premium subscription, available at aibhlinn.ai." The
+address is plain text, never a link: Google's Payments policy lets a
+consumption-only app say where to buy only "without direct links" (owner,
+25 Nov 2026). As a
 backstop, `billing.js` refuses to open checkout or the portal there.
 `pricing.html` and `foundation.html` send a Play visit back to the app, and
 `privacy.html` and `terms.html` hide their links to pricing and refunds, each
