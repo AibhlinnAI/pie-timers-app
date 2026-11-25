@@ -213,13 +213,20 @@
   function trialBadge(left) {
     var node = document.createElement('span');
     node.className = 'plan-chip plan-chip--trial';
+    var main = document.createElement('span');
+    main.className = 'plan-chip-main';
+    main.appendChild(mark());
+    main.appendChild(document.createTextNode('Free Trial'));
+    node.appendChild(main);
     /* One day over is a device clock running behind the server on a new
        account, and is still day 1. */
-    var counted = left !== null && left >= 1 && left <= TRIAL_DAYS + 1;
-    node.textContent = counted
-      ? 'Day ' + Math.max(1, TRIAL_DAYS - left + 1) + ' of ' + TRIAL_DAYS
-      : 'Free Trial';
-    node.title = 'Free trial';
+    if (left !== null && left >= 1 && left <= TRIAL_DAYS + 1) {
+      node.className += ' plan-chip--tagged';
+      var tag = document.createElement('span');
+      tag.className = 'plan-chip-tag';
+      tag.textContent = 'Day ' + Math.max(1, TRIAL_DAYS - left + 1) + ' of ' + TRIAL_DAYS;
+      node.appendChild(tag);
+    }
     return node;
   }
 

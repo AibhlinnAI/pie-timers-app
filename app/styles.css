@@ -1944,10 +1944,13 @@ body.is-focus{
 }
 .plan-chip .ai-mark{ width:20px; height:20px; display:block; }
 
-/* Trial: Pie Timers' own orange, no border. A note, not a control. */
+/* Trial: AibhlínnAI purple with a quieter, lighter purple edge and
+   lettering (owner, 25 Nov 2026). Status, not a control. Fixed colours,
+   as with Sign in, because the pill sits on the header in both themes. */
 .plan-chip--trial{
-  color:var(--orange-text);
-  background:var(--amber-tint);
+  color:#E0BFF0;
+  background:#4B2A5A;
+  border:1px solid #B07FE0;
 }
 
 /* Entitled: AibhlínnAI purple, bordered. Status, nothing to press. */
@@ -1958,24 +1961,29 @@ body.is-focus{
 }
 
 /* The ask. The only one that is a link, and so the only one that
-   looks pressable. */
+   looks pressable: the same purple fill and neon green edge as Sign in
+   and the Premium Feature buttons. */
 .plan-chip--offer{
-  color:var(--purple-lift);
-  background:var(--purple-tint);
-  border:1px solid var(--purple);
+  color:#6FD08C;
+  background:#4B2A5A;
+  border:2px solid #6FD08C;
 }
-/* The offer with a second, smaller line under the name. */
+.plan-chip--offer:hover{ background:#6FD08C; color:#4B2A5A; }
+.plan-chip--offer:focus-visible{ outline:2px solid #6FD08C; outline-offset:2px; }
+/* A pill with a second, smaller line under the name: the trial's day
+   count, or the offer's hook. */
 .plan-chip--tagged{
   flex-direction:column; justify-content:center; gap:1px;
   padding:3px 14px; line-height:1.1;
 }
 .plan-chip-main{ display:inline-flex; align-items:center; gap:7px; }
 .plan-chip-tag{ font-size:.68rem; font-weight:500; }
-/* On a phone the day badge gives up its side padding, so badge, button
-   and Sign out share one row down to about 340px. */
-@media (max-width:600px){ .plan-chip--trial{ padding:0 8px; } }
-.plan-chip--offer:hover{
-  background:var(--purple-mid);
-  color:var(--ink);
+/* On a phone both pills tighten, so the trial pill, the button and
+   Sign out share one row at 360px. */
+@media (max-width:600px){
+  .topbar-signin .plan-chip{ padding-left:9px; padding-right:9px; font-size:.8rem; }
+  .topbar-signin .plan-chip .ai-mark{ width:16px; height:16px; }
+  .topbar-signin .plan-chip-main{ gap:5px; }
+  .topbar-signin .aib-signin-status-slot{ gap:4px; }
 }
 .aib-signin-status-slot{ display:inline-flex; align-items:center; gap:6px; }
