@@ -76,8 +76,8 @@ says "Pie Timers | AibhlínnAI".
   the icon's green plate with a rim. The pies keep the app's meaning for
   colour (purple for a break, green for the end of the day, orange for an
   appointment), each lightened until it stands out on the green plate. They
-  are in `res/values/colors.xml`. These colours compile and have not yet
-  been seen on a phone.
+  are in `res/values/colors.xml`. Seen on the Pixel 6 below at four cells by
+  two, both sides, on 26 Nov 2026; not yet at the smaller sizes.
 - **The app holds no timer maths.** A widget is drawn by Android while the
   app is closed, so it cannot ask the page anything. The page works out the
   next seven days (`widgetSnapshot` in `app/app.js`) and hands them to
@@ -102,9 +102,10 @@ says "Pie Timers | AibhlínnAI".
   The corner tap to the QR code and back, a tap on a pie opening the app,
   and the minute by minute update all worked. The week was handed to the
   app through the debugging port, because the live site did not have
-  `widgetSnapshot` yet. Still to check: the QR code read by another phone's
-  camera, taller sizes, and the app handing the week over by itself once
-  the site has the new code.
+  `widgetSnapshot` yet. Once the site had it, the test app handed the week
+  over by itself on leaving the screen, and the widget drew the app's own
+  timers. Still to check: the QR code read by another phone's camera, and
+  taller sizes.
 
 ## Phone notifications (release 7 on)
 
