@@ -3858,7 +3858,9 @@ check('P19 pricing.html: the panel says how long the offer runs',
 
   check('P15 foundation.html: the places line starts hidden and is a status region',
     /<p id="foundationState" role="status" aria-live="polite" hidden><\/p>/.test(FOUNDATION));
-  check('P15 foundation.html is no longer kept out of search', !/name="robots"/.test(FOUNDATION));
+  /* Since 26 Nov 2026 the page lives on the Premium site, and this copy
+     is left out of search so the two are not listed twice (H5 below). */
+  check('P15 foundation.html is left out of search now that the page has moved', /<meta name="robots" content="noindex">/.test(FOUNDATION));
   check('P15 foundation.html no longer calls itself an unlinked draft', !/not linked from any page/i.test(FOUNDATION) && /Not yet reviewed by a lawyer/.test(FOUNDATION));
   const terms = read('app/terms.html');
   /* terms.html has no date check, so this sentence dates itself: it
@@ -4780,6 +4782,22 @@ for (const [name, html] of Object.entries(OFFER_PAGES)) {
   check('H3 pricing.html asks for identity-bridge.js by the same version as index.html',
     (index.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] === (pricing.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] &&
     read('app/sw.js').includes("'identity-bridge.js" + (index.match(/identity-bridge\.js(\?v=\d+)/) || [])[1] + "'"));
+  /* foundation.html: moved to the Premium site on 26 Nov 2026 (owner).
+     The old address is in emails and posts already sent, so the file
+     stays and sends a visit on, after the Play gate, the way
+     pricing.html does. */
+  {
+    const fGate = FOUNDATION.indexOf("location.replace('index.html#in-app');");
+    const fSend = FOUNDATION.indexOf('location.replace(FOUNDATION_PAGE);');
+    check('H5 foundation.html sends a visit to the Foundation page on the Premium site, after the Play gate, and never a Play visit',
+      fGate > 0 && fSend > fGate && /var FOUNDATION_PAGE = 'https:\/\/premium\.aibhlinn\.ai\/foundation\.html';\s*if \(!FOUNDATION_PAGE \|\| \(window\.CT && window\.CT\.inPlayApp\)\) return;/.test(FOUNDATION));
+    check('H5 foundation.html carries a plain link as the fallback, and shows the page again if the browser will not leave',
+      /<p class="notice notice--info" id="movedNotice">Foundation Members has moved to\s*<a href="https:\/\/premium\.aibhlinn\.ai\/foundation\.html">premium\.aibhlinn\.ai\/foundation\.html<\/a>\.<\/p>/.test(FOUNDATION) &&
+      /setTimeout\(function \(\) \{ document\.documentElement\.style\.display = ''; \}, 3000\);/.test(FOUNDATION));
+    check('H5 the redirect carries nothing about the visitor: the address is fixed text', !/location\.replace\(FOUNDATION_PAGE\s*\+/.test(FOUNDATION));
+    check('H5 the notes say where the Foundation page lives now',
+      read('CLAUDE.md').includes('https://premium.aibhlinn.ai/foundation.html') && read('DEPLOY.md').includes('https://premium.aibhlinn.ai/foundation.html'));
+  }
   check('H4 the notes say the checkout is hidden, not deleted, and where Premium is sold',
     /hidden, not deleted/.test(read('CLAUDE.md')) && /hidden, not deleted/.test(read('DEPLOY.md')) &&
     read('DEPLOY.md').includes('https://premium.aibhlinn.ai') && read('DEPLOY.md').includes('AibhlinnAI/premium.aibhlinn.ai'));

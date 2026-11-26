@@ -25,6 +25,29 @@
     location.replace('index.html#in-app');
   }());
 </script>
+<!-- This page has moved, and is hidden, not deleted (owner, 26 Nov 2026).
+     Foundation Members now lives with the rest of AibhlínnAI Premium, at
+     https://premium.aibhlinn.ai/foundation.html, in that site's branding.
+     A visit here is sent there, and search engines are asked to leave
+     this copy out. This address is in emails and posts already sent, so
+     the file must stay. Everything below still works. To bring the page
+     back: set FOUNDATION_PAGE to '' here, and take out the robots line
+     and the notice at the top of the body. The Play gate above runs
+     first, so a Play visit goes back to the app and is never sent to a
+     place of sale. The wording below and the wording there are the same:
+     change one and change the other. -->
+<meta name="robots" content="noindex">
+<script>
+  (function () {
+    var FOUNDATION_PAGE = 'https://premium.aibhlinn.ai/foundation.html';
+    if (!FOUNDATION_PAGE || (window.CT && window.CT.inPlayApp)) return;
+    document.documentElement.style.display = 'none';
+    location.replace(FOUNDATION_PAGE);
+    /* If the browser will not leave, show the page after all: the
+       notice at the top carries a plain link. */
+    setTimeout(function () { document.documentElement.style.display = ''; }, 3000);
+  }());
+</script>
 <title>Foundation Members · Pie Timers</title>
 <!-- The description carries no offer and no date, on purpose. Nothing can
      take a description down when an offer ends, so it must stay true
@@ -70,6 +93,8 @@
 </header>
 
 <main class="legal">
+  <p class="notice notice--info" id="movedNotice">Foundation Members has moved to
+  <a href="https://premium.aibhlinn.ai/foundation.html">premium.aibhlinn.ai/foundation.html</a>.</p>
   <p class="legal-meta">
     Last updated: <strong>22 November 2026</strong> &middot;
     <a href="https://premium.aibhlinn.ai/">Pricing</a> &middot;

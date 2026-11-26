@@ -260,7 +260,8 @@ address is plain text, never a link: Google's Payments policy lets a
 consumption-only app say where to buy only "without direct links" (owner,
 25 Nov 2026). As a
 backstop, `billing.js` refuses to open checkout or the portal there.
-`pricing.html` and `foundation.html` send a Play visit back to the app, and
+`pricing.html` and `foundation.html` send a Play visit back to the app (and
+any other visit on to the Premium site, where both pages now live), and
 `privacy.html` and `terms.html` hide their links to pricing and refunds, each
 reading the same sessionStorage key.
 
