@@ -15,6 +15,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -76,6 +77,12 @@ public class PieWidget extends AppWidgetProvider {
     /* Everything in the widget that is not pie: padding, the name in the
        corner, and the two lines of text. */
     private static final int CHROME_DP = 72;
+    /* Narrower than this and the two names along the top do not both
+       fit, so only their icons are shown. */
+    private static final int NAMES_DP = 200;
+    /* A pie with less width than this gets smaller text, so one pie's
+       time never runs into the next. */
+    private static final int ROOMY_SLOT_DP = 100;
 
     private static final long MINUTE_MS = 60_000L;
 
@@ -197,6 +204,9 @@ public class PieWidget extends AppWidgetProvider {
         RemoteViews views = side == SIDE_PIES
                 ? pieSide(context, manager, id, prefs.getString(PREF_SNAPSHOT, null))
                 : qrSide(context, id, side == SIDE_QR_AI);
+        int names = size(context, manager, id)[0] < NAMES_DP ? View.GONE : View.VISIBLE;
+        views.setViewVisibility(R.id.widget_brand_pie_text, names);
+        views.setViewVisibility(R.id.widget_brand_ai_text, names);
         views.setOnClickPendingIntent(R.id.widget_brand_pie, flip(context, id, SIDE_QR_PIE));
         views.setOnClickPendingIntent(R.id.widget_brand_ai, flip(context, id, SIDE_QR_AI));
         manager.updateAppWidget(id, views);
@@ -232,20 +242,9 @@ public class PieWidget extends AppWidgetProvider {
         views.setViewVisibility(R.id.widget_pies, View.VISIBLE);
         views.setViewVisibility(R.id.widget_note, View.GONE);
 
-        /* The size the home screen gives the widget, in dp. It reports a
-           range; upright uses the narrow width with the tall height, and
-           on its side the other pair. */
-        Bundle options = manager.getAppWidgetOptions(id);
-        boolean sideways = context.getResources().getConfiguration().orientation
-                == Configuration.ORIENTATION_LANDSCAPE;
-        int width = options.getInt(sideways
-                ? AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
-                : AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
-        int height = options.getInt(sideways
-                ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
-                : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
-        if (width <= 0) width = 250;
-        if (height <= 0) height = 110;
+        int[] size = size(context, manager, id);
+        int width = size[0];
+        int height = size[1];
 
         int room = Math.max(1, Math.min(3, width / SLOT_DP));
         int pieDp = Math.max(MIN_PIE_DP,
@@ -262,6 +261,7 @@ public class PieWidget extends AppWidgetProvider {
         }
 
         boolean[] shown = choose(slots, room);
+        boolean roomy = width / room >= ROOMY_SLOT_DP;
         for (int i = 0; i < 3; i++) {
             views.setViewVisibility(SLOT[i], shown[i] ? View.VISIBLE : View.GONE);
             if (!shown[i]) continue;
@@ -269,6 +269,8 @@ public class PieWidget extends AppWidgetProvider {
             String time = slot.time(context);
             views.setTextViewText(LABEL[i], slot.label);
             views.setTextViewText(TIME[i], time);
+            views.setTextViewTextSize(LABEL[i], TypedValue.COMPLEX_UNIT_SP, roomy ? 12 : 11);
+            views.setTextViewTextSize(TIME[i], TypedValue.COMPLEX_UNIT_SP, roomy ? 14 : 12);
             views.setTextColor(TIME[i], ContextCompat.getColor(context,
                     slot.running() ? R.color.widget_text : R.color.widget_off));
             views.setImageViewBitmap(PIE[i], pie(context, piePx, slot, i));
@@ -277,6 +279,22 @@ public class PieWidget extends AppWidgetProvider {
                     : slot.label + ", " + time);
         }
         return views;
+    }
+
+    /* The width and height the home screen gives the widget, in dp. It
+       reports a range; upright uses the narrow width with the tall
+       height, and on its side the other pair. */
+    private static int[] size(Context context, AppWidgetManager manager, int id) {
+        Bundle options = manager.getAppWidgetOptions(id);
+        boolean sideways = context.getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        int width = options.getInt(sideways
+                ? AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
+                : AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
+        int height = options.getInt(sideways
+                ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
+                : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
+        return new int[] {width <= 0 ? 250 : width, height <= 0 ? 110 : height};
     }
 
     /* Which pies a widget with room for fewer than three shows: the ones
