@@ -23,7 +23,8 @@
     <string name="widget_about">Your pies on the home screen: your next break, the end of your day and your next appointment.</string>
     <string name="widget_brand">Pie Timers | AibhlínnAI</string>
     <string name="widget_open">Open Pie Timers</string>
-    <string name="widget_qr_caption">Scan to get Pie Timers</string>
+    <!-- The line across the shoulders of the conference shirt. -->
+    <string name="widget_qr_caption">sometimes you eat the pie…</string>
     <string name="widget_qr_about">QR code for Pie Timers on Google Play</string>
     <!-- Under a pie: nothing running, and the time arrived. -->
     <string name="widget_idle">–</string>

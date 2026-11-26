@@ -68,7 +68,16 @@ says "Pie Timers | AibhlínnAI".
   keeps sideways swipes for moving between its own pages, so a widget never
   sees one.
 - **The QR code** is the plain Play address with nothing added: no tag and
-  no referrer. It is a picture made once by `tools/make-widget-qr.js`.
+  no referrer. It is a picture made once by `tools/make-widget-qr.js`, drawn
+  as it is on the back of the conference shirt: plum squares on a cream
+  tile. Under it is the shirt's line, "sometimes you eat the pie…".
+- **Colours** (the owner, 26 Nov 2026: "B but on the shirt purple"). The
+  ground is the shirt's purple and the numbers its cream. Each pie sits on
+  the icon's green plate with a rim. The pies keep the app's meaning for
+  colour (purple for a break, green for the end of the day, orange for an
+  appointment), each lightened until it stands out on the green plate. They
+  are in `res/values/colors.xml`. These colours compile and have not yet
+  been seen on a phone.
 - **The app holds no timer maths.** A widget is drawn by Android while the
   app is closed, so it cannot ask the page anything. The page works out the
   next seven days (`widgetSnapshot` in `app/app.js`) and hands them to

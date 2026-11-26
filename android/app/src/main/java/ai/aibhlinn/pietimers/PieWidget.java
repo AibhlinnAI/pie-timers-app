@@ -277,20 +277,35 @@ public class PieWidget extends AppWidgetProvider {
         return shown;
     }
 
+    /* The pie's radius as a share of its plate's, as in the app's icon
+       (app/icon.svg: pie 150, plate 184), so the plate shows as a rim. */
+    private static final float PIE_ON_PLATE = 150f / 184f;
+
     /* A solid pie, never a ring: the filled area is the time left, as on
        the Dashboard (wedgePath() in app/app.js). The gap opens at twelve
-       o'clock and grows clockwise, so what is left always ends at twelve. */
+       o'clock and grows clockwise, so what is left always ends at twelve.
+       It sits on a plate with a rim, as the icon's pie does. */
     private static Bitmap pie(Context context, int size, Slot slot, int index) {
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         float edge = Math.max(1f, size / 48f);
-        RectF dial = new RectF(edge, edge, size - edge, size - edge);
+        RectF plate = new RectF(edge, edge, size - edge, size - edge);
+        float inset = plate.width() / 2f * (1f - PIE_ON_PLATE);
+        RectF dial = new RectF(plate.left + inset, plate.top + inset,
+                plate.right - inset, plate.bottom - inset);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(ContextCompat.getColor(context,
                 slot.seen ? R.color.widget_plate : R.color.widget_off_plate));
-        canvas.drawOval(dial, paint);
+        canvas.drawOval(plate, paint);
+        if (slot.seen) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(edge);
+            paint.setColor(ContextCompat.getColor(context, R.color.widget_plate_rim));
+            canvas.drawOval(plate, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
 
         if (slot.fraction > 0f) {
             boolean urgent = slot.urgent;

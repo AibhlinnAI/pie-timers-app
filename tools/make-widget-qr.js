@@ -39,6 +39,18 @@ for (let r = 0; r < n; r++) {
   }
 }
 
+// Drawn the way the conference shirt's QR is: plum squares on a cream
+// tile with rounded corners (the shirt's tile is 280 across with corners
+// of 14, so a twentieth of its width). Dark on light, never the other way
+// round, because some phone scanners cannot read an inverted code.
+const CREAM = '#F6D7B0';
+const PLUM = '#2E1838';
+const r = size / 20;
+const tile = 'M' + r + ',0h' + (size - 2 * r) + 'a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r +
+  'v' + (size - 2 * r) + 'a' + r + ',' + r + ' 0 0 1 -' + r + ',' + r +
+  'h-' + (size - 2 * r) + 'a' + r + ',' + r + ' 0 0 1 -' + r + ',-' + r +
+  'v-' + (size - 2 * r) + 'a' + r + ',' + r + ' 0 0 1 ' + r + ',-' + r + 'z';
+
 const xml = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Made by tools/make-widget-qr.js. Do not edit by hand.
      ${URL} -->
@@ -48,10 +60,10 @@ const xml = `<?xml version="1.0" encoding="utf-8"?>
     android:viewportWidth="${size}"
     android:viewportHeight="${size}">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M0,0h${size}v${size}h-${size}z" />
+        android:fillColor="${CREAM}"
+        android:pathData="${tile}" />
     <path
-        android:fillColor="#000000"
+        android:fillColor="${PLUM}"
         android:pathData="${d}" />
 </vector>
 `;
