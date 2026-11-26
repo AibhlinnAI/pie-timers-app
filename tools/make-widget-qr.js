@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /* ============================================================
-   Makes the QR code the Android home screen widget shows:
-   android/app/src/main/res/drawable/widget_qr.xml
+   Makes the two QR codes the Android home screen widget shows, in
+   android/app/src/main/res/drawable/:
+     widget_qr_pie.xml   the app's Google Play page
+     widget_qr_ai.xml    aibhlinn.ai
 
-   The code is the app's Google Play page and nothing else: no tag, no
-   referrer, nothing that says who scanned it or whose phone showed it.
-   It never changes, so it is drawn once here, with the same vendored
-   generator the Settings tab uses (app/qrcode.js), and shipped as a
-   picture. The Android app then needs no QR library.
+   Each is its address and nothing else: no tag, no referrer, nothing
+   that says who scanned it or whose phone showed it. They never change,
+   so they are drawn once here, with the same vendored generator the
+   Settings tab uses (app/qrcode.js), and shipped as pictures. The
+   Android app then needs no QR library.
 
    Run:  node tools/make-widget-qr.js
-   Run it again only if the address below changes.
+   Run it again only if an address below changes.
    ============================================================ */
 'use strict';
 
@@ -18,9 +20,13 @@ const fs = require('fs');
 const path = require('path');
 const qrcode = require('../app/qrcode.js');
 
-const URL = 'https://play.google.com/store/apps/details?id=ai.aibhlinn.pietimers';
+const CODES = [
+  ['widget_qr_pie.xml', 'https://play.google.com/store/apps/details?id=ai.aibhlinn.pietimers'],
+  ['widget_qr_ai.xml', 'https://aibhlinn.ai'],
+];
 const QUIET = 4;   // the blank margin the QR standard asks for, in modules
 
+for (const [FILE, URL] of CODES) {
 const qr = qrcode(0, 'M');
 qr.addData(URL);
 qr.make();
@@ -68,6 +74,7 @@ const xml = `<?xml version="1.0" encoding="utf-8"?>
 </vector>
 `;
 
-const out = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'drawable', 'widget_qr.xml');
+const out = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'drawable', FILE);
 fs.writeFileSync(out, xml);
 console.log('Wrote ' + path.relative(process.cwd(), out) + ': ' + n + ' modules a side, ' + xml.length + ' characters.');
+}

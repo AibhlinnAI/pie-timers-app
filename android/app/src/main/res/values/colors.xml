@@ -8,12 +8,14 @@
     <color name="on_accent">#1C1024</color>
 
     <!-- The home screen widget, in the conference shirt's colours: its
-         purple for the ground, its cream for the numbers, and the app
-         icon's green plate. One look whatever the phone's theme, because
-         a widget sits on a wallpaper. -->
+         purple for the ground, its cream for the names, its orange for
+         the thin border and the times, and the app icon's green plate.
+         One look whatever the phone's theme, because a widget sits on a
+         wallpaper. -->
     <color name="widget_background">#4B2A5A</color>
+    <color name="widget_border">#FF8A00</color>
     <color name="widget_text">#F6D7B0</color>
-    <color name="widget_text_muted">#D7CCE2</color>
+    <color name="widget_time">#FF9A1F</color>
     <!-- The plate and its rim. What is eaten shows the plate. -->
     <color name="widget_plate">#32493C</color>
     <color name="widget_plate_rim">#3E5A4A</color>

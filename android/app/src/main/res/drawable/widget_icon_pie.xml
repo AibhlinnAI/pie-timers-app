@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon's plate and pie (app/icon.svg) without its dark square,
+     for beside the name "Pie Timers" on the widget. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="12dp"
+    android:viewportWidth="376"
+    android:viewportHeight="376">
+    <group
+        android:translateX="-68"
+        android:translateY="-68">
+        <path
+            android:fillColor="#32493C"
+            android:strokeColor="#3E5A4A"
+            android:strokeWidth="8"
+            android:pathData="M72,256a184,184 0 1,0 368,0a184,184 0 1,0 -368,0z" />
+        <path
+            android:fillColor="#FF8A00"
+            android:pathData="M256,256 369.4,157.7A150,150 0 1 1 256,106z" />
+    </group>
+</vector>
