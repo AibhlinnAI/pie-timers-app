@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- How Android offers the widget. It starts four cells wide and two
+     tall, which shows all three pies, and can be dragged down to two by
+     two (fewer pies) or made larger. targetCell* is read from Android 12;
+     older phones work the starting size out from minWidth and minHeight.
+
+     updatePeriodMillis is only a safety net, every 30 minutes, which is
+     the most often Android allows: PieWidget keeps its own once-a-minute
+     alarm, which runs only while the phone is awake. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_about"
+    android:initialLayout="@layout/widget_pies"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s" />

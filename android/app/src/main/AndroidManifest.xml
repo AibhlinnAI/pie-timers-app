@@ -48,6 +48,22 @@
             </intent-filter>
         </service>
 
+        <!-- The home screen widget (PieWidget). Exported because the home
+             screen, another app, is what asks it to draw. It only ever
+             redraws from what the app already holds, or turns over to its
+             QR code, whoever asks. -->
+        <receiver
+            android:name=".PieWidget"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pie_widget_info" />
+        </receiver>
+
         <!-- configChanges: the page keeps its state through a rotation or a
              keyboard instead of being reloaded. Not uiMode: a dark mode
              switch recreates the screen so the page's "Match my device"

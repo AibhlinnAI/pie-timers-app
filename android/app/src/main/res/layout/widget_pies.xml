@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home screen widget: up to three pies, each with its name above
+     and the time left below. PieWidget.java fills it in and hides the
+     pies a narrow widget has no room for. Only the kinds of view Android
+     allows in a widget are used here. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingBottom="8dp">
+
+    <!-- Tapping the name turns the widget over to the QR code. -->
+    <TextView
+        android:id="@+id/widget_brand"
+        style="@style/Widget.PieTimers.Brand" />
+
+    <LinearLayout
+        android:id="@+id/widget_pies"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/slot1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/slot1_label"
+                style="@style/Widget.PieTimers.Label" />
+
+            <ImageView
+                android:id="@+id/slot1_pie"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp"
+                android:layout_weight="1"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/slot1_time"
+                style="@style/Widget.PieTimers.Time" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/slot2"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/slot2_label"
+                style="@style/Widget.PieTimers.Label" />
+
+            <ImageView
+                android:id="@+id/slot2_pie"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp"
+                android:layout_weight="1"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/slot2_time"
+                style="@style/Widget.PieTimers.Time" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/slot3"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/slot3_label"
+                style="@style/Widget.PieTimers.Label" />
+
+            <ImageView
+                android:id="@+id/slot3_pie"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp"
+                android:layout_weight="1"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/slot3_time"
+                style="@style/Widget.PieTimers.Time" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- In place of the pies when there is nothing to draw them from. -->
+    <TextView
+        android:id="@+id/widget_note"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/widget_open"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp"
+        android:visibility="gone" />
+</LinearLayout>
