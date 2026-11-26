@@ -18,13 +18,13 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingLeft="16dp"
-        android:paddingTop="13dp"
+        android:paddingTop="12dp"
         android:paddingRight="10dp"
         android:paddingBottom="4dp">
 
         <ImageView
-            android:layout_width="14dp"
-            android:layout_height="14dp"
+            android:layout_width="13dp"
+            android:layout_height="13dp"
             android:layout_marginRight="4dp"
             android:importantForAccessibility="no"
             android:src="@drawable/widget_icon_pie" />
@@ -47,19 +47,20 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingLeft="10dp"
-        android:paddingTop="13dp"
+        android:paddingTop="12dp"
         android:paddingRight="16dp"
         android:paddingBottom="4dp">
 
         <ImageView
-            android:layout_width="14dp"
-            android:layout_height="14dp"
+            android:layout_width="13dp"
+            android:layout_height="13dp"
             android:layout_marginRight="4dp"
             android:importantForAccessibility="no"
             android:src="@drawable/widget_mark_ai" />
 
         <TextView
             style="@style/Widget.PieTimers.Brand"
-            android:text="@string/widget_brand_ai" />
+            android:text="@string/widget_brand_ai"
+            android:textColor="@color/widget_brand_ai" />
     </LinearLayout>
 </LinearLayout>

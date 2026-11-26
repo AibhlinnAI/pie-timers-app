@@ -77,14 +77,19 @@ its mark is on the right.
   is for another phone to scan, so nothing in the app opens either
   address.
 - **Colours** (the owner, 26 Nov 2026: "B but on the shirt purple", then
-  brighter text and "a thin orange border"). The ground is the shirt's
-  purple inside a thin orange line, the names are its cream and the times
-  the pie's orange. Each pie sits on
-  the icon's green plate with a rim. The pies keep the app's meaning for
-  colour (purple for a break, green for the end of the day, orange for an
-  appointment), each lightened until it stands out on the green plate. They
-  are in `res/values/colors.xml`. Seen on the Pixel 6 below at four cells by
-  two, all three sides, on 26 Nov 2026; not yet at the smaller sizes.
+  "a thin orange border"; the rest from a review he agreed to on 27 Nov).
+  The ground is the shirt's purple inside an orange line drawn to the home
+  screen's own corners. Names and times are the shirt's cream. Orange is
+  kept to the border and the appointment pie. Each pie sits on the icon's
+  green plate with a rim, and keeps the app's meaning for colour (purple
+  for a break, green for the end of the day, orange for an appointment),
+  the purple and green lightened to stand out on the plate. A pie that has
+  been reached keeps a thin ring of its colour; a place with nothing today
+  keeps a faint outline. The two names along the top are quieter than the
+  pies, and "AibhlínnAI" and its mark are the suite's titanium
+  (`brand/README.md`). All in `res/values/colors.xml`. Seen on the Pixel 6
+  below at four cells by two with all three pies running; the reached and
+  empty looks, and the smaller sizes, have not been seen since.
 - **The app holds no timer maths.** A widget is drawn by Android while the
   app is closed, so it cannot ask the page anything. The page works out the
   next seven days (`widgetSnapshot` in `app/app.js`) and hands them to

@@ -270,7 +270,7 @@ public class PieWidget extends AppWidgetProvider {
             views.setTextViewText(LABEL[i], slot.label);
             views.setTextViewText(TIME[i], time);
             views.setTextColor(TIME[i], ContextCompat.getColor(context,
-                    slot.running() ? R.color.widget_time : R.color.widget_off));
+                    slot.running() ? R.color.widget_text : R.color.widget_off));
             views.setImageViewBitmap(PIE[i], pie(context, piePx, slot, i));
             views.setContentDescription(SLOT[i], slot.running()
                     ? context.getString(R.string.widget_slot_spoken, slot.label, time)
@@ -318,13 +318,20 @@ public class PieWidget extends AppWidgetProvider {
         paint.setColor(ContextCompat.getColor(context,
                 slot.seen ? R.color.widget_plate : R.color.widget_off_plate));
         canvas.drawOval(plate, paint);
-        if (slot.seen) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(edge);
-            paint.setColor(ContextCompat.getColor(context, R.color.widget_plate_rim));
-            canvas.drawOval(plate, paint);
-            paint.setStyle(Paint.Style.FILL);
+        /* A plate with nothing on it today still has its outline, so the
+           place reads as empty and not as missing. */
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(edge);
+        paint.setColor(ContextCompat.getColor(context,
+                slot.seen ? R.color.widget_plate_rim : R.color.widget_off_rim));
+        canvas.drawOval(plate, paint);
+        /* Reached: the pie is eaten, and a thin ring in its own colour
+           stays to say which pie it was. */
+        if (slot.seen && slot.fraction <= 0f) {
+            paint.setColor(ContextCompat.getColor(context, FILL[index]));
+            canvas.drawOval(dial, paint);
         }
+        paint.setStyle(Paint.Style.FILL);
 
         if (slot.fraction > 0f) {
             boolean urgent = slot.urgent;

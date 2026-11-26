@@ -8,29 +8,35 @@
     <color name="on_accent">#1C1024</color>
 
     <!-- The home screen widget, in the conference shirt's colours: its
-         purple for the ground, its cream for the names, its orange for
-         the thin border and the times, and the app icon's green plate.
-         One look whatever the phone's theme, because a widget sits on a
-         wallpaper. -->
+         purple for the ground, its cream for the names and times, its
+         orange for the border, and the app icon's green plate. One look
+         whatever the phone's theme, because a widget sits on a wallpaper.
+         Orange is kept to the border and the appointment pie. -->
     <color name="widget_background">#4B2A5A</color>
     <color name="widget_border">#FF8A00</color>
     <color name="widget_text">#F6D7B0</color>
-    <color name="widget_time">#FF9A1F</color>
+    <!-- The two names along the top, quieter than the pies under them:
+         the cream thinned, and the suite's titanium, which is how the
+         AibhlínnAI wordmark is drawn on a dark ground (brand/README.md). -->
+    <color name="widget_brand">#CCF6D7B0</color>
+    <color name="widget_brand_ai">#CED1D8</color>
     <!-- The plate and its rim. What is eaten shows the plate. -->
     <color name="widget_plate">#32493C</color>
     <color name="widget_plate_rim">#3E5A4A</color>
     <!-- The app's meaning for each colour (purple for a break, green for
-         the end of the day, orange for an appointment), each lightened
-         until it stands out on the green plate. -->
-    <color name="widget_pie_break">#D9B3F2</color>
-    <color name="widget_pie_end">#A8E0B5</color>
+         the end of the day, orange for an appointment), the purple and
+         the green lightened until they stand out on the green plate and
+         kept as strong as the orange beside them. -->
+    <color name="widget_pie_break">#C48BF5</color>
+    <color name="widget_pie_end">#86DC9E</color>
     <color name="widget_pie_appointment">#FF8A00</color>
     <!-- Nearly out of time: green for a break or the end of the day,
          which is good news, and crimson for an appointment. -->
-    <color name="widget_urgent_good">#6FD08C</color>
+    <color name="widget_urgent_good">#2FD968</color>
     <color name="widget_urgent">#D91E48</color>
     <color name="widget_urgent_edge">#FFD2DC</color>
     <!-- Nothing running: one quiet colour, so it never looks live. -->
     <color name="widget_off">#B9A8C4</color>
     <color name="widget_off_plate">#3D2349</color>
+    <color name="widget_off_rim">#7A6388</color>
 </resources>
