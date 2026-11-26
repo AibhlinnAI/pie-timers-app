@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -140,5 +140,31 @@ jobs:
         with:
           path: site
 
-      - id: deployment
+      # Three tries at the publish, 30 s and then 90 s apart (added
+      # 26 Nov 2026). From about 10:18 UTC on 25 Nov 2026 deploy-pages
+      # failed on and off with "No artifacts named github-pages were
+      # found for this workflow run", although the upload above had just
+      # succeeded. The fault is inside deploy-pages' own lookup, so
+      # waiting for the artifact to be listed does not help. Trying
+      # again inside the same run does. Do not re-run a failed run
+      # instead: that uploads a second artifact into the run, and
+      # deploy-pages then fails with "Multiple artifacts named
+      # github-pages". Start a fresh run.
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 90
+
+      - id: deploy3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
