@@ -521,6 +521,41 @@ an email the inbox agent had sorted more than two hours earlier.
   Undo disappear once. Confirm it in a browser before changing anything. If
   real, the likely fix is small: have Restore defaults write normalised days,
   or compare against `normalise(state)`.
+- **Decided, not built: a lapsed plan loses every Premium feature** (Mal,
+  26 Nov 2026: "Lapsed accounts should lose all AibhlínnAI premium
+  features"). Premium is sync across devices, connected calendars (with the
+  month view) and alerts while the app is closed, on the web and in the
+  Android app. What `main` does today, from reading `8be491b` on
+  26 Nov 2026, not run:
+  - **Closed-app alerts carry on after a lapse.** The only plan check is the
+    Background alerts switch turning grey (`updateNotificationNotices` in
+    `app/app.js`). Neither `refreshSubscription` in `app/notify.js` nor
+    `wantsPush` in `supabase/functions/notify-milestones` asks about a plan,
+    and nothing calls `entitled_user_ids()` in `supabase/schema-billing.sql`.
+    The grey switch also stays ticked, so the person cannot switch Background
+    alerts off in the app; only Milestone alerts or the browser's own setting
+    stops them. This covers the Android app's Firebase devices too, which sit
+    in `push_subscriptions` beside the browsers. On 26 Nov no account was in
+    this position.
+  - **Sync still pulls on every start.** `init()` in `app/sync.js` runs
+    `CT.auth.loadUser().then(pull)`, which hands the user object to `pull()`
+    as `manual`, so the start-up pull skips `!manual && !isEntitled()`.
+    Pushes and the minute's polls do stop. The server enforces nothing here:
+    row-level security on `timer_profiles` lets any signed-in account read
+    and write its own row.
+  - **Calendars already stop.** `calendar-sync` and `google-connect` check
+    `has_active_plan()` with the service key, and the app hides the month view
+    and stops loading calendar events (`loadCalendar` in `app/app.js`).
+  - **Decide before building:** the comment above `pull()` says a pull the
+    person asks for (Sync now) is always allowed, so that "someone's own
+    schedule must never be held hostage to a lapsed payment". That predates
+    Mal's decision. Ask him whether Sync now stays free before changing it.
+  - **Likely fix for alerts:** in `notify-milestones`, skip accounts without
+    an active plan, checked with the service key the way `calendar-sync`
+    does. Then let a lapsed person see Background alerts as off, or switch
+    it off. Update `privacy.html` section 6 and `ARCHITECTURE.md` rule 4 in
+    the same PR, extend `tools/check-push-gate.js` and
+    `tools/notify-run-test.mjs`, and deploy the function only on Mal's yes.
 
 ## Working with Mal
 
