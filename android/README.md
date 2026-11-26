@@ -87,13 +87,15 @@ says "Pie Timers | AibhlínnAI".
   storage, which is left out of backups like everything else here.
 - **Free.** It works on one device with no account, so it is not a Premium
   feature.
-- **Seen on one phone, at one size** (26 Nov 2026: a Pixel 6 on Android 17,
-  four cells by two, test build). The three pies, the corner tap to the QR
-  code and back, a tap on a pie opening the app, and the minute by minute
-  update all worked. The week was handed to the app through the debugging
-  port, because the live site did not have `widgetSnapshot` yet. Still to
-  check: the smaller sizes, the QR code read by another phone's camera, and
-  the app handing the week over by itself once the site has the new code.
+- **Seen on one phone** (26 Nov 2026: a Pixel 6 on Android 17, whose home
+  screen is five cells wide, test build). At four cells by two and at three
+  by two it showed all three pies; at two by two it showed the two soonest.
+  The corner tap to the QR code and back, a tap on a pie opening the app,
+  and the minute by minute update all worked. The week was handed to the
+  app through the debugging port, because the live site did not have
+  `widgetSnapshot` yet. Still to check: the QR code read by another phone's
+  camera, taller sizes, and the app handing the week over by itself once
+  the site has the new code.
 
 ## Phone notifications (release 7 on)
 
