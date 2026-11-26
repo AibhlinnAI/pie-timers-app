@@ -89,7 +89,7 @@ its mark is on the right.
   pies, and "AibhlínnAI" and its mark are the suite's titanium
   (`brand/README.md`). All in `res/values/colors.xml`. Seen on the Pixel 6
   below with all three pies running, at full width, three cells and two
-  cells; the reached and empty looks have not been seen since. Narrower
+  cells; and the reached and empty looks, from a made-up week. Narrower
   than 200dp the top line shows its two icons without the names, and a
   pie with under 100dp of width gets smaller text. Both QR codes were
   read by another phone's camera on 27 Nov 2026.
