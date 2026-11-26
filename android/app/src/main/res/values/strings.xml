@@ -21,10 +21,18 @@
          phone's widget picker shows. -->
     <string name="widget_name">Pie Timers</string>
     <string name="widget_about">Your pies on the home screen: your next break, the end of your day and your next appointment.</string>
-    <string name="widget_brand">Pie Timers | AibhlínnAI</string>
+    <!-- The two names along the top. Tapping one shows its QR code. -->
+    <string name="widget_brand_pie">Pie Timers</string>
+    <string name="widget_brand_ai" translatable="false">AibhlínnAI</string>
+    <string name="widget_brand_pie_about">Pie Timers: show the QR code for Google Play</string>
+    <string name="widget_brand_ai_about">AibhlínnAI: show the QR code for aibhlinn.ai</string>
     <string name="widget_open">Open Pie Timers</string>
-    <string name="widget_qr_caption">Scan to get Pie Timers</string>
-    <string name="widget_qr_about">QR code for Pie Timers on Google Play</string>
+    <!-- Under each QR code. The first is the line across the shoulders
+         of the conference shirt. -->
+    <string name="widget_qr_pie_caption">sometimes you eat the pie…</string>
+    <string name="widget_qr_ai_caption" translatable="false">aibhlinn.ai</string>
+    <string name="widget_qr_pie_about">QR code for Pie Timers on Google Play</string>
+    <string name="widget_qr_ai_about">QR code for aibhlinn.ai</string>
     <!-- Under a pie: nothing running, and the time arrived. -->
     <string name="widget_idle">–</string>
     <string name="widget_reached">Done</string>

@@ -9,14 +9,12 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:paddingLeft="8dp"
-    android:paddingRight="8dp"
-    android:paddingBottom="8dp">
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp"
+    android:paddingBottom="12dp">
 
-    <!-- Tapping the name turns the widget over to the QR code. -->
-    <TextView
-        android:id="@+id/widget_brand"
-        style="@style/Widget.PieTimers.Brand" />
+    <!-- Tapping a name turns the widget over to that name's QR code. -->
+    <include layout="@layout/widget_header" />
 
     <LinearLayout
         android:id="@+id/widget_pies"

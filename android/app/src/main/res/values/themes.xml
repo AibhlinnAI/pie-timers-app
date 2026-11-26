@@ -18,26 +18,22 @@
     <style name="Widget.PieTimers.Brand" parent="">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_gravity">end</item>
-        <item name="android:paddingTop">8dp</item>
-        <item name="android:paddingBottom">4dp</item>
-        <item name="android:paddingLeft">12dp</item>
-        <item name="android:paddingRight">2dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:text">@string/widget_brand</item>
-        <item name="android:textColor">@color/widget_text_muted</item>
-        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/widget_brand</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <style name="Widget.PieTimers.Label" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:gravity">center</item>
+        <item name="android:paddingLeft">1dp</item>
+        <item name="android:paddingRight">1dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="android:textColor">@color/widget_text_muted</item>
-        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/widget_text</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <style name="Widget.PieTimers.Time" parent="">
@@ -46,7 +42,7 @@
         <item name="android:gravity">center</item>
         <item name="android:maxLines">1</item>
         <item name="android:textColor">@color/widget_text</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 </resources>

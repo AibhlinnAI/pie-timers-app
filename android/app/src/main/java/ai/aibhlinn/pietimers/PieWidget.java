@@ -13,7 +13,9 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.net.Uri;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -40,10 +42,11 @@ import org.json.JSONObject;
  * only changes when this class sends new ones: once a minute while the
  * phone is awake, and whenever the page hands over a new week.
  *
- * Tapping the name in the corner turns the widget over to a QR code for
- * the app's Google Play page; tapping again turns it back. A home screen
- * keeps sideways swipes for moving between its own pages, so a widget
- * never sees one.
+ * Two names run along the top. Tapping "Pie Timers" turns the widget over
+ * to a QR code for the app's Google Play page, and tapping "AibhlínnAI"
+ * to one for aibhlinn.ai; tapping the same name again, or the code, turns
+ * it back. A home screen keeps sideways swipes for moving between its own
+ * pages, so a widget never sees one.
  */
 public class PieWidget extends AppWidgetProvider {
 
@@ -52,8 +55,15 @@ public class PieWidget extends AppWidgetProvider {
 
     private static final String PREFS = "widget";
     private static final String PREF_SNAPSHOT = "snapshot";
-    /* Per widget: whether it is showing the QR code. */
-    private static final String PREF_QR = "qr_";
+    /* Per widget: which side it is showing. */
+    private static final String PREF_SIDE = "side_";
+    private static final String EXTRA_SIDE = "side";
+    private static final int SIDE_PIES = 0;
+    private static final int SIDE_QR_PIE = 1;
+    private static final int SIDE_QR_AI = 2;
+    /* What a build before the two names kept: true while its one QR code
+       was showing. Only cleared now. */
+    private static final String PREF_QR_OLD = "qr_";
 
     /* The page sends about three thousand characters for a busy week.
        Anything far beyond that did not come from the page. */
@@ -67,6 +77,12 @@ public class PieWidget extends AppWidgetProvider {
     /* Everything in the widget that is not pie: padding, the name in the
        corner, and the two lines of text. */
     private static final int CHROME_DP = 72;
+    /* Narrower than this and the two names along the top do not both
+       fit, so only their icons are shown. */
+    private static final int NAMES_DP = 200;
+    /* A pie with less width than this gets smaller text, so one pie's
+       time never runs into the next. */
+    private static final int ROOMY_SLOT_DP = 100;
 
     private static final long MINUTE_MS = 60_000L;
 
@@ -121,7 +137,7 @@ public class PieWidget extends AppWidgetProvider {
     public void onDeleted(Context context, int[] ids) {
         SharedPreferences.Editor edit =
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
-        for (int id : ids) edit.remove(PREF_QR + id);
+        for (int id : ids) edit.remove(PREF_SIDE + id).remove(PREF_QR_OLD + id);
         edit.apply();
     }
 
@@ -142,7 +158,10 @@ public class PieWidget extends AppWidgetProvider {
                     AppWidgetManager.INVALID_APPWIDGET_ID);
             if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return;
             SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            prefs.edit().putBoolean(PREF_QR + id, !prefs.getBoolean(PREF_QR + id, false)).apply();
+            /* Tapping the name of the side already showing turns back. */
+            int asked = intent.getIntExtra(EXTRA_SIDE, SIDE_PIES);
+            int side = asked == prefs.getInt(PREF_SIDE + id, SIDE_PIES) ? SIDE_PIES : asked;
+            prefs.edit().putInt(PREF_SIDE + id, side).remove(PREF_QR_OLD + id).apply();
             draw(context, AppWidgetManager.getInstance(context), id);
         } else {
             super.onReceive(context, intent);
@@ -181,16 +200,27 @@ public class PieWidget extends AppWidgetProvider {
 
     private static void draw(Context context, AppWidgetManager manager, int id) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        RemoteViews views = prefs.getBoolean(PREF_QR + id, false)
-                ? qrSide(context, id)
-                : pieSide(context, manager, id, prefs.getString(PREF_SNAPSHOT, null));
+        int side = prefs.getInt(PREF_SIDE + id, SIDE_PIES);
+        RemoteViews views = side == SIDE_PIES
+                ? pieSide(context, manager, id, prefs.getString(PREF_SNAPSHOT, null))
+                : qrSide(context, id, side == SIDE_QR_AI);
+        int names = size(context, manager, id)[0] < NAMES_DP ? View.GONE : View.VISIBLE;
+        views.setViewVisibility(R.id.widget_brand_pie_text, names);
+        views.setViewVisibility(R.id.widget_brand_ai_text, names);
+        views.setOnClickPendingIntent(R.id.widget_brand_pie, flip(context, id, SIDE_QR_PIE));
+        views.setOnClickPendingIntent(R.id.widget_brand_ai, flip(context, id, SIDE_QR_AI));
         manager.updateAppWidget(id, views);
     }
 
-    private static RemoteViews qrSide(Context context, int id) {
+    private static RemoteViews qrSide(Context context, int id, boolean ai) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_qr);
-        views.setOnClickPendingIntent(R.id.widget_root, flip(context, id));
-        views.setOnClickPendingIntent(R.id.widget_brand, flip(context, id));
+        views.setOnClickPendingIntent(R.id.widget_root, flip(context, id, SIDE_PIES));
+        views.setImageViewResource(R.id.widget_qr,
+                ai ? R.drawable.widget_qr_ai : R.drawable.widget_qr_pie);
+        views.setContentDescription(R.id.widget_qr, context.getString(
+                ai ? R.string.widget_qr_ai_about : R.string.widget_qr_pie_about));
+        views.setTextViewText(R.id.widget_qr_caption, context.getString(
+                ai ? R.string.widget_qr_ai_caption : R.string.widget_qr_pie_caption));
         return views;
     }
 
@@ -198,7 +228,6 @@ public class PieWidget extends AppWidgetProvider {
                                        String json) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_pies);
         views.setOnClickPendingIntent(R.id.widget_root, openApp(context));
-        views.setOnClickPendingIntent(R.id.widget_brand, flip(context, id));
 
         long now = System.currentTimeMillis();
         JSONObject snapshot = read(json);
@@ -213,20 +242,9 @@ public class PieWidget extends AppWidgetProvider {
         views.setViewVisibility(R.id.widget_pies, View.VISIBLE);
         views.setViewVisibility(R.id.widget_note, View.GONE);
 
-        /* The size the home screen gives the widget, in dp. It reports a
-           range; upright uses the narrow width with the tall height, and
-           on its side the other pair. */
-        Bundle options = manager.getAppWidgetOptions(id);
-        boolean sideways = context.getResources().getConfiguration().orientation
-                == Configuration.ORIENTATION_LANDSCAPE;
-        int width = options.getInt(sideways
-                ? AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
-                : AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
-        int height = options.getInt(sideways
-                ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
-                : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
-        if (width <= 0) width = 250;
-        if (height <= 0) height = 110;
+        int[] size = size(context, manager, id);
+        int width = size[0];
+        int height = size[1];
 
         int room = Math.max(1, Math.min(3, width / SLOT_DP));
         int pieDp = Math.max(MIN_PIE_DP,
@@ -243,6 +261,7 @@ public class PieWidget extends AppWidgetProvider {
         }
 
         boolean[] shown = choose(slots, room);
+        boolean roomy = width / room >= ROOMY_SLOT_DP;
         for (int i = 0; i < 3; i++) {
             views.setViewVisibility(SLOT[i], shown[i] ? View.VISIBLE : View.GONE);
             if (!shown[i]) continue;
@@ -250,6 +269,8 @@ public class PieWidget extends AppWidgetProvider {
             String time = slot.time(context);
             views.setTextViewText(LABEL[i], slot.label);
             views.setTextViewText(TIME[i], time);
+            views.setTextViewTextSize(LABEL[i], TypedValue.COMPLEX_UNIT_SP, roomy ? 12 : 11);
+            views.setTextViewTextSize(TIME[i], TypedValue.COMPLEX_UNIT_SP, roomy ? 14 : 12);
             views.setTextColor(TIME[i], ContextCompat.getColor(context,
                     slot.running() ? R.color.widget_text : R.color.widget_off));
             views.setImageViewBitmap(PIE[i], pie(context, piePx, slot, i));
@@ -258,6 +279,22 @@ public class PieWidget extends AppWidgetProvider {
                     : slot.label + ", " + time);
         }
         return views;
+    }
+
+    /* The width and height the home screen gives the widget, in dp. It
+       reports a range; upright uses the narrow width with the tall
+       height, and on its side the other pair. */
+    private static int[] size(Context context, AppWidgetManager manager, int id) {
+        Bundle options = manager.getAppWidgetOptions(id);
+        boolean sideways = context.getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        int width = options.getInt(sideways
+                ? AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
+                : AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
+        int height = options.getInt(sideways
+                ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
+                : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
+        return new int[] {width <= 0 ? 250 : width, height <= 0 ? 110 : height};
     }
 
     /* Which pies a widget with room for fewer than three shows: the ones
@@ -277,20 +314,42 @@ public class PieWidget extends AppWidgetProvider {
         return shown;
     }
 
+    /* The pie's radius as a share of its plate's, as in the app's icon
+       (app/icon.svg: pie 150, plate 184), so the plate shows as a rim. */
+    private static final float PIE_ON_PLATE = 150f / 184f;
+
     /* A solid pie, never a ring: the filled area is the time left, as on
        the Dashboard (wedgePath() in app/app.js). The gap opens at twelve
-       o'clock and grows clockwise, so what is left always ends at twelve. */
+       o'clock and grows clockwise, so what is left always ends at twelve.
+       It sits on a plate with a rim, as the icon's pie does. */
     private static Bitmap pie(Context context, int size, Slot slot, int index) {
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         float edge = Math.max(1f, size / 48f);
-        RectF dial = new RectF(edge, edge, size - edge, size - edge);
+        RectF plate = new RectF(edge, edge, size - edge, size - edge);
+        float inset = plate.width() / 2f * (1f - PIE_ON_PLATE);
+        RectF dial = new RectF(plate.left + inset, plate.top + inset,
+                plate.right - inset, plate.bottom - inset);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(ContextCompat.getColor(context,
                 slot.seen ? R.color.widget_plate : R.color.widget_off_plate));
-        canvas.drawOval(dial, paint);
+        canvas.drawOval(plate, paint);
+        /* A plate with nothing on it today still has its outline, so the
+           place reads as empty and not as missing. */
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(edge);
+        paint.setColor(ContextCompat.getColor(context,
+                slot.seen ? R.color.widget_plate_rim : R.color.widget_off_rim));
+        canvas.drawOval(plate, paint);
+        /* Reached: the pie is eaten, and a thin ring in its own colour
+           stays to say which pie it was. */
+        if (slot.seen && slot.fraction <= 0f) {
+            paint.setColor(ContextCompat.getColor(context, FILL[index]));
+            canvas.drawOval(dial, paint);
+        }
+        paint.setStyle(Paint.Style.FILL);
 
         if (slot.fraction > 0f) {
             boolean urgent = slot.urgent;
@@ -402,12 +461,15 @@ public class PieWidget extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    /* One per widget (the request code), so two widgets turn over
-       separately. */
-    private static PendingIntent flip(Context context, int id) {
+    /* One per widget and per side asked for: Android tells two of these
+       apart by the address, never by the extras, so the address carries
+       both and two widgets turn over separately. */
+    private static PendingIntent flip(Context context, int id, int side) {
         Intent intent = new Intent(context, PieWidget.class)
                 .setAction(ACTION_FLIP)
-                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+                .setData(Uri.parse("pietimers-widget://flip/" + id + "/" + side))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(EXTRA_SIDE, side);
         return PendingIntent.getBroadcast(context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }

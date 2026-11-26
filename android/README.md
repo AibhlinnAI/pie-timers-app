@@ -56,19 +56,43 @@ stops updating with no error.
 
 Up to three pies on the phone's home screen, the same three as the
 Dashboard: the next break or lunch, the end of the day and the next
-appointment. Each has its name above and the time left below. The corner
-says "Pie Timers | AibhlínnAI".
+appointment. Each has its name above and the time left below. Along the
+top, "Pie Timers" with a small pie is on the left and "AibhlínnAI" with
+its mark is on the right.
 
 - **Sizes.** It starts four cells wide and two tall, which shows all three
   pies. It can be dragged down to two by two, or made larger. A narrower
   widget shows fewer pies: those still counting down first, soonest first.
-- **Tap a pie** to open the app. **Tap the name in the corner** to turn the
-  widget over to a QR code for the app's Google Play page, and tap again to
-  turn it back. A swipe was asked for and cannot be built: a home screen
-  keeps sideways swipes for moving between its own pages, so a widget never
-  sees one.
-- **The QR code** is the plain Play address with nothing added: no tag and
-  no referrer. It is a picture made once by `tools/make-widget-qr.js`.
+- **Tap a pie** to open the app. **Tap "Pie Timers"** to turn the widget
+  over to a QR code for the app's Google Play page, or **"AibhlínnAI"** for
+  one to aibhlinn.ai. Tap the same name again, or the code, to turn it
+  back. A swipe was asked for and cannot be built: a home screen keeps
+  sideways swipes for moving between its own pages, so a widget never sees
+  one.
+- **The two QR codes** are the plain addresses with nothing added: no tag
+  and no referrer. They are pictures made once by
+  `tools/make-widget-qr.js`, drawn as on the back of the conference shirt:
+  plum squares on a cream tile. Under the Play one is the shirt's line,
+  "sometimes you eat the pie…"; under the other, "aibhlinn.ai". A QR code
+  is for another phone to scan, so nothing in the app opens either
+  address.
+- **Colours** (the owner, 26 Nov 2026: "B but on the shirt purple", then
+  "a thin orange border"; the rest from a review he agreed to on 27 Nov).
+  The ground is the shirt's purple inside an orange line drawn to the home
+  screen's own corners. Names and times are the shirt's cream. Orange is
+  kept to the border and the appointment pie. Each pie sits on the icon's
+  green plate with a rim, and keeps the app's meaning for colour (purple
+  for a break, green for the end of the day, orange for an appointment),
+  the purple and green lightened to stand out on the plate. A pie that has
+  been reached keeps a thin ring of its colour; a place with nothing today
+  keeps a faint outline. The two names along the top are quieter than the
+  pies, and "AibhlínnAI" and its mark are the suite's titanium
+  (`brand/README.md`). All in `res/values/colors.xml`. Seen on the Pixel 6
+  below with all three pies running, at full width, three cells and two
+  cells; and the reached and empty looks, from a made-up week. Narrower
+  than 200dp the top line shows its two icons without the names, and a
+  pie with under 100dp of width gets smaller text. Both QR codes were
+  read by another phone's camera on 27 Nov 2026.
 - **The app holds no timer maths.** A widget is drawn by Android while the
   app is closed, so it cannot ask the page anything. The page works out the
   next seven days (`widgetSnapshot` in `app/app.js`) and hands them to
@@ -93,9 +117,10 @@ says "Pie Timers | AibhlínnAI".
   The corner tap to the QR code and back, a tap on a pie opening the app,
   and the minute by minute update all worked. The week was handed to the
   app through the debugging port, because the live site did not have
-  `widgetSnapshot` yet. Still to check: the QR code read by another phone's
-  camera, taller sizes, and the app handing the week over by itself once
-  the site has the new code.
+  `widgetSnapshot` yet. Once the site had it, the test app handed the week
+  over by itself on leaving the screen, and the widget drew the app's own
+  timers. Still to check: the QR code read by another phone's camera, and
+  taller sizes.
 
 ## Phone notifications (release 7 on)
 

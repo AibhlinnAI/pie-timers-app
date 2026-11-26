@@ -1,0 +1,5 @@
+<resources>
+    <!-- The widget's corners before Android 12, which has no corner of
+         its own to follow. -->
+    <dimen name="widget_radius">20dp</dimen>
+</resources>
