@@ -61,8 +61,11 @@ an email the inbox agent had sorted more than two hours earlier.
   31 Dec 2026.** It first ran in October 2026 ("Launch
   Month": 18 Oct, 1 Nov, 1 Dec), before the app was public. Mal reset it on
   22 Nov 2026, the day Pie Timers went public on Google Play, and revised
-  its terms the same day. `app/foundation.html` is the product-facing
-  source of truth. The hook is **"Pay nothing until 2027"**. It is only
+  its terms the same day. The Foundation Members page is the
+  product-facing source of truth. Since 26 Nov 2026 the page people see
+  is https://premium.aibhlinn.ai/foundation.html (see "The Foundation
+  Members page moved" below); `app/foundation.html` holds the same
+  wording. The hook is **"Pay nothing until 2027"**. It is only
   true with its condition, so it always sits right beside "Subscribe while
   your free trial is running and your first payment is taken from
   1 January 2027." The hook has **no subscribe-by date**. It had one for a
@@ -362,10 +365,29 @@ an email the inbox agent had sorted more than two hours earlier.
     Mal, 25 Nov 2026; Paddle would not approve checkout on aibhlinn.ai,
     which also describes consulting). Its `index.html` and `premium.js`
     carry the offer's wording and an `OFFER_CLOSES` of their own, and
-    must move with the rest. That site calls this repo's `signin` and
+    must move with the rest. So must its `foundation.html` and
+    `foundation.js`, which carry the Foundation page's wording and the
+    pie's `START` and `END` and `FOUNDATION_CLOSES`. That site calls this repo's `signin` and
     `create-checkout` functions, which is why both read a list of
     allowed sites (`ALLOWED_ORIGINS`, with the older `ALLOWED_ORIGIN`
     still counted; `tools/origin-test.mjs` pins the behaviour).
+- **The Foundation Members page moved to the Premium site** (Mal,
+  26 Nov 2026), so it sits with the sale and wears that site's branding.
+  The page people see is https://premium.aibhlinn.ai/foundation.html
+  (`foundation.html` and `foundation.js` in the
+  `AibhlinnAI/premium.aibhlinn.ai` repo). `app/foundation.html` here is
+  hidden, not deleted: it asks search engines to leave it out and sends a
+  visit to the new address, after the Play gate, with a plain link at
+  the top as the fallback. **Never delete it or rename it**: the old
+  address, `pietimers.aibhlinn.ai/foundation.html`, is in the launch
+  emails and in the LinkedIn, Instagram and Discord posts of 26 Nov
+  2026. The wording is the same in both files, so **change one and
+  change the other**, and the dates in `foundation.js` (`START`, `END`,
+  `FOUNDATION_CLOSES`) are on the "launch dates live in several places"
+  list. `tools/foundation-test.mjs` still pins the copy here, and its H5
+  checks pin the redirect; nothing tests the Premium site's copy. To
+  bring the page back here: set `FOUNDATION_PAGE` to `''` in the head of
+  `app/foundation.html` and take out the robots line and the notice.
 - **The checkout on pietimers.aibhlinn.ai is hidden, not deleted** (Mal,
   25 Nov 2026). Premium is bought on https://premium.aibhlinn.ai. Every
   offer in the web app links there: the header button, both Premium

@@ -1109,6 +1109,13 @@ real phone checks it against Google.
 > checkout in this repo, which is kept working so the old route can be
 > switched back (see CLAUDE.md, "hidden, not deleted"). Tests A to E in
 > 8.4 were run against this site's checkout before the move.
+>
+> **Since 26 Nov 2026 the Foundation Members page is
+> https://premium.aibhlinn.ai/foundation.html**, in the same repo.
+> `foundation.html` on this site is hidden, not deleted, and sends a
+> visit there. Wherever a step below says to open `foundation.html`,
+> the page that opens is the one on the Premium site. Its wording and
+> dates are held in both places and must be changed in both.
 
 Paddle will ask for your terms and privacy URLs during seller verification:
 
